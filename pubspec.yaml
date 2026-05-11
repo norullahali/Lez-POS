@@ -37,6 +37,10 @@ dependencies:
 
   esc_pos_utils_plus: ^2.0.4
 
+  # Windows RAW printer API — required at runtime by RawWindowsPrinter.
+  win32: ^5.5.0
+  ffi: ^2.1.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -46,12 +50,11 @@ dev_dependencies:
   riverpod_generator: ^2.4.0
   custom_lint: ^0.6.0
   riverpod_lint: ^2.3.10
-  win32: ^5.5.0
-  ffi: ^2.1.0
 
 flutter:
   uses-material-design: true
   generate: true
+
   assets:
-    - assets/fonts/NotoSansArabic-Regular.ttf
+    - assets/fonts/
     - assets/images/

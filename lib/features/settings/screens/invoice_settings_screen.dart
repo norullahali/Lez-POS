@@ -15,26 +15,43 @@ class InvoiceSettingsScreen extends StatefulWidget {
 
 class _InvoiceSettingsScreenState extends State<InvoiceSettingsScreen> {
   final _storeNameCtrl = TextEditingController();
+  final _phoneCtrl = TextEditingController();
+  final _addressCtrl = TextEditingController();
   final _footerCtrl = TextEditingController();
+  final _footer2Ctrl = TextEditingController();
 
   bool showTax = true;
+  bool showQr = false;
   String? logoPath;
 
   @override
   void initState() {
     super.initState();
     _loadSettings();
-    // Trigger rebuild on every keystroke so the live preview updates instantly.
-    _storeNameCtrl.addListener(_onFieldChanged);
-    _footerCtrl.addListener(_onFieldChanged);
+    // Rebuild on every keystroke so the live preview updates instantly.
+    for (final c in [
+      _storeNameCtrl,
+      _phoneCtrl,
+      _addressCtrl,
+      _footerCtrl,
+      _footer2Ctrl,
+    ]) {
+      c.addListener(_onFieldChanged);
+    }
   }
 
   @override
   void dispose() {
-    _storeNameCtrl.removeListener(_onFieldChanged);
-    _footerCtrl.removeListener(_onFieldChanged);
-    _storeNameCtrl.dispose();
-    _footerCtrl.dispose();
+    for (final c in [
+      _storeNameCtrl,
+      _phoneCtrl,
+      _addressCtrl,
+      _footerCtrl,
+      _footer2Ctrl,
+    ]) {
+      c.removeListener(_onFieldChanged);
+      c.dispose();
+    }
     super.dispose();
   }
 
@@ -44,8 +61,12 @@ class _InvoiceSettingsScreenState extends State<InvoiceSettingsScreen> {
     final prefs = await SharedPreferences.getInstance();
     logoPath = prefs.getString('store_logo');
     _storeNameCtrl.text = prefs.getString('store_name') ?? '';
+    _phoneCtrl.text = prefs.getString('store_phone') ?? '';
+    _addressCtrl.text = prefs.getString('store_address') ?? '';
     _footerCtrl.text = prefs.getString('invoice_footer') ?? '';
+    _footer2Ctrl.text = prefs.getString('invoice_footer2') ?? '';
     showTax = prefs.getBool('show_tax') ?? true;
+    showQr = prefs.getBool('show_qr') ?? false;
     setState(() {});
   }
 
@@ -53,8 +74,12 @@ class _InvoiceSettingsScreenState extends State<InvoiceSettingsScreen> {
     final prefs = await SharedPreferences.getInstance();
     if (logoPath != null) await prefs.setString('store_logo', logoPath!);
     await prefs.setString('store_name', _storeNameCtrl.text);
+    await prefs.setString('store_phone', _phoneCtrl.text);
+    await prefs.setString('store_address', _addressCtrl.text);
     await prefs.setString('invoice_footer', _footerCtrl.text);
+    await prefs.setString('invoice_footer2', _footer2Ctrl.text);
     await prefs.setBool('show_tax', showTax);
+    await prefs.setBool('show_qr', showQr);
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('تم الحفظ بنجاح')),
@@ -79,13 +104,18 @@ class _InvoiceSettingsScreenState extends State<InvoiceSettingsScreen> {
         children: [
           // ── Left column: settings form ────────────────────────────────────
           SizedBox(
-            width: 400,
+            width: 420,
             child: _SettingsForm(
               storeNameCtrl: _storeNameCtrl,
+              phoneCtrl: _phoneCtrl,
+              addressCtrl: _addressCtrl,
               footerCtrl: _footerCtrl,
+              footer2Ctrl: _footer2Ctrl,
               showTax: showTax,
+              showQr: showQr,
               logoPath: logoPath,
               onShowTaxChanged: (v) => setState(() => showTax = v),
+              onShowQrChanged: (v) => setState(() => showQr = v),
               onPickLogo: _pickLogo,
               onSave: _saveSettings,
             ),
@@ -93,13 +123,16 @@ class _InvoiceSettingsScreenState extends State<InvoiceSettingsScreen> {
 
           const SizedBox(width: 28),
 
-          // ── Right column: live preview ────────────────────────────────────
-          // Injected here — updates in real time as settings change.
+          // Right column: live preview — updates in real time as fields change.
           Expanded(
             child: InvoiceLivePreview(
               storeName: _storeNameCtrl.text,
+              phone: _phoneCtrl.text,
+              address: _addressCtrl.text,
               footerText: _footerCtrl.text,
+              footerText2: _footer2Ctrl.text,
               showTax: showTax,
+              showQr: showQr,
               logoPath: logoPath,
             ),
           ),
@@ -115,19 +148,29 @@ class _InvoiceSettingsScreenState extends State<InvoiceSettingsScreen> {
 
 class _SettingsForm extends StatelessWidget {
   final TextEditingController storeNameCtrl;
+  final TextEditingController phoneCtrl;
+  final TextEditingController addressCtrl;
   final TextEditingController footerCtrl;
+  final TextEditingController footer2Ctrl;
   final bool showTax;
+  final bool showQr;
   final String? logoPath;
   final ValueChanged<bool> onShowTaxChanged;
+  final ValueChanged<bool> onShowQrChanged;
   final VoidCallback onPickLogo;
   final VoidCallback onSave;
 
   const _SettingsForm({
     required this.storeNameCtrl,
+    required this.phoneCtrl,
+    required this.addressCtrl,
     required this.footerCtrl,
+    required this.footer2Ctrl,
     required this.showTax,
+    required this.showQr,
     required this.logoPath,
     required this.onShowTaxChanged,
+    required this.onShowQrChanged,
     required this.onPickLogo,
     required this.onSave,
   });
@@ -167,7 +210,7 @@ class _SettingsForm extends StatelessWidget {
               ],
             ),
 
-            const SizedBox(height: 24),
+            const SizedBox(height: 20),
 
             // ── Store name ──────────────────────────────────────────────────
             TextField(
@@ -180,36 +223,79 @@ class _SettingsForm extends StatelessWidget {
               ),
             ),
 
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
 
-            // ── Footer text ─────────────────────────────────────────────────
+            // ── Phone number ────────────────────────────────────────────────
+            TextField(
+              controller: phoneCtrl,
+              keyboardType: TextInputType.phone,
+              decoration: const InputDecoration(
+                labelText: 'رقم الهاتف',
+                hintText: 'مثال: 07700000000',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.phone_rounded),
+              ),
+            ),
+
+            const SizedBox(height: 12),
+
+            // ── Store address ───────────────────────────────────────────────
+            TextField(
+              controller: addressCtrl,
+              decoration: const InputDecoration(
+                labelText: 'عنوان المحل',
+                hintText: 'مثال: شارع السعدون، بغداد',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.location_on_rounded),
+              ),
+            ),
+
+            const SizedBox(height: 12),
+
+            // ── Footer line 1 ───────────────────────────────────────────────
             TextField(
               controller: footerCtrl,
               maxLines: 2,
               decoration: const InputDecoration(
-                labelText: 'نص أسفل الفاتورة',
-                hintText: 'مثال: شكراً لزيارتكم، نتمنى لكم يوماً سعيداً',
+                labelText: 'نص أسفل الفاتورة (السطر الأول)',
+                hintText: 'مثال: شكراً لزيارتكم',
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.text_fields_rounded),
               ),
             ),
 
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
 
-            // ── Show tax toggle ─────────────────────────────────────────────
-            Card(
-              margin: EdgeInsets.zero,
-              elevation: 0,
-              color: Theme.of(context).colorScheme.surfaceContainerHighest,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8)),
-              child: SwitchListTile(
-                title: const Text('إظهار الضريبة'),
-                subtitle: const Text('تضمين ضريبة 15% في الفاتورة'),
-                value: showTax,
-                onChanged: onShowTaxChanged,
-                secondary: const Icon(Icons.percent_rounded),
+            // ── Footer line 2 (extra) ───────────────────────────────────────
+            TextField(
+              controller: footer2Ctrl,
+              decoration: const InputDecoration(
+                labelText: 'نص إضافي (السطر الثاني)',
+                hintText: 'مثال: نتمنى لكم يوماً سعيداً',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.notes_rounded),
               ),
+            ),
+
+            const SizedBox(height: 12),
+
+            // ── Toggles group ───────────────────────────────────────────────
+            _toggle(
+              context,
+              icon: Icons.percent_rounded,
+              title: 'إظهار الضريبة',
+              subtitle: 'تضمين ضريبة 15% في الفاتورة',
+              value: showTax,
+              onChanged: onShowTaxChanged,
+            ),
+            const SizedBox(height: 8),
+            _toggle(
+              context,
+              icon: Icons.qr_code_rounded,
+              title: 'إظهار رمز QR',
+              subtitle: 'إضافة رمز QR في أسفل الفاتورة',
+              value: showQr,
+              onChanged: onShowQrChanged,
             ),
 
             const SizedBox(height: 16),
@@ -291,6 +377,31 @@ class _SettingsForm extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _toggle(
+    BuildContext context, {
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required bool value,
+    required ValueChanged<bool> onChanged,
+  }) {
+    return Card(
+      margin: EdgeInsets.zero,
+      elevation: 0,
+      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+      shape:
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      child: SwitchListTile(
+        title: Text(title),
+        subtitle: Text(subtitle),
+        value: value,
+        onChanged: onChanged,
+        secondary: Icon(icon),
+        dense: true,
       ),
     );
   }

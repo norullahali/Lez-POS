@@ -1,6 +1,7 @@
 // lib/features/products/repositories/products_repository.dart
 import 'package:drift/drift.dart';
 import '../../../core/database/app_database.dart';
+import '../../../core/utils/number_parser.dart';
 import '../models/product_model.dart';
 
 class ProductsRepository {
@@ -24,12 +25,14 @@ class ProductsRepository {
   }
 
   Future<List<ProductModel>> search(String query) async {
-    final rows = await _db.productsDao.searchProducts(query);
+    // Normalize digits so Arabic '٤٥٦' and English '456' return the same results.
+    final rows = await _db.productsDao.searchProducts(query.normalizeBarcode());
     return rows.map((p) => _toModel(p, p.currentStock)).toList();
   }
 
   Future<ProductModel?> findByBarcode(String barcode) async {
-    final product = await _db.productsDao.findByBarcode(barcode);
+    // Normalize before DB lookup so scanners using Arabic digits still match.
+    final product = await _db.productsDao.findByBarcode(barcode.trim().normalizeBarcode());
     if (product == null) return null;
     return _toModel(product, product.currentStock);
   }
@@ -49,7 +52,7 @@ class ProductsRepository {
     await _db.productsDao.insertProduct(
       ProductsCompanion(
         name: Value(model.name),
-        barcode: Value(model.barcode),
+        barcode: Value(model.barcode.normalizeBarcode()),
         categoryId: Value(model.categoryId),
         supplierId: Value(model.supplierId),
         costPrice: Value(model.costPrice),
@@ -67,7 +70,7 @@ class ProductsRepository {
       ProductsCompanion(
         id: Value(model.id!),
         name: Value(model.name),
-        barcode: Value(model.barcode),
+        barcode: Value(model.barcode.normalizeBarcode()),
         categoryId: Value(model.categoryId),
         supplierId: Value(model.supplierId),
         costPrice: Value(model.costPrice),

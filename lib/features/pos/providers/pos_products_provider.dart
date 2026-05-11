@@ -2,6 +2,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/utils/number_parser.dart';
 import '../../products/models/product_model.dart';
 import '../../products/providers/products_provider.dart';
 import '../models/search_result.dart';
@@ -65,7 +66,9 @@ class PosProductsNotifier extends AsyncNotifier<PosProductsState> {
       if (p.id != null) {
         _internalMap[p.id!] = p;
         if (p.barcode.isNotEmpty) {
-          _internalBarcodeIndex[p.barcode] = p.id!;
+          // Normalize so Arabic-digit barcodes (e.g. ٤٥٦) are indexed as
+          // English digits (456) and scanner input always matches.
+          _internalBarcodeIndex[p.barcode.normalizeBarcode()] = p.id!;
         }
       }
     }
@@ -117,22 +120,27 @@ class PosProductsNotifier extends AsyncNotifier<PosProductsState> {
     }
   }
 
-  /// O(1) Barcode lookup from memory
+  /// O(1) Barcode lookup from memory.
+  /// Input is normalized before lookup so Arabic-digit input (٤٥٦) matches
+  /// the English-digit keys stored in the index (456).
   Future<ProductModel?> findByBarcode(String barcode) async {
     final st = state.valueOrNull;
     if (st == null) return null;
 
-    final id = st.barcodeIndex[barcode];
+    final normalized = barcode.trim().normalizeBarcode();
+    final id = st.barcodeIndex[normalized];
     if (id != null) {
       return st.productsMap[id];
     }
 
-    // Fallback to DB if not found (in case it was just added but not synced yet)
+    // Fallback to DB if not found (product added after last cache refresh)
     final repo = ref.read(productsRepositoryProvider);
-    final product = await repo.findByBarcode(barcode);
+    final product = await repo.findByBarcode(normalized);
     if (product != null && product.id != null) {
       _internalMap[product.id!] = product;
-      if (product.barcode.isNotEmpty) _internalBarcodeIndex[product.barcode] = product.id!;
+      if (product.barcode.isNotEmpty) {
+        _internalBarcodeIndex[product.barcode.normalizeBarcode()] = product.id!;
+      }
       _rebuildIndex();
       state = AsyncValue.data(PosProductsState(
         productsMap: Map.of(_internalMap),
@@ -149,7 +157,7 @@ class PosProductsNotifier extends AsyncNotifier<PosProductsState> {
 
     _internalMap[product.id!] = product;
     if (product.barcode.isNotEmpty) {
-      _internalBarcodeIndex[product.barcode] = product.id!;
+      _internalBarcodeIndex[product.barcode.normalizeBarcode()] = product.id!;
     }
 
     _rebuildIndex();
@@ -167,7 +175,7 @@ class PosProductsNotifier extends AsyncNotifier<PosProductsState> {
   void removeProduct(int id) {
     final p = _internalMap.remove(id);
     if (p != null && p.barcode.isNotEmpty) {
-      _internalBarcodeIndex.remove(p.barcode);
+      _internalBarcodeIndex.remove(p.barcode.normalizeBarcode());
     }
 
     _rebuildIndex();
@@ -239,7 +247,8 @@ final filteredPosProductsProvider = Provider<List<ProductModel>>((ref) {
 
   if (posState == null) return [];
 
-  final query = ref.watch(posSearchQueryProvider).toLowerCase();
+  // Normalize digits before comparison so Arabic-digit queries match English-stored barcodes.
+  final query = ref.watch(posSearchQueryProvider).normalizeBarcode().toLowerCase();
   final categoryId = ref.watch(posCategoryFilterProvider);
 
   final allProducts = posState.productsMap.values;

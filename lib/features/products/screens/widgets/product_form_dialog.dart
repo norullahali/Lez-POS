@@ -129,7 +129,9 @@ class _ProductFormDialogState extends ConsumerState<ProductFormDialog> {
     Navigator.pop(context, ProductModel(
       id: widget.existing?.id,
       name: _nameCtrl.text.trim(),
-      barcode: _barcodeCtrl.text.trim(),
+      // Normalize Arabic/Persian digits so all stored barcodes are ASCII.
+      // Example: '٤٥٦٤٥٧' → '456457'
+      barcode: _barcodeCtrl.text.trim().normalizeBarcode(),
       categoryId: _categoryId,
       supplierId: _supplierId,
       costPrice: _costCtrl.text.tryParseArabicDouble() ?? 0,

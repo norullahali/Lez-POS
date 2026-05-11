@@ -112,7 +112,7 @@ class AppDatabase extends _$AppDatabase {
   late final pricingDao = PricingDao(this);
 
   @override
-  int get schemaVersion => 17;
+  int get schemaVersion => 18;
 
   @override
   MigrationStrategy get migration {
@@ -497,6 +497,31 @@ class AppDatabase extends _$AppDatabase {
             );
           } catch (e) {
             debugPrint('skip: $e');
+          }
+        }
+
+        if (from < 18) {
+          // Normalise any Eastern-Arabic (٠-٩) and Persian (۰-۹) digits that
+          // were previously stored in the barcode column to ASCII digits (0-9).
+          // SQLite REPLACE() is idempotent: already-English barcodes are unchanged.
+          debugPrint('[Migration] v18: normalising Arabic/Persian digits in product barcodes...');
+          try {
+            await customStatement('''
+              UPDATE products SET barcode =
+                REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+                REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+                REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+                REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+                  barcode,
+                  '٠','0'),'١','1'),'٢','2'),'٣','3'),'٤','4'),
+                  '٥','5'),'٦','6'),'٧','7'),'٨','8'),'٩','9'),
+                  '۰','0'),'۱','1'),'۲','2'),'۳','3'),'۴','4'),
+                  '۵','5'),'۶','6'),'۷','7'),'۸','8'),'۹','9')
+              WHERE barcode IS NOT NULL AND barcode != ''
+            ''');
+            debugPrint('[Migration] v18: barcode normalisation complete');
+          } catch (e) {
+            debugPrint('[Migration] v18: barcode normalisation error: $e');
           }
         }
       },

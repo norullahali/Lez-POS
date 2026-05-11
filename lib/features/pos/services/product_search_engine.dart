@@ -13,6 +13,7 @@
 // Performance target: < 50 ms for 50,000 products.
 
 import 'package:flutter/material.dart';
+import '../../../core/utils/number_parser.dart';
 import '../../products/models/product_model.dart';
 import '../models/search_result.dart';
 
@@ -204,7 +205,9 @@ class ProductSearchEngine {
       entries.add(_IndexEntry(
         productId: p.id!,
         normName: normalizeArabic(p.name),
-        normBarcode: p.barcode.toLowerCase(),
+        // normalizeBarcode converts Arabic/Persian digits (٠-٩, ۰-۹) to ASCII
+        // so a stored barcode like '٤٥٦' is indexed as '456'.
+        normBarcode: p.barcode.normalizeBarcode().toLowerCase(),
         normCategory: normalizeArabic(p.categoryName ?? ''),
       ));
     }
@@ -228,7 +231,9 @@ class ProductSearchEngine {
   ///   If [rawQuery] is an extension of [_lastQuery], we only scan
   ///   [_lastCandidates] instead of the full [_index].
   List<SearchResult> search(String rawQuery, {int maxResults = 20}) {
-    final normQuery = normalizeArabic(rawQuery.trim());
+    // Normalize Arabic/Persian digits BEFORE the general Arabic normalisation so
+    // a query like '٤٥٦' becomes '456' and matches the English-digit index entries.
+    final normQuery = normalizeArabic(rawQuery.trim().normalizeBarcode());
 
     if (normQuery.isEmpty) {
       _lastQuery = '';

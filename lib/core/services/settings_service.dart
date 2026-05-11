@@ -4,6 +4,7 @@ import 'package:drift/drift.dart' show Variable;
 import 'package:flutter/foundation.dart';
 import '../constants/loyalty_config.dart';
 import '../database/app_database.dart';
+import '../printing/printer_config.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 // ── Setting key constants ─────────────────────────────────────────────────────
@@ -16,6 +17,9 @@ abstract class SettingsKeys {
   static const String storeLogoPath = 'store_logo_path';
   static const String phone = 'phone';
   static const String address = 'address';
+  // Invoice display
+  static const String invoiceFooter = 'invoice_footer';
+  static const String showTax = 'show_tax';
 }
 
 // ── Service ───────────────────────────────────────────────────────────────────
@@ -24,25 +28,99 @@ class SettingsService {
   final AppDatabase _db;
   SettingsService(this._db);
 
+  // ── Printer configuration ──────────────────────────────────────────────────
+
+  /// Loads the full printer configuration from app_settings.
+  ///
+  /// Falls back to [PrinterConfig.defaults] when no settings are persisted.
+  /// For backward compatibility, if [printer_type] is absent from the DB it
+  /// also checks SharedPreferences (where it was stored in older versions).
+  Future<PrinterConfig> getPrinterConfig() async {
+    // Resolve printer type — check DB first, then legacy SharedPrefs.
+    String? typeRaw = await _getRaw(PrinterSettingsKeys.printerType);
+    if (typeRaw == null || typeRaw.isEmpty) {
+      final prefs = await SharedPreferences.getInstance();
+      typeRaw = prefs.getString('printer_type');
+    }
+    final type = PrinterType.values.firstWhere(
+      (t) => t.name == typeRaw,
+      orElse: () => PrinterType.pdf,
+    );
+
+    final printerName = await _getRaw(PrinterSettingsKeys.printerName);
+    final printerIp = await _getRaw(PrinterSettingsKeys.printerIp);
+    final portRaw = await _getRaw(PrinterSettingsKeys.printerPort);
+    final printerPort = int.tryParse(portRaw ?? '') ?? 9100;
+    final bluetoothDeviceId = await _getRaw(PrinterSettingsKeys.bluetoothDeviceId);
+    final paperSizeRaw = await _getRaw(PrinterSettingsKeys.receiptPaperSize);
+    final paperSize = PrinterConfig.parsePaperSize(paperSizeRaw);
+
+    return PrinterConfig(
+      type: type,
+      printerName: printerName,
+      printerIp: printerIp,
+      printerPort: printerPort,
+      bluetoothDeviceId: bluetoothDeviceId,
+      paperSize: paperSize,
+    );
+  }
+
+  /// Persists all printer settings to app_settings.
+  Future<void> savePrinterConfig(PrinterConfig config) async {
+    await _setRaw(PrinterSettingsKeys.printerType, config.type.name);
+    await _setRaw(PrinterSettingsKeys.receiptPaperSize,
+        PrinterConfig.paperSizeToString(config.paperSize));
+    if (config.printerName != null && config.printerName!.isNotEmpty) {
+      await _setRaw(PrinterSettingsKeys.printerName, config.printerName!);
+    }
+    if (config.printerIp != null && config.printerIp!.isNotEmpty) {
+      await _setRaw(PrinterSettingsKeys.printerIp, config.printerIp!);
+    }
+    await _setRaw(PrinterSettingsKeys.printerPort, config.printerPort.toString());
+    if (config.bluetoothDeviceId != null && config.bluetoothDeviceId!.isNotEmpty) {
+      await _setRaw(PrinterSettingsKeys.bluetoothDeviceId, config.bluetoothDeviceId!);
+    }
+    debugPrint('[SettingsService] Printer config saved: $config');
+  }
+
+  /// Legacy setter — kept for backward compatibility.
+  /// Prefer [savePrinterConfig] going forward.
   Future<void> setPrinterType(String type) async {
+    await _setRaw(PrinterSettingsKeys.printerType, type);
+    // Also update SharedPreferences for any code still reading from there.
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('printer_type', type);
   }
 
+  /// Legacy getter — kept for backward compatibility.
+  /// Prefer [getPrinterConfig] going forward.
   Future<String> getPrinterType() async {
+    final fromDb = await _getRaw(PrinterSettingsKeys.printerType);
+    if (fromDb != null && fromDb.isNotEmpty) return fromDb;
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString('printer_type') ?? 'pdf';
   }
 
-  Future<String?> getInvoiceFooter() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('invoice_footer');
+  // ── Invoice display ────────────────────────────────────────────────────────
+
+  Future<String?> getInvoiceFooter() => _getRaw(SettingsKeys.invoiceFooter);
+
+  Future<void> setInvoiceFooter(String? v) async {
+    if (v == null || v.isEmpty) {
+      await _db.customStatement(
+          'DELETE FROM app_settings WHERE key = ?', [SettingsKeys.invoiceFooter]);
+    } else {
+      await _setRaw(SettingsKeys.invoiceFooter, v);
+    }
   }
 
   Future<bool> getShowTax() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool('show_tax') ?? true;
+    final v = await _getRaw(SettingsKeys.showTax);
+    if (v == null) return true;
+    return v == '1' || v.toLowerCase() == 'true';
   }
+
+  Future<void> setShowTax(bool v) => _setRaw(SettingsKeys.showTax, v ? '1' : '0');
 
   // ── Low-level helpers ─────────────────────────────────────────────────────
 
@@ -206,12 +284,5 @@ class LoyaltySettings {
   }
 }
 
-Future<void> setPrinterType(String type) async {
-  final prefs = await SharedPreferences.getInstance();
-  await prefs.setString('printer_type', type);
-}
-
-Future<String> getPrinterType() async {
-  final prefs = await SharedPreferences.getInstance();
-  return prefs.getString('printer_type') ?? 'pdf'; // default
-}
+// Legacy top-level functions removed — use SettingsService.setPrinterType /
+// SettingsService.getPrinterConfig instead.

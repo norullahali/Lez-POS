@@ -10,28 +10,21 @@ class InventoryRepository {
 
   Future<List<StockOverviewItem>> getStockOverview() async {
     try {
-      debugPrint('[InventoryRepository] getStockOverview: fetching products + stocks...');
+      debugPrint('[InventoryRepository] getStockOverview: fetching products...');
       final products = await _db.productsDao.getAllProducts();
-      final stocks = await _db.stockDao.getAllStocks();
       debugPrint('[InventoryRepository] getStockOverview: found ${products.length} products.');
-      return products.map((p) {
-        final stock = stocks[p.id] ?? 0.0;
-        return StockOverviewItem(
-          productId: p.id,
-          name: p.name,
-          barcode: p.barcode,
-          currentStock: stock,
-          minStock: p.minStock,
-          unit: p.unit,
-          costPrice: p.costPrice,
-          sellPrice: p.sellPrice,
-          stockValue: stock * p.costPrice,
-        );
-      }).toList();
+      return products.map(_toOverviewItem).toList();
     } catch (e, st) {
       debugPrint('[InventoryRepository] getStockOverview error: $e\n$st');
       rethrow;
     }
+  }
+
+  /// Reactive stream — re-emits a fresh list whenever products.current_stock changes.
+  Stream<List<StockOverviewItem>> watchStockOverview() {
+    return _db.productsDao.watchAllProducts().map(
+      (rows) => rows.map(_toOverviewItem).toList(),
+    );
   }
 
   Future<List<Map<String, dynamic>>> getLowStockProducts() async {
@@ -43,6 +36,23 @@ class InventoryRepository {
       rethrow;
     }
   }
+
+  /// Reactive stream — re-emits whenever any product falls below or recovers above min_stock.
+  Stream<List<Map<String, dynamic>>> watchLowStockProducts() {
+    return _db.stockDao.watchLowStockProducts();
+  }
+
+  StockOverviewItem _toOverviewItem(Product p) => StockOverviewItem(
+        productId: p.id,
+        name: p.name,
+        barcode: p.barcode,
+        currentStock: p.currentStock,
+        minStock: p.minStock,
+        unit: p.unit,
+        costPrice: p.costPrice,
+        sellPrice: p.sellPrice,
+        stockValue: p.currentStock * p.costPrice,
+      );
 
   Future<List<Map<String, dynamic>>> getExpiringProducts(int withinDays) async {
     try {

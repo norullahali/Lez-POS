@@ -64,7 +64,7 @@ class PosSaleService {
             final itemWithInvoice = item.copyWith(invoiceId: Value(invoiceId));
             batch.insert(db.saleItems, itemWithInvoice);
 
-            // Add stock ledger entry to batch
+            // Add stock ledger entry to batch (audit trail)
             batch.insert(
               db.stockLedger,
               StockLedgerCompanion(
@@ -77,6 +77,18 @@ class PosSaleService {
             );
           }
         });
+
+        // Decrement current_stock for each item (negative qty handles returns-within-sale)
+        for (final item in items) {
+          await db.customUpdate(
+            'UPDATE products SET current_stock = current_stock - ? WHERE id = ?',
+            variables: [
+              Variable.withReal(item.quantity.value),
+              Variable.withInt(item.productId.value),
+            ],
+            updates: {db.products},
+          );
+        }
 
         // 3. Update CustomerAccount balance/debt if provided
         if (debtAmount != null && debtAmount > 0) {
@@ -194,6 +206,18 @@ class PosSaleService {
           }
         });
 
+        // Increment current_stock for each returned item
+        for (final item in returnedItems) {
+          await db.customUpdate(
+            'UPDATE products SET current_stock = current_stock + ? WHERE id = ?',
+            variables: [
+              Variable.withReal(item.quantity.value),
+              Variable.withInt(item.productId.value),
+            ],
+            updates: {db.products},
+          );
+        }
+
         // 5. Update CustomerAccount balance if refundAmount is provided
         if (refundAmount != null && refundAmount > 0 && customerId != null && customerId != 1) {
           await db.customerAccountsDao.recordReturn(
@@ -260,7 +284,7 @@ class PosSaleService {
               ),
             );
 
-        // 3. Update stock ledger
+        // 3. Update stock ledger (audit trail)
         await db.into(db.stockLedger).insert(
               StockLedgerCompanion.insert(
                 productId: productId,
@@ -270,6 +294,13 @@ class PosSaleService {
                 unitCost: Value(product.costPrice),
               ),
             );
+
+        // Increment current stock
+        await db.customUpdate(
+          'UPDATE products SET current_stock = current_stock + ? WHERE id = ?',
+          variables: [Variable.withReal(quantity), Variable.withInt(productId)],
+          updates: {db.products},
+        );
 
         // 4. Audit Log
         final logDetails = 'Quick Return | Product ID: $productId | Qty: $quantity | Reason: $reason';

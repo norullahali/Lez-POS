@@ -19,21 +19,21 @@ class StockInfo {
 class StockDao extends DatabaseAccessor<AppDatabase> with _$StockDaoMixin {
   StockDao(super.db);
 
-  // Get current stock for one product
+  // Get current stock for one product — reads authoritative products.current_stock
   Future<double> getStock(int productId) async {
     final result = await customSelect(
-      'SELECT COALESCE(SUM(quantity_change), 0.0) as stock FROM stock_ledger WHERE product_id = ?',
+      'SELECT current_stock FROM products WHERE id = ?',
       variables: [Variable.withInt(productId)],
-      readsFrom: {stockLedger},
+      readsFrom: {products},
     ).getSingleOrNull();
-    return (result?.data['stock'] as num?)?.toDouble() ?? 0.0;
+    return (result?.data['current_stock'] as num?)?.toDouble() ?? 0.0;
   }
 
-  // Get stock for all products
+  // Get current stock for all products — reads authoritative products.current_stock
   Future<Map<int, double>> getAllStocks() async {
     final results = await customSelect(
-      'SELECT product_id, COALESCE(SUM(quantity_change), 0.0) as stock FROM stock_ledger GROUP BY product_id',
-      readsFrom: {stockLedger},
+      'SELECT id AS product_id, current_stock AS stock FROM products',
+      readsFrom: {products},
     ).get();
     return {
       for (final row in results)
@@ -41,13 +41,13 @@ class StockDao extends DatabaseAccessor<AppDatabase> with _$StockDaoMixin {
     };
   }
 
-  // Watch stock for one product
+  // Watch current stock for one product — reacts to products.current_stock changes
   Stream<double> watchStock(int productId) {
     return customSelect(
-      'SELECT COALESCE(SUM(quantity_change), 0.0) as stock FROM stock_ledger WHERE product_id = ?',
+      'SELECT current_stock FROM products WHERE id = ?',
       variables: [Variable.withInt(productId)],
-      readsFrom: {stockLedger},
-    ).watchSingle().map((row) => (row.data['stock'] as num?)?.toDouble() ?? 0.0);
+      readsFrom: {products},
+    ).watchSingle().map((row) => (row.data['current_stock'] as num?)?.toDouble() ?? 0.0);
   }
 
   // Insert a ledger entry
@@ -66,20 +66,16 @@ class StockDao extends DatabaseAccessor<AppDatabase> with _$StockDaoMixin {
         ..orderBy([(l) => OrderingTerm.desc(l.createdAt)]))
           .get();
 
-  // Get low stock products (stock < min_stock)
+  // Get low stock products — compares products.current_stock directly (no ledger join)
   Future<List<Map<String, dynamic>>> getLowStockProducts() async {
     try {
       debugPrint('[StockDao] getLowStockProducts: querying...');
       return await customSelect('''
-        SELECT p.id, p.name, p.barcode, p.min_stock, p.unit, p.category_id,
-               COALESCE(SUM(sl.quantity_change), 0) as current_stock
-        FROM products p
-        LEFT JOIN stock_ledger sl ON sl.product_id = p.id
-        WHERE p.is_active = 1
-        GROUP BY p.id
-        HAVING current_stock < p.min_stock
+        SELECT id, name, barcode, min_stock, unit, category_id, current_stock
+        FROM products
+        WHERE is_active = 1 AND current_stock < min_stock
         ORDER BY current_stock ASC
-      ''', readsFrom: {products, stockLedger}).get().then(
+      ''', readsFrom: {products}).get().then(
             (rows) => rows.map((r) => r.data).toList(),
           );
     } catch (e, st) {
@@ -88,25 +84,34 @@ class StockDao extends DatabaseAccessor<AppDatabase> with _$StockDaoMixin {
     }
   }
 
-  // Get inventory value report
+  // Reactive stream of low stock products — re-emits whenever products.current_stock changes
+  Stream<List<Map<String, dynamic>>> watchLowStockProducts() {
+    return customSelect('''
+      SELECT id, name, barcode, min_stock, unit, category_id, current_stock
+      FROM products
+      WHERE is_active = 1 AND current_stock < min_stock
+      ORDER BY current_stock ASC
+    ''', readsFrom: {products}).watch().map(
+          (rows) => rows.map((r) => r.data).toList(),
+        );
+  }
+
+  // Get inventory value report — uses products.current_stock as authoritative source
   Future<List<Map<String, dynamic>>> getInventoryValueReport() async {
     try {
       debugPrint('[StockDao] getInventoryValueReport: querying...');
       final rows = await customSelect('''
-        SELECT 
-          p.id as product_id, 
-          p.name as product_name,
-          p.barcode,
-          p.cost_price,
-          COALESCE(SUM(sl.quantity_change), 0) as current_stock,
-          (COALESCE(SUM(sl.quantity_change), 0) * p.cost_price) as total_value
-        FROM products p
-        LEFT JOIN stock_ledger sl ON sl.product_id = p.id
-        WHERE p.is_active = 1
-        GROUP BY p.id
-        HAVING current_stock > 0
+        SELECT
+          id          AS product_id,
+          name        AS product_name,
+          barcode,
+          cost_price,
+          current_stock,
+          (current_stock * cost_price) AS total_value
+        FROM products
+        WHERE is_active = 1 AND current_stock > 0
         ORDER BY total_value DESC
-      ''', readsFrom: {products, stockLedger}).get();
+      ''', readsFrom: {products}).get();
       return rows.map((r) => r.data).toList();
     } catch (e, st) {
       debugPrint('[StockDao] getInventoryValueReport error: $e\n$st');
@@ -143,6 +148,13 @@ class StockDao extends DatabaseAccessor<AppDatabase> with _$StockDaoMixin {
           quantityChange: Value(quantityChange),
           note: Value('$reason: $note'),
         ),
+      );
+
+      // Apply signed delta to current stock (positive = increase, negative = decrease)
+      await customUpdate(
+        'UPDATE products SET current_stock = current_stock + ? WHERE id = ?',
+        variables: [Variable.withReal(quantityChange), Variable.withInt(productId)],
+        updates: {products},
       );
     });
   }

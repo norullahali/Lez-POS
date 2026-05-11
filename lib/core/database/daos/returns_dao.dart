@@ -64,6 +64,13 @@ class ReturnsDao extends DatabaseAccessor<AppDatabase> with _$ReturnsDaoMixin {
             unitCost: Value(cost),
           ),
         );
+
+        // Increment current stock
+        await customUpdate(
+          'UPDATE products SET current_stock = current_stock + ? WHERE id = ?',
+          variables: [Variable.withReal(qty), Variable.withInt(productId)],
+          updates: {db.products},
+        );
       }
       return returnId;
     });
@@ -112,6 +119,13 @@ class ReturnsDao extends DatabaseAccessor<AppDatabase> with _$ReturnsDaoMixin {
             quantityChange: Value(-qty), // negative = out
             unitCost: Value(cost),
           ),
+        );
+
+        // Decrement current stock
+        await customUpdate(
+          'UPDATE products SET current_stock = current_stock - ? WHERE id = ?',
+          variables: [Variable.withReal(qty), Variable.withInt(productId)],
+          updates: {db.products},
         );
       }
       return returnId;

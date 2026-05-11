@@ -88,12 +88,19 @@ class PurchasesDao extends DatabaseAccessor<AppDatabase> with _$PurchasesDaoMixi
           ),
         );
 
-        // Update cost price on product
-        await (update(products)..where((p) => p.id.equals(productId))).write(
-          ProductsCompanion(costPrice: Value(cost), updatedAt: Value(DateTime.now())),
+        // Update cost price and increment current stock atomically
+        await customUpdate(
+          'UPDATE products SET cost_price = ?, current_stock = current_stock + ?, updated_at = ? WHERE id = ?',
+          variables: [
+            Variable.withReal(cost),
+            Variable.withReal(qty),
+            Variable(DateTime.now()),
+            Variable.withInt(productId),
+          ],
+          updates: {products},
         );
 
-        // Add stock ledger entry
+        // Add stock ledger entry (audit trail)
         await into(stockLedger).insert(
           StockLedgerCompanion(
             productId: Value(productId),

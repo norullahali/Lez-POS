@@ -177,6 +177,13 @@ class SalesDao extends DatabaseAccessor<AppDatabase> with _$SalesDaoMixin {
             unitCost: Value(cost),
           ),
         );
+
+        // Decrement current stock
+        await customUpdate(
+          'UPDATE products SET current_stock = current_stock - ? WHERE id = ?',
+          variables: [Variable.withReal(qty), Variable.withInt(productId)],
+          updates: {db.products},
+        );
       }
       return invoiceId;
     });

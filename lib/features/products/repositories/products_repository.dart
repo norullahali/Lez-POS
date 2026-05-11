@@ -8,48 +8,41 @@ class ProductsRepository {
   ProductsRepository(this._db);
 
   Stream<List<ProductModel>> watchAll() {
-    return _db.productsDao.watchAllProducts().asyncMap((rows) async {
-      final stocks = await _db.stockDao.getAllStocks();
-      return rows.map((p) => _toModel(p, stocks[p.id] ?? 0)).toList();
-    });
+    return _db.productsDao.watchAllProducts().map(
+      (rows) => rows.map((p) => _toModel(p, p.currentStock)).toList(),
+    );
   }
 
   Future<List<ProductModel>> getAll() async {
     final rows = await _db.productsDao.getAllProducts();
-    final stocks = await _db.stockDao.getAllStocks();
-    return rows.map((p) => _toModel(p, stocks[p.id] ?? 0)).toList();
+    return rows.map((p) => _toModel(p, p.currentStock)).toList();
   }
 
   Future<List<ProductModel>> getLimit(int limit, {int offset = 0}) async {
     final rows = await _db.productsDao.getProductsLimit(limit, offset: offset);
-    final stocks = await _db.stockDao.getAllStocks();
-    return rows.map((p) => _toModel(p, stocks[p.id] ?? 0)).toList();
+    return rows.map((p) => _toModel(p, p.currentStock)).toList();
   }
 
   Future<List<ProductModel>> search(String query) async {
     final rows = await _db.productsDao.searchProducts(query);
-    final stocks = await _db.stockDao.getAllStocks();
-    return rows.map((p) => _toModel(p, stocks[p.id] ?? 0)).toList();
+    return rows.map((p) => _toModel(p, p.currentStock)).toList();
   }
 
   Future<ProductModel?> findByBarcode(String barcode) async {
     final product = await _db.productsDao.findByBarcode(barcode);
     if (product == null) return null;
-    final stock = await _db.stockDao.getStock(product.id);
-    return _toModel(product, stock);
+    return _toModel(product, product.currentStock);
   }
 
   Future<List<ProductModel>> getByCategory(int categoryId) async {
     final rows = await _db.productsDao.getProductsByCategory(categoryId);
-    final stocks = await _db.stockDao.getAllStocks();
-    return rows.map((p) => _toModel(p, stocks[p.id] ?? 0)).toList();
+    return rows.map((p) => _toModel(p, p.currentStock)).toList();
   }
 
   Future<ProductModel?> getProductById(int id) async {
     final product = await _db.productsDao.getProductById(id);
     if (product == null) return null;
-    final stock = await _db.stockDao.getStock(id);
-    return _toModel(product, stock);
+    return _toModel(product, product.currentStock);
   }
 
   Future<void> add(ProductModel model) async {

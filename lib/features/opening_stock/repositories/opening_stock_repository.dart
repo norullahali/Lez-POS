@@ -17,14 +17,15 @@ class OpeningStockRepository {
     return ((result?.data['cnt'] as int?) ?? 0) > 0;
   }
 
-  /// Save opening stock - creates a OPENING ledger entry
+  /// Save opening stock — sets current_stock directly and records an OPENING ledger entry.
   Future<void> saveOpeningStock(int productId, double quantity, double unitCost) async {
-    // Remove existing opening entry if any
+    // Remove existing opening ledger entry if any (keeps audit trail clean)
     await _db.customStatement(
       "DELETE FROM stock_ledger WHERE product_id = ? AND movement_type = 'OPENING'",
       [productId],
     );
-    // Insert fresh opening entry
+
+    // Insert fresh opening ledger entry (audit trail only)
     await _db.stockDao.addMovement(
       StockLedgerCompanion(
         productId: Value(productId),
@@ -34,6 +35,13 @@ class OpeningStockRepository {
         unitCost: Value(unitCost),
         note: const Value('رصيد افتتاحي'),
       ),
+    );
+
+    // Set current_stock directly — this is the authoritative write for opening stock
+    await _db.customUpdate(
+      'UPDATE products SET current_stock = ? WHERE id = ?',
+      variables: [Variable.withReal(quantity), Variable.withInt(productId)],
+      updates: {_db.products},
     );
   }
 

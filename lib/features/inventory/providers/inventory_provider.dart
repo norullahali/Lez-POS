@@ -35,18 +35,12 @@ class StockOverviewItem {
   bool get isLowStock => currentStock <= minStock;
 }
 
-class InventoryNotifier extends AsyncNotifier<List<StockOverviewItem>> {
+/// Reactive notifier — auto-updates whenever products.current_stock changes in the DB.
+class InventoryNotifier extends StreamNotifier<List<StockOverviewItem>> {
   @override
-  Future<List<StockOverviewItem>> build() async {
-    try {
-      debugPrint('[InventoryNotifier] build: loading stock overview...');
-      final result = await ref.watch(inventoryRepositoryProvider).getStockOverview();
-      debugPrint('[InventoryNotifier] build: loaded ${result.length} items.');
-      return result;
-    } catch (e, st) {
-      debugPrint('[InventoryNotifier] build error: $e\n$st');
-      rethrow;
-    }
+  Stream<List<StockOverviewItem>> build() {
+    debugPrint('[InventoryNotifier] build: watching stock overview stream...');
+    return ref.watch(inventoryRepositoryProvider).watchStockOverview();
   }
 
   Future<void> refresh() {
@@ -71,7 +65,8 @@ class InventoryNotifier extends AsyncNotifier<List<StockOverviewItem>> {
         note: note,
         createdByUserId: userId,
       );
-      ref.invalidateSelf();
+      // No invalidateSelf needed — watchStockOverview() stream auto-emits
+      // when products.current_stock is updated by createAdjustment()
     } catch (e, st) {
       debugPrint('[InventoryNotifier] adjust error: $e\n$st');
       rethrow;
@@ -80,17 +75,12 @@ class InventoryNotifier extends AsyncNotifier<List<StockOverviewItem>> {
 }
 
 final inventoryNotifierProvider =
-    AsyncNotifierProvider<InventoryNotifier, List<StockOverviewItem>>(InventoryNotifier.new);
+    StreamNotifierProvider<InventoryNotifier, List<StockOverviewItem>>(InventoryNotifier.new);
 
-// Low stock items
-final lowStockProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
-  try {
-    debugPrint('[lowStockProvider] loading...');
-    return await ref.watch(inventoryRepositoryProvider).getLowStockProducts();
-  } catch (e, st) {
-    debugPrint('[lowStockProvider] error: $e\n$st');
-    rethrow;
-  }
+// Low stock items — reactive stream, re-evaluates whenever any current_stock changes
+final lowStockProvider = StreamProvider<List<Map<String, dynamic>>>((ref) {
+  debugPrint('[lowStockProvider] watching low-stock stream...');
+  return ref.watch(inventoryRepositoryProvider).watchLowStockProducts();
 });
 
 // Expiring products

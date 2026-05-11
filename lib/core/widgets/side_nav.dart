@@ -22,23 +22,78 @@ class NavItem {
 }
 
 const kNavItems = [
-  NavItem(route: '/dashboard', icon: Icons.dashboard_rounded, label: 'الرئيسية'),
-  NavItem(route: '/pos', icon: Icons.point_of_sale_rounded, label: 'نقطة البيع', isPrimary: true, permissionKey: 'pos.sell'),
-  NavItem(route: '/products', icon: Icons.inventory_2_rounded, label: 'المنتجات', permissionKey: 'products.view'),
-  NavItem(route: '/categories', icon: Icons.category_rounded, label: 'الفئات', permissionKey: 'products.view'),
-  NavItem(route: '/customers', icon: Icons.people_rounded, label: 'العملاء', permissionKey: 'pos.sell'),
-  NavItem(route: '/suppliers', icon: Icons.local_shipping_rounded, label: 'الموردون', permissionKey: 'purchases.view'),
-  NavItem(route: '/purchases', icon: Icons.receipt_long_rounded, label: 'المشتريات', permissionKey: 'purchases.view'),
-  NavItem(route: '/opening-stock', icon: Icons.start_rounded, label: 'الرصيد الافتتاحي', permissionKey: 'products.edit'),
-  NavItem(route: '/inventory', icon: Icons.warehouse_rounded, label: 'المخزن', permissionKey: 'products.view'),
-  NavItem(route: '/customer-returns', icon: Icons.assignment_return_rounded, label: 'مرتجعات العملاء', permissionKey: 'pos.refund'),
-  NavItem(route: '/supplier-returns', icon: Icons.local_shipping_rounded, label: 'مرتجعات الموردين', permissionKey: 'purchases.edit'),
-  NavItem(route: '/pricing', icon: Icons.local_offer_rounded, label: 'العروض والأسعار', permissionKey: 'settings.edit'),
-  NavItem(route: '/loyalty-settings', icon: Icons.star_rounded, label: 'إعدادات النقاط', permissionKey: 'settings.edit'),
-  NavItem(route: '/reports', icon: Icons.bar_chart_rounded, label: 'التقارير', permissionKey: 'reports.view'),
-  NavItem(route: '/users', icon: Icons.manage_accounts_rounded, label: 'المستخدمون', permissionKey: 'users.manage'),
-  NavItem(route: '/roles', icon: Icons.security_rounded, label: 'الصلاحيات', permissionKey: 'users.manage'),
-  NavItem(route: '/backup', icon: Icons.backup_rounded, label: 'النسخ الاحتياطي', permissionKey: 'settings.edit'),
+  NavItem(
+      route: '/dashboard', icon: Icons.dashboard_rounded, label: 'الرئيسية'),
+  NavItem(
+      route: '/pos',
+      icon: Icons.point_of_sale_rounded,
+      label: 'نقطة البيع',
+      isPrimary: true,
+      permissionKey: 'pos.sell'),
+  NavItem(
+      route: '/products',
+      icon: Icons.inventory_2_rounded,
+      label: 'المنتجات',
+      permissionKey: 'products.view'),
+  NavItem(
+      route: '/categories',
+      icon: Icons.category_rounded,
+      label: 'الفئات',
+      permissionKey: 'products.view'),
+  NavItem(
+      route: '/customers',
+      icon: Icons.people_rounded,
+      label: 'العملاء',
+      permissionKey: 'pos.sell'),
+  NavItem(
+      route: '/suppliers',
+      icon: Icons.local_shipping_rounded,
+      label: 'الموردون',
+      permissionKey: 'purchases.view'),
+  NavItem(
+      route: '/purchases',
+      icon: Icons.receipt_long_rounded,
+      label: 'المشتريات',
+      permissionKey: 'purchases.view'),
+  NavItem(
+      route: '/opening-stock',
+      icon: Icons.start_rounded,
+      label: 'الرصيد الافتتاحي',
+      permissionKey: 'products.edit'),
+  NavItem(
+      route: '/inventory',
+      icon: Icons.warehouse_rounded,
+      label: 'المخزن',
+      permissionKey: 'products.view'),
+  NavItem(
+      route: '/customer-returns',
+      icon: Icons.assignment_return_rounded,
+      label: 'مرتجعات العملاء',
+      permissionKey: 'pos.refund'),
+  NavItem(
+      route: '/supplier-returns',
+      icon: Icons.local_shipping_rounded,
+      label: 'مرتجعات الموردين',
+      permissionKey: 'purchases.edit'),
+  NavItem(
+      route: '/pricing',
+      icon: Icons.local_offer_rounded,
+      label: 'العروض والأسعار',
+      permissionKey: 'settings.edit'),
+  //vItem(route: '/loyalty-settings', icon: Icons.star_rounded, label: 'إعدادات النقاط', permissionKey: 'settings.edit'),
+  NavItem(
+      route: '/reports',
+      icon: Icons.bar_chart_rounded,
+      label: 'التقارير',
+      permissionKey: 'reports.view'),
+  //vItem(route: '/users', icon: Icons.manage_accounts_rounded, label: 'المستخدمون', permissionKey: 'users.manage'),
+  //vItem(route: '/roles', icon: Icons.security_rounded, label: 'الصلاحيات', permissionKey: 'users.manage'),
+  //vItem(route: '/backup', icon: Icons.backup_rounded, label: 'النسخ الاحتياطي', permissionKey: 'settings.edit'),
+  NavItem(
+    route: '/settings',
+    icon: Icons.settings,
+    label: 'الإعدادات',
+  ),
 ];
 
 class SideNav extends ConsumerWidget {
@@ -74,12 +129,16 @@ class SideNav extends ConsumerWidget {
                     color: AppColors.accent,
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Icon(Icons.point_of_sale, color: Colors.white, size: 26),
+                  child: const Icon(Icons.point_of_sale,
+                      color: Colors.white, size: 26),
                 ),
                 const SizedBox(height: 4),
                 const Text(
-                  'ليز POS',
-                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15),
+                  'Lez POS',
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 15),
                 ),
               ],
             ),
@@ -90,7 +149,10 @@ class SideNav extends ConsumerWidget {
           Expanded(
             child: ListView(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              children: visibleItems.map((item) => _NavTile(item: item, isActive: currentRoute == item.route)).toList(),
+              children: visibleItems
+                  .map((item) => _NavTile(
+                      item: item, isActive: currentRoute == item.route))
+                  .toList(),
             ),
           ),
           const Divider(color: Colors.white24, height: 1),
@@ -100,16 +162,21 @@ class SideNav extends ConsumerWidget {
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               child: Row(
                 children: [
-                  const Icon(Icons.person_rounded, color: Colors.white70, size: 20),
+                  const Icon(Icons.person_rounded,
+                      color: Colors.white70, size: 20),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       authState!.user!.fullName,
-                      style: const TextStyle(color: Colors.white, fontSize: 13, overflow: TextOverflow.ellipsis),
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                          overflow: TextOverflow.ellipsis),
                     ),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.logout_rounded, color: Colors.white70, size: 20),
+                    icon: const Icon(Icons.logout_rounded,
+                        color: Colors.white70, size: 20),
                     tooltip: 'تسجيل الخروج',
                     onPressed: () {
                       ref.read(authProvider.notifier).logout();
@@ -124,7 +191,8 @@ class SideNav extends ConsumerWidget {
             padding: const EdgeInsets.all(8),
             child: Text(
               'v1.0.0',
-              style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 11),
+              style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.4), fontSize: 11),
               textAlign: TextAlign.center,
             ),
           ),
@@ -154,7 +222,9 @@ class _NavTile extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
             decoration: BoxDecoration(
               color: isActive
-                  ? (item.isPrimary ? AppColors.accent : Colors.white.withValues(alpha: 0.15))
+                  ? (item.isPrimary
+                      ? AppColors.accent
+                      : Colors.white.withValues(alpha: 0.15))
                   : Colors.transparent,
               borderRadius: BorderRadius.circular(10),
             ),

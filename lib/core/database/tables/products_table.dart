@@ -7,7 +7,8 @@ class Products extends Table {
   IntColumn get id => integer().autoIncrement()();
   TextColumn get name => text().withLength(min: 1, max: 200)();
   TextColumn get barcode => text().withDefault(const Constant(''))();
-  IntColumn get categoryId => integer().nullable().references(Categories, #id)();
+  IntColumn get categoryId =>
+      integer().nullable().references(Categories, #id)();
   IntColumn get supplierId => integer().nullable().references(Suppliers, #id)();
   RealColumn get costPrice => real().withDefault(const Constant(0.0))();
   RealColumn get sellPrice => real().withDefault(const Constant(0.0))();
@@ -16,6 +17,7 @@ class Products extends Table {
   RealColumn get minStock => real().withDefault(const Constant(0.0))();
   BoolColumn get trackExpiry => boolean().withDefault(const Constant(false))();
   BoolColumn get isActive => boolean().withDefault(const Constant(true))();
+  RealColumn get currentStock => real().withDefault(const Constant(0.0))();
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
   DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
 
@@ -25,8 +27,11 @@ class Products extends Table {
       ];
 
   List<Index> get indexes => [
-        Index('products_barcode_idx', 'CREATE INDEX IF NOT EXISTS products_barcode_idx ON products (barcode)'),
-        Index('products_category_idx', 'CREATE INDEX IF NOT EXISTS products_category_idx ON products (category_id)'),
-        Index('products_name_idx', 'CREATE INDEX IF NOT EXISTS products_name_idx ON products (name)'),
+        Index('products_barcode_idx',
+            'CREATE INDEX IF NOT EXISTS products_barcode_idx ON products (barcode)'),
+        Index('products_category_idx',
+            'CREATE INDEX IF NOT EXISTS products_category_idx ON products (category_id)'),
+        Index('products_name_idx',
+            'CREATE INDEX IF NOT EXISTS products_name_idx ON products (name)'),
       ];
 }

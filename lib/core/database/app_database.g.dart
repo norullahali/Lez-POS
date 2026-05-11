@@ -2692,6 +2692,14 @@ class $ProductsTable extends Products with TableInfo<$ProductsTable, Product> {
       defaultConstraints:
           GeneratedColumn.constraintIsAlways('CHECK ("is_active" IN (0, 1))'),
       defaultValue: const Constant(true));
+  static const VerificationMeta _currentStockMeta =
+      const VerificationMeta('currentStock');
+  @override
+  late final GeneratedColumn<double> currentStock = GeneratedColumn<double>(
+      'current_stock', aliasedName, false,
+      type: DriftSqlType.double,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0.0));
   static const VerificationMeta _createdAtMeta =
       const VerificationMeta('createdAt');
   @override
@@ -2722,6 +2730,7 @@ class $ProductsTable extends Products with TableInfo<$ProductsTable, Product> {
         minStock,
         trackExpiry,
         isActive,
+        currentStock,
         createdAt,
         updatedAt
       ];
@@ -2792,6 +2801,12 @@ class $ProductsTable extends Products with TableInfo<$ProductsTable, Product> {
       context.handle(_isActiveMeta,
           isActive.isAcceptableOrUnknown(data['is_active']!, _isActiveMeta));
     }
+    if (data.containsKey('current_stock')) {
+      context.handle(
+          _currentStockMeta,
+          currentStock.isAcceptableOrUnknown(
+              data['current_stock']!, _currentStockMeta));
+    }
     if (data.containsKey('created_at')) {
       context.handle(_createdAtMeta,
           createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
@@ -2837,6 +2852,8 @@ class $ProductsTable extends Products with TableInfo<$ProductsTable, Product> {
           .read(DriftSqlType.bool, data['${effectivePrefix}track_expiry'])!,
       isActive: attachedDatabase.typeMapping
           .read(DriftSqlType.bool, data['${effectivePrefix}is_active'])!,
+      currentStock: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}current_stock'])!,
       createdAt: attachedDatabase.typeMapping
           .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
       updatedAt: attachedDatabase.typeMapping
@@ -2863,6 +2880,7 @@ class Product extends DataClass implements Insertable<Product> {
   final double minStock;
   final bool trackExpiry;
   final bool isActive;
+  final double currentStock;
   final DateTime createdAt;
   final DateTime updatedAt;
   const Product(
@@ -2878,6 +2896,7 @@ class Product extends DataClass implements Insertable<Product> {
       required this.minStock,
       required this.trackExpiry,
       required this.isActive,
+      required this.currentStock,
       required this.createdAt,
       required this.updatedAt});
   @override
@@ -2899,6 +2918,7 @@ class Product extends DataClass implements Insertable<Product> {
     map['min_stock'] = Variable<double>(minStock);
     map['track_expiry'] = Variable<bool>(trackExpiry);
     map['is_active'] = Variable<bool>(isActive);
+    map['current_stock'] = Variable<double>(currentStock);
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
     return map;
@@ -2922,6 +2942,7 @@ class Product extends DataClass implements Insertable<Product> {
       minStock: Value(minStock),
       trackExpiry: Value(trackExpiry),
       isActive: Value(isActive),
+      currentStock: Value(currentStock),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
     );
@@ -2943,6 +2964,7 @@ class Product extends DataClass implements Insertable<Product> {
       minStock: serializer.fromJson<double>(json['minStock']),
       trackExpiry: serializer.fromJson<bool>(json['trackExpiry']),
       isActive: serializer.fromJson<bool>(json['isActive']),
+      currentStock: serializer.fromJson<double>(json['currentStock']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
@@ -2963,6 +2985,7 @@ class Product extends DataClass implements Insertable<Product> {
       'minStock': serializer.toJson<double>(minStock),
       'trackExpiry': serializer.toJson<bool>(trackExpiry),
       'isActive': serializer.toJson<bool>(isActive),
+      'currentStock': serializer.toJson<double>(currentStock),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
@@ -2981,6 +3004,7 @@ class Product extends DataClass implements Insertable<Product> {
           double? minStock,
           bool? trackExpiry,
           bool? isActive,
+          double? currentStock,
           DateTime? createdAt,
           DateTime? updatedAt}) =>
       Product(
@@ -2996,6 +3020,7 @@ class Product extends DataClass implements Insertable<Product> {
         minStock: minStock ?? this.minStock,
         trackExpiry: trackExpiry ?? this.trackExpiry,
         isActive: isActive ?? this.isActive,
+        currentStock: currentStock ?? this.currentStock,
         createdAt: createdAt ?? this.createdAt,
         updatedAt: updatedAt ?? this.updatedAt,
       );
@@ -3018,6 +3043,9 @@ class Product extends DataClass implements Insertable<Product> {
       trackExpiry:
           data.trackExpiry.present ? data.trackExpiry.value : this.trackExpiry,
       isActive: data.isActive.present ? data.isActive.value : this.isActive,
+      currentStock: data.currentStock.present
+          ? data.currentStock.value
+          : this.currentStock,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
@@ -3038,6 +3066,7 @@ class Product extends DataClass implements Insertable<Product> {
           ..write('minStock: $minStock, ')
           ..write('trackExpiry: $trackExpiry, ')
           ..write('isActive: $isActive, ')
+          ..write('currentStock: $currentStock, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -3058,6 +3087,7 @@ class Product extends DataClass implements Insertable<Product> {
       minStock,
       trackExpiry,
       isActive,
+      currentStock,
       createdAt,
       updatedAt);
   @override
@@ -3076,6 +3106,7 @@ class Product extends DataClass implements Insertable<Product> {
           other.minStock == this.minStock &&
           other.trackExpiry == this.trackExpiry &&
           other.isActive == this.isActive &&
+          other.currentStock == this.currentStock &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
 }
@@ -3093,6 +3124,7 @@ class ProductsCompanion extends UpdateCompanion<Product> {
   final Value<double> minStock;
   final Value<bool> trackExpiry;
   final Value<bool> isActive;
+  final Value<double> currentStock;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
   const ProductsCompanion({
@@ -3108,6 +3140,7 @@ class ProductsCompanion extends UpdateCompanion<Product> {
     this.minStock = const Value.absent(),
     this.trackExpiry = const Value.absent(),
     this.isActive = const Value.absent(),
+    this.currentStock = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
   });
@@ -3124,6 +3157,7 @@ class ProductsCompanion extends UpdateCompanion<Product> {
     this.minStock = const Value.absent(),
     this.trackExpiry = const Value.absent(),
     this.isActive = const Value.absent(),
+    this.currentStock = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
   }) : name = Value(name);
@@ -3140,6 +3174,7 @@ class ProductsCompanion extends UpdateCompanion<Product> {
     Expression<double>? minStock,
     Expression<bool>? trackExpiry,
     Expression<bool>? isActive,
+    Expression<double>? currentStock,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
   }) {
@@ -3156,6 +3191,7 @@ class ProductsCompanion extends UpdateCompanion<Product> {
       if (minStock != null) 'min_stock': minStock,
       if (trackExpiry != null) 'track_expiry': trackExpiry,
       if (isActive != null) 'is_active': isActive,
+      if (currentStock != null) 'current_stock': currentStock,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
     });
@@ -3174,6 +3210,7 @@ class ProductsCompanion extends UpdateCompanion<Product> {
       Value<double>? minStock,
       Value<bool>? trackExpiry,
       Value<bool>? isActive,
+      Value<double>? currentStock,
       Value<DateTime>? createdAt,
       Value<DateTime>? updatedAt}) {
     return ProductsCompanion(
@@ -3189,6 +3226,7 @@ class ProductsCompanion extends UpdateCompanion<Product> {
       minStock: minStock ?? this.minStock,
       trackExpiry: trackExpiry ?? this.trackExpiry,
       isActive: isActive ?? this.isActive,
+      currentStock: currentStock ?? this.currentStock,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -3233,6 +3271,9 @@ class ProductsCompanion extends UpdateCompanion<Product> {
     if (isActive.present) {
       map['is_active'] = Variable<bool>(isActive.value);
     }
+    if (currentStock.present) {
+      map['current_stock'] = Variable<double>(currentStock.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -3257,6 +3298,7 @@ class ProductsCompanion extends UpdateCompanion<Product> {
           ..write('minStock: $minStock, ')
           ..write('trackExpiry: $trackExpiry, ')
           ..write('isActive: $isActive, ')
+          ..write('currentStock: $currentStock, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -15190,6 +15232,7 @@ typedef $$ProductsTableCreateCompanionBuilder = ProductsCompanion Function({
   Value<double> minStock,
   Value<bool> trackExpiry,
   Value<bool> isActive,
+  Value<double> currentStock,
   Value<DateTime> createdAt,
   Value<DateTime> updatedAt,
 });
@@ -15206,6 +15249,7 @@ typedef $$ProductsTableUpdateCompanionBuilder = ProductsCompanion Function({
   Value<double> minStock,
   Value<bool> trackExpiry,
   Value<bool> isActive,
+  Value<double> currentStock,
   Value<DateTime> createdAt,
   Value<DateTime> updatedAt,
 });
@@ -15378,6 +15422,9 @@ class $$ProductsTableFilterComposer
 
   ColumnFilters<bool> get isActive => $composableBuilder(
       column: $table.isActive, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get currentStock => $composableBuilder(
+      column: $table.currentStock, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
       column: $table.createdAt, builder: (column) => ColumnFilters(column));
@@ -15594,6 +15641,10 @@ class $$ProductsTableOrderingComposer
   ColumnOrderings<bool> get isActive => $composableBuilder(
       column: $table.isActive, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<double> get currentStock => $composableBuilder(
+      column: $table.currentStock,
+      builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
       column: $table.createdAt, builder: (column) => ColumnOrderings(column));
 
@@ -15679,6 +15730,9 @@ class $$ProductsTableAnnotationComposer
 
   GeneratedColumn<bool> get isActive =>
       $composableBuilder(column: $table.isActive, builder: (column) => column);
+
+  GeneratedColumn<double> get currentStock => $composableBuilder(
+      column: $table.currentStock, builder: (column) => column);
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
@@ -15898,6 +15952,7 @@ class $$ProductsTableTableManager extends RootTableManager<
             Value<double> minStock = const Value.absent(),
             Value<bool> trackExpiry = const Value.absent(),
             Value<bool> isActive = const Value.absent(),
+            Value<double> currentStock = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
             Value<DateTime> updatedAt = const Value.absent(),
           }) =>
@@ -15914,6 +15969,7 @@ class $$ProductsTableTableManager extends RootTableManager<
             minStock: minStock,
             trackExpiry: trackExpiry,
             isActive: isActive,
+            currentStock: currentStock,
             createdAt: createdAt,
             updatedAt: updatedAt,
           ),
@@ -15930,6 +15986,7 @@ class $$ProductsTableTableManager extends RootTableManager<
             Value<double> minStock = const Value.absent(),
             Value<bool> trackExpiry = const Value.absent(),
             Value<bool> isActive = const Value.absent(),
+            Value<double> currentStock = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
             Value<DateTime> updatedAt = const Value.absent(),
           }) =>
@@ -15946,6 +16003,7 @@ class $$ProductsTableTableManager extends RootTableManager<
             minStock: minStock,
             trackExpiry: trackExpiry,
             isActive: isActive,
+            currentStock: currentStock,
             createdAt: createdAt,
             updatedAt: updatedAt,
           ),

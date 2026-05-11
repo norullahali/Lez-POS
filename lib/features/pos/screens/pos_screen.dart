@@ -6,7 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 import '../../../core/theme/app_colors.dart';
-import '../../../core/services/printing_service.dart';
+import '../../backup/screens/settings_screen.dart';
 import '../../../core/services/settings_service.dart';
 import '../../categories/providers/categories_provider.dart';
 import '../../customers/providers/customer_accounts_provider.dart';
@@ -24,8 +24,42 @@ import 'widgets/payment_dialog.dart';
 import 'widgets/session_dialog.dart';
 import 'widgets/customer_selection_modal.dart';
 import 'widgets/smart_search_bar.dart';
+import 'package:lez_pos/core/services/receipt_service.dart';
+
+import '../models/invoice_models.dart';
 
 final posNfProvider = Provider<NumberFormat>((ref) => NumberFormat('#,##0.##'));
+
+class _PosTopBar extends ConsumerWidget {
+  const _PosTopBar();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Container(
+      height: 50,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      color: AppColors.posPanel,
+      child: Row(
+        children: [
+          IconButton(
+              icon: const Icon(Icons.arrow_back, color: Colors.white),
+              onPressed: () {
+                if (context.canPop()) {
+                  context.pop();
+                } else {
+                  context.go('/dashboard');
+                }
+              }),
+          const Text(
+            'Lez POS',
+            style: TextStyle(color: Colors.white),
+          ),
+          const Spacer(),
+        ],
+      ),
+    );
+  }
+}
 
 class PosScreen extends ConsumerStatefulWidget {
   const PosScreen({super.key});
@@ -40,7 +74,6 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkSession();
-      // Initialize POS products load in background (warm-up)
       ref.read(posProductsProvider);
     });
   }
@@ -58,132 +91,43 @@ class _PosScreenState extends ConsumerState<PosScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // ref.listen must be called here (build phase), not in initState/callbacks
-    ref.listen<CartState>(cartProvider, (prev, next) {
-      if ((prev?.restoredFromStorage ?? false) == false &&
-          next.restoredFromStorage &&
-          mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('تم استرجاع السلات السابقة'),
-            backgroundColor: Colors.teal,
-            duration: Duration(seconds: 3),
-          ),
-        );
-      }
-    });
-
-    // Scaffold builds ONCE. Micro-widgets handle their own state.
-    return KeyboardListener(
-      focusNode: FocusNode(),
-      autofocus: true,
-      onKeyEvent: _handleKeyEvent,
-      child: Scaffold(
-        backgroundColor: AppColors.posBackground,
-        body: Column(
-          children: [
-            const _PosTopBar(),
-            Expanded(
-              child: Row(
-                children: [
-                  // LEFT: Product picker (60%)
-                  Expanded(
-                    flex: 6,
-                    child: Column(
-                      children: [
-                        SmartSearchBar(
-                          onProductSelected: (product) {
-                            final cart = ref.read(cartProvider);
-                            final currentQty = cart.items
-                                .where((i) => i.product.id == product.id)
-                                .fold(0.0, (s, i) => s + i.quantity);
-                            if (product.currentStock <= currentQty) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('المخزون غير كافٍ: ${product.name}'),
-                                  backgroundColor: AppColors.warning,
-                                ),
-                              );
-                              return;
-                            }
-                            ref.read(cartProvider.notifier).addProduct(product);
-                          },
-                          onBarcodeSubmit: (barcode) async {
-                            final product = await ref
-                                .read(posProductsProvider.notifier)
-                                .findByBarcode(barcode);
-                            if (product != null) {
-                              final cart = ref.read(cartProvider);
-                              final currentQty = cart.items
-                                  .where((i) => i.product.id == product.id)
-                                  .fold(0.0, (s, i) => s + i.quantity);
-                              if (product.currentStock <= currentQty) {
-                                if (!context.mounted) return;
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text('المخزون غير كافٍ: ${product.name}'),
-                                    backgroundColor: AppColors.warning,
-                                  ),
-                                );
-                                return;
-                              }
-                              ref.read(cartProvider.notifier).addProduct(product);
-                            } else {
-                              if (!context.mounted) return;
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('المنتج غير موجود: $barcode'),
-                                  backgroundColor: AppColors.error,
-                                  duration: const Duration(seconds: 2),
-                                ),
-                              );
-                            }
-                          },
-                        ),
-                        const _CategoryTabsPanel(),
-                        const SizedBox(height: 8),
-                        const Expanded(child: _ProductGridPanel()),
-                      ],
-                    ),
+    return Scaffold(
+      backgroundColor: AppColors.posBackground,
+      body: Column(
+        children: [
+          const _PosTopBar(),
+          Expanded(
+            child: Row(
+              children: [
+                Expanded(
+                  flex: 6,
+                  child: Column(
+                    children: [
+                      SmartSearchBar(
+                        onProductSelected: (product) {
+                          ref.read(cartProvider.notifier).addProduct(product);
+                        },
+                        onBarcodeSubmit: (barcode) {},
+                      ),
+                      _CategoryTabsPanel(),
+                      SizedBox(height: 8),
+                      Expanded(child: _ProductGridPanel()),
+                    ],
                   ),
-                  // RIGHT: Cart (40%)
-                  Container(
-                    width: 380,
-                    color: AppColors.posCartBg,
-                    child: const _CartPanel(),
-                  ),
-                ],
-              ),
+                ),
+                Container(
+                  width: 380,
+                  color: AppColors.posCartBg,
+                  child: const _CartPanel(),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
-
-  }
-
-  void _handleKeyEvent(KeyEvent event) {
-    if (event is KeyDownEvent) {
-      if (event.logicalKey == LogicalKeyboardKey.f12) {
-        final cart = ref.read(cartProvider);
-        if (cart.items.isNotEmpty) {
-          // Trigger checkout (need a way to call it, maybe via a global event or just keeping checkout logic inside CartPanel)
-        }
-      } else if (event.logicalKey == LogicalKeyboardKey.escape) {
-        ref.read(cartProvider.notifier).clearCart();
-      } else if (event.logicalKey == LogicalKeyboardKey.delete) {
-        final cart = ref.read(cartProvider);
-        final selected = cart.selectedIndex;
-        if (selected != null) {
-          ref.read(cartProvider.notifier).removeItem(selected);
-        }
-      }
-    }
   }
 }
-
-
-
 
 class _CategoryTabsPanel extends ConsumerWidget {
   const _CategoryTabsPanel();
@@ -224,7 +168,7 @@ class _ProductGridPanel extends ConsumerWidget {
   const _ProductGridPanel();
 
   void _addProduct(BuildContext context, WidgetRef ref, ProductModel product) {
-    final cart = ref.read(cartProvider);
+    final cart = ref.watch(cartProvider);
     final currentQty = cart.items
         .where((i) => i.product.id == product.id)
         .fold(0.0, (s, i) => s + i.quantity);
@@ -313,127 +257,6 @@ class _ProductGridPanel extends ConsumerWidget {
   }
 }
 
-class _PosTopBar extends ConsumerWidget {
-  const _PosTopBar();
-
-  Future<void> _closeSession(BuildContext context, WidgetRef ref) async {
-    final closingCashCtrl = TextEditingController(text: '0');
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: AppColors.posPanel,
-        title: const Text('إغلاق جلسة الكاشير',
-            style: TextStyle(color: Colors.white)),
-        content: TextField(
-          controller: closingCashCtrl,
-          style: const TextStyle(color: Colors.white),
-          decoration: const InputDecoration(
-              labelText: 'النقد الختامي',
-              labelStyle: TextStyle(color: Colors.white70)),
-          keyboardType: TextInputType.number,
-          autofocus: true,
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child:
-                  const Text('إلغاء', style: TextStyle(color: Colors.white70))),
-          ElevatedButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('إغلاق الجلسة')),
-        ],
-      ),
-    );
-
-    if (result == true && context.mounted) {
-      final closingCash = double.tryParse(closingCashCtrl.text) ?? 0;
-      final summary =
-          await ref.read(posSessionProvider.notifier).closeSession(closingCash);
-
-      if (context.mounted) {
-        showDialog(
-          context: context,
-          builder: (_) => AlertDialog(
-            backgroundColor: AppColors.posPanel,
-            title: const Text('ملخص الجلسة',
-                style: TextStyle(color: Colors.white)),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _SummaryRow('عدد الفواتير:', '${summary['count'] ?? 0}'),
-                _SummaryRow('إجمالي المبيعات:',
-                    '${NumberFormat('#,##0').format(summary['total'] ?? 0)} د.ع'),
-                _SummaryRow('نقدي:',
-                    '${NumberFormat('#,##0').format(summary['cash'] ?? 0)} د.ع'),
-                _SummaryRow('بطاقة:',
-                    '${NumberFormat('#,##0').format(summary['card'] ?? 0)} د.ع'),
-              ],
-            ),
-            actions: [
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                  context.go('/dashboard');
-                },
-                child: const Text('حسناً'),
-              ),
-            ],
-          ),
-        );
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final sessionAsync = ref.watch(posSessionProvider);
-    final sessionName = sessionAsync.valueOrNull?.cashierName ?? '';
-
-    return Container(
-      height: 52,
-      color: AppColors.posPanel,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Row(
-        children: [
-          IconButton(
-              icon: const Icon(Icons.arrow_back_rounded, color: Colors.white70),
-              onPressed: () => context.go('/dashboard'),
-              tooltip: 'العودة'),
-          const SizedBox(width: 8),
-          const Icon(Icons.point_of_sale_rounded,
-              color: AppColors.accent, size: 22),
-          const SizedBox(width: 8),
-          const Text('ليز POS',
-              style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 16)),
-          const Spacer(),
-          if (sessionName.isNotEmpty) ...[
-            const Icon(Icons.person_rounded, color: Colors.white54, size: 18),
-            const SizedBox(width: 4),
-            Text(sessionName,
-                style: const TextStyle(color: Colors.white70, fontSize: 13)),
-            const SizedBox(width: 16),
-          ],
-          Text('F2:بحث  F12:دفع  Esc:مسح',
-              style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.3), fontSize: 11)),
-          const SizedBox(width: 16),
-          TextButton.icon(
-            icon: const Icon(Icons.logout_rounded,
-                size: 16, color: Colors.white54),
-            label: const Text('إغلاق الجلسة',
-                style: TextStyle(color: Colors.white54, fontSize: 12)),
-            onPressed: () => _closeSession(context, ref),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _CartPanel extends ConsumerStatefulWidget {
   const _CartPanel();
   @override
@@ -452,101 +275,89 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
   /// Prints receipt from a CartSession snapshot.
   /// Used by checkout so the correct cart data is printed even if the
   /// user switches active cart between checkout start and completion.
-  void _printReceiptFromSnapshot({
-    required String invoiceNumber,
-    required CartSession cart,
-    required PaymentInfo payment,
-    required String cashierName,
-    double? currentDebt,
-    double? pointsBefore,
-    double? pointsEarned,
-    double? pointsAfter,
-  }) {
-    final data = ReceiptData(
-      invoiceNumber: invoiceNumber,
-      date: DateTime.now(),
-      items: cart.items
-          .map((i) => ReceiptItem(
-              name: i.product.name,
-              qty: i.quantity,
-              unitPrice: i.unitPrice,
-              discount: i.discount,
-              total: i.lineTotal))
-          .toList(),
-      subtotal: cart.subtotal,
-      discount: cart.invoiceDiscount,
-      total: cart.total,
-      paymentMethod: payment.method,
-      cashPaid: payment.cashPaid,
-      change: payment.change,
-      cashierName: cashierName,
-      customerName: cart.selectedCustomer != null && cart.selectedCustomer!.id != 1 ? cart.selectedCustomer!.name : null,
-      currentDebt: currentDebt,
-      pointsBefore: pointsBefore,
-      pointsEarned: pointsEarned,
-      pointsAfter: pointsAfter,
-    );
-    PrintingService.printReceipt(data).catchError((_) {});
-  }
 
   /// Opens a quick settle-debt dialog — allows paying previous balance from POS.
-  Future<void> _settleDebt(int customerId, double currentBalance, String customerName) async {
-    final amtCtrl = TextEditingController(text: currentBalance.toStringAsFixed(0));
+  Future<void> _settleDebt(
+      int customerId, double currentBalance, String customerName) async {
+    final amtCtrl =
+        TextEditingController(text: currentBalance.toStringAsFixed(0));
     try {
       final result = await showDialog<bool>(
-        context: context,
-        barrierDismissible: false,
-        builder: (dialogCtx) => AlertDialog(
-          backgroundColor: AppColors.posPanel,
-          title: Text('تسوية دين: $customerName',
-              style: const TextStyle(color: Colors.white)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'الرصيد الحالي: ${NumberFormat('#,##0.##').format(currentBalance)} د.ع',
-                style: const TextStyle(color: Colors.orange, fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: amtCtrl,
-                autofocus: true,
-                style: const TextStyle(color: Colors.white, fontSize: 18),
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(
-                  labelText: 'مبلغ الدفع',
-                  labelStyle: TextStyle(color: Colors.white54),
-                  suffixText: 'د.ع',
-                  suffixStyle: TextStyle(color: Colors.white54),
+          context: context,
+          barrierDismissible: false,
+          builder: (dialogCtx) => AlertDialog(
+                backgroundColor: AppColors.posPanel,
+                title: Text('تسوية دين: $customerName',
+                    style: const TextStyle(color: Colors.white)),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'الرصيد الحالي: ${NumberFormat('#,##0.##').format(currentBalance)} د.ع',
+                      style: const TextStyle(
+                          color: Colors.orange, fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: amtCtrl,
+                      autofocus: true,
+                      style: const TextStyle(color: Colors.white, fontSize: 18),
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
+                      decoration: const InputDecoration(
+                        labelText: 'مبلغ الدفع',
+                        labelStyle: TextStyle(color: Colors.white54),
+                        suffixText: 'د.ع',
+                        suffixStyle: TextStyle(color: Colors.white54),
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogCtx, false),
-              child: const Text('إلغاء', style: TextStyle(color: Colors.white54)),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.success),
-              onPressed: () => Navigator.pop(dialogCtx, true),
-              child: const Text('تأكيد الدفع'),
-            ),
-          ],
-        ),
-      );
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(dialogCtx, false),
+                    child: const Text('إلغاء'),
+                  ),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.success,
+                    ),
+                    onPressed: () async {
+                      final cart = ref.watch(cartProvider);
 
+                      await printSale(
+                        invoiceNumber:
+                            DateTime.now().millisecondsSinceEpoch.toString(),
+                        items: cart.items.map((e) {
+                          return InvoiceItem(
+                            name: e.product.name,
+                            qty: e.quantity.toDouble(), // ✅ صححناها
+                            unitPrice: e.product.sellPrice,
+                            lineTotal: e.quantity * e.product.sellPrice,
+                          );
+                        }).toList(),
+                        paid: 0,
+                        change: 0,
+                      );
+
+                      Navigator.pop(dialogCtx, true);
+                    },
+                    child: const Text('تأكيد الدفع'),
+                  ),
+                ],
+              ));
       if (result == true && mounted) {
         final amt = double.tryParse(amtCtrl.text.trim()) ?? 0;
         if (amt <= 0) return;
         await ref.read(posRepositoryProvider).settleDebt(
-          customerId: customerId,
-          amount: amt,
-          note: 'تسوية دين من POS',
-        );
+              customerId: customerId,
+              amount: amt,
+              note: 'تسوية دين من POS',
+            );
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text('تم تسجيل دفعة ${NumberFormat('#,##0.##').format(amt)} د.ع'),
+            content: Text(
+                'تم تسجيل دفعة ${NumberFormat('#,##0.##').format(amt)} د.ع'),
             backgroundColor: AppColors.success,
           ));
         }
@@ -587,18 +398,22 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
     int? approvedByUserId;
     if (activeCartSnapshot.items.any((i) => i.isReturn)) {
       final user = ref.read(authProvider).valueOrNull?.user;
-      if (user != null && user.roleId != 1) { // 1 = Admin (skip)
+      if (user != null && user.roleId != 1) {
+        // 1 = Admin (skip)
         final refundLimit = user.refundLimit;
-        final totalRet = activeCartSnapshot.items.where((i) => i.isReturn).fold(0.0, (s, i) => s + i.lineTotal.abs());
+        final totalRet = activeCartSnapshot.items
+            .where((i) => i.isReturn)
+            .fold(0.0, (s, i) => s + i.lineTotal.abs());
         final nf = ref.read(posNfProvider);
-        
+
         if (totalRet > refundLimit) {
           final approver = await showDialog<User>(
             context: context,
             barrierDismissible: false,
             builder: (_) => ManagerApprovalDialog(
               requiredPermission: 'pos.refund',
-              actionDescription: 'قيمة المرتجع (${nf.format(totalRet)} د.ع) تتجاوز الحد المسموح للكاشير (${nf.format(refundLimit)} د.ع)',
+              actionDescription:
+                  'قيمة المرتجع (${nf.format(totalRet)} د.ع) تتجاوز الحد المسموح للكاشير (${nf.format(refundLimit)} د.ع)',
             ),
           );
           if (approver == null) return; // Cancelled
@@ -629,9 +444,12 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
     }
 
     try {
-      final userId = ref.read(authProvider).valueOrNull?.user?.id;
-      final invoiceNumber = generateInvoiceNumber();
+      final user = ref.read(authProvider).valueOrNull?.user;
 
+      final userId = user?.id;
+      final invoiceNumber = await generateInvoiceNumber();
+
+      // ✅ تنفيذ عملية البيع
       await ref.read(cartProvider.notifier).checkout(
             sessionId: session.id,
             invoiceNumber: invoiceNumber,
@@ -640,12 +458,20 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
             approvedByUserId: approvedByUserId,
           );
 
-      final pointsBefore = selectedCustomer != null && selectedCustomer.id != 1 
-          ? ref.read(customerLoyaltyPointsProvider(selectedCustomer.id)).valueOrNull ?? 0 
+      final items = activeCartSnapshot.items;
+
+      // ✅ طباعة
+
+// أو ترسله للطابعة / viewer
+      final pointsBefore = selectedCustomer != null && selectedCustomer.id != 1
+          ? ref
+                  .read(customerLoyaltyPointsProvider(selectedCustomer.id))
+                  .valueOrNull ??
+              0
           : null;
       double? pointsEarned;
       double? pointsAfter;
-      
+
       final pb = pointsBefore;
       if (pb != null) {
         final settings = SettingsService(AppDatabase.instance);
@@ -658,21 +484,11 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
       }
 
       final currentDebt = payment.method == 'DEBT' || payment.method == 'MIXED'
-          ? (customerBalance - payment.cashPaid + activeCartSnapshot.total) 
+          ? (customerBalance - payment.cashPaid + activeCartSnapshot.total)
           : customerBalance;
 
-      final cashierName = ref.read(authProvider).valueOrNull?.user?.fullName ?? session.cashierName;
-
-      _printReceiptFromSnapshot(
-        invoiceNumber: invoiceNumber,
-        cart: activeCartSnapshot,
-        payment: payment,
-        cashierName: cashierName,
-        currentDebt: currentDebt > 0 ? currentDebt : null,
-        pointsBefore: pointsBefore,
-        pointsEarned: pointsEarned,
-        pointsAfter: pointsAfter,
-      );
+      final cashierName = ref.read(authProvider).valueOrNull?.user?.fullName ??
+          session.cashierName;
 
       // clearCart() resets loyaltyPointsUsed/loyaltyDiscount too.
       ref.read(cartProvider.notifier).clearCart();
@@ -699,8 +515,8 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
       // Roll back loyalty points application on error
       ref.read(cartProvider.notifier).clearLoyaltyPoints();
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('خطأ: $e'), backgroundColor: AppColors.error));
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('خطأ: $e'), backgroundColor: AppColors.error));
     }
   }
 
@@ -793,8 +609,9 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
                         Consumer(builder: (ctx, r, _) {
                           final balAsync = r.watch(customerBalanceProvider(
                               cart.selectedCustomer!.id));
-                          final ptsAsync = r.watch(customerLoyaltyPointsProvider(
-                              cart.selectedCustomer!.id));
+                          final ptsAsync = r.watch(
+                              customerLoyaltyPointsProvider(
+                                  cart.selectedCustomer!.id));
                           final bal = balAsync.valueOrNull ?? 0.0;
                           final pts = ptsAsync.valueOrNull ?? 0.0;
                           final nf = NumberFormat('#,##0.##');
@@ -836,8 +653,8 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
                 if (cart.selectedCustomer != null &&
                     cart.selectedCustomer!.id != 1)
                   Consumer(builder: (ctx, r, _) {
-                    final balAsync = r.watch(customerBalanceProvider(
-                        cart.selectedCustomer!.id));
+                    final balAsync = r.watch(
+                        customerBalanceProvider(cart.selectedCustomer!.id));
                     final bal = balAsync.valueOrNull ?? 0.0;
                     if (bal <= 0) return const SizedBox.shrink();
                     return IconButton(
@@ -847,8 +664,8 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
                       padding: EdgeInsets.zero,
                       constraints:
                           const BoxConstraints(minWidth: 32, minHeight: 32),
-                      onPressed: () => _settleDebt(
-                          cart.selectedCustomer!.id, bal, cart.selectedCustomer!.name),
+                      onPressed: () => _settleDebt(cart.selectedCustomer!.id,
+                          bal, cart.selectedCustomer!.name),
                     );
                   }),
                 if (cart.selectedCustomer != null)
@@ -891,7 +708,7 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
                     return GestureDetector(
                       onTap: () =>
                           ref.read(cartProvider.notifier).selectItem(i),
-                      onLongPress: () => 
+                      onLongPress: () =>
                           ref.read(cartProvider.notifier).toggleReturnItem(i),
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 100),
@@ -910,7 +727,9 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
                                 children: [
                                   Text(item.product.name,
                                       style: TextStyle(
-                                          color: item.isReturn ? Colors.red.shade200 : Colors.white,
+                                          color: item.isReturn
+                                              ? Colors.red.shade200
+                                              : Colors.white,
                                           fontWeight: FontWeight.w600,
                                           fontSize: 13),
                                       maxLines: 1,
@@ -918,48 +737,84 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
                                   if (item.isReturn) ...[
                                     const SizedBox(height: 2),
                                     Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                                      decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(4)),
-                                      child: const Text('إرجاع', style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 4, vertical: 2),
+                                      decoration: BoxDecoration(
+                                          color: Colors.red,
+                                          borderRadius:
+                                              BorderRadius.circular(4)),
+                                      child: const Text('إرجاع',
+                                          style: TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 9,
+                                              fontWeight: FontWeight.bold)),
                                     ),
                                   ],
                                   const SizedBox(height: 2),
                                   Wrap(
                                     spacing: 6,
-                                    crossAxisAlignment: WrapCrossAlignment.center,
+                                    crossAxisAlignment:
+                                        WrapCrossAlignment.center,
                                     children: [
-                                      if (item.originalPrice != item.unitPrice && !item.isFreeItem)
+                                      if (item.originalPrice !=
+                                              item.unitPrice &&
+                                          !item.isFreeItem)
                                         Text(nf.format(item.originalPrice),
                                             style: const TextStyle(
                                                 color: Colors.white38,
                                                 fontSize: 11,
-                                                decoration: TextDecoration.lineThrough)),
-                                      Text(item.isFreeItem ? 'مجاناً' : '${nf.format(item.unitPrice)} د.ع',
+                                                decoration: TextDecoration
+                                                    .lineThrough)),
+                                      Text(
+                                          item.isFreeItem
+                                              ? 'مجاناً'
+                                              : '${nf.format(item.unitPrice)} د.ع',
                                           style: TextStyle(
-                                              color: item.isFreeItem ? AppColors.success : Colors.white54,
-                                              fontWeight: item.isFreeItem ? FontWeight.w700 : FontWeight.w400,
+                                              color: item.isFreeItem
+                                                  ? AppColors.success
+                                                  : Colors.white54,
+                                              fontWeight: item.isFreeItem
+                                                  ? FontWeight.w700
+                                                  : FontWeight.w400,
                                               fontSize: 12)),
-                                      if (item.appliedRuleLabel != null && !item.isFreeItem)
+                                      if (item.appliedRuleLabel != null &&
+                                          !item.isFreeItem)
                                         Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 4, vertical: 1),
                                           decoration: BoxDecoration(
-                                            color: AppColors.warning.withValues(alpha: 0.2),
-                                            borderRadius: BorderRadius.circular(4),
-                                            border: Border.all(color: AppColors.warning.withValues(alpha: 0.5)),
+                                            color: AppColors.warning
+                                                .withValues(alpha: 0.2),
+                                            borderRadius:
+                                                BorderRadius.circular(4),
+                                            border: Border.all(
+                                                color: AppColors.warning
+                                                    .withValues(alpha: 0.5)),
                                           ),
                                           child: Text(item.appliedRuleLabel!,
-                                              style: const TextStyle(color: AppColors.warning, fontSize: 9, fontWeight: FontWeight.w600)),
+                                              style: const TextStyle(
+                                                  color: AppColors.warning,
+                                                  fontSize: 9,
+                                                  fontWeight: FontWeight.w600)),
                                         ),
                                       if (item.isFreeItem)
                                         Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 4, vertical: 1),
                                           decoration: BoxDecoration(
-                                            color: AppColors.success.withValues(alpha: 0.2),
-                                            borderRadius: BorderRadius.circular(4),
-                                            border: Border.all(color: AppColors.success.withValues(alpha: 0.5)),
+                                            color: AppColors.success
+                                                .withValues(alpha: 0.2),
+                                            borderRadius:
+                                                BorderRadius.circular(4),
+                                            border: Border.all(
+                                                color: AppColors.success
+                                                    .withValues(alpha: 0.5)),
                                           ),
                                           child: const Text('مجاني',
-                                              style: TextStyle(color: AppColors.success, fontSize: 9, fontWeight: FontWeight.w600)),
+                                              style: TextStyle(
+                                                  color: AppColors.success,
+                                                  fontSize: 9,
+                                                  fontWeight: FontWeight.w600)),
                                         ),
                                     ],
                                   ),
@@ -968,7 +823,8 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
                             ),
                             // Qty controls
                             Opacity(
-                              opacity: item.isFreeItem || item.isReturn ? 0.5 : 1.0,
+                              opacity:
+                                  item.isFreeItem || item.isReturn ? 0.5 : 1.0,
                               child: IgnorePointer(
                                 ignoring: item.isFreeItem || item.isReturn,
                                 child: Row(
@@ -979,8 +835,8 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
                                             .read(cartProvider.notifier)
                                             .decrementQty(i)),
                                     Padding(
-                                      padding:
-                                          const EdgeInsets.symmetric(horizontal: 8),
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 8),
                                       child: Text(nf.format(item.quantity),
                                           style: const TextStyle(
                                               color: Colors.white,
@@ -999,7 +855,9 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
                             const SizedBox(width: 12),
                             Text('${nf.format(item.lineTotal)} د.ع',
                                 style: TextStyle(
-                                    color: item.isReturn ? Colors.red.shade300 : AppColors.accentLight,
+                                    color: item.isReturn
+                                        ? Colors.red.shade300
+                                        : AppColors.accentLight,
                                     fontWeight: FontWeight.w700,
                                     fontSize: 13)),
                             const SizedBox(width: 4),
@@ -1029,7 +887,8 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
               TextField(
                 controller: _invoiceDiscountCtrl,
                 enabled: canDiscount,
-                style: TextStyle(color: canDiscount ? Colors.white : AppColors.textHint),
+                style: TextStyle(
+                    color: canDiscount ? Colors.white : AppColors.textHint),
                 decoration: InputDecoration(
                   labelText: 'خصم الفاتورة${canDiscount ? "" : " (غير مصرح)"}',
                   labelStyle: const TextStyle(color: Colors.white54),
@@ -1379,8 +1238,7 @@ class _CartTab extends StatelessWidget {
                   style: TextStyle(
                     color: isActive ? Colors.white : Colors.white60,
                     fontSize: 12,
-                    fontWeight:
-                        isActive ? FontWeight.w700 : FontWeight.w400,
+                    fontWeight: isActive ? FontWeight.w700 : FontWeight.w400,
                   ),
                 ),
                 if (onRemove != null) ...[
@@ -1390,9 +1248,7 @@ class _CartTab extends StatelessWidget {
                     child: Icon(
                       Icons.close_rounded,
                       size: 13,
-                      color: isActive
-                          ? Colors.white70
-                          : Colors.white30,
+                      color: isActive ? Colors.white70 : Colors.white30,
                     ),
                   ),
                 ],

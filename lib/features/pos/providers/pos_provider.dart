@@ -10,10 +10,9 @@ import '../../products/models/product_model.dart';
 import '../../pricing/services/pricing_engine.dart';
 import '../../pricing/providers/pricing_provider.dart';
 import '../../../core/services/pos_sale_service.dart';
-import '../../../core/utils/invoice_generator.dart';
-import '../../../core/utils/invoice_pdf_builder.dart';
+
 import 'package:drift/drift.dart' show Value;
-import 'package:printing/printing.dart';
+import '../../../core/services/invoice_number_service.dart';
 
 final posRepositoryProvider = Provider<PosRepository>((ref) {
   return PosRepository(AppDatabase.instance);
@@ -32,14 +31,17 @@ class PosSessionNotifier extends AsyncNotifier<PosSession?> {
 
   Future<void> openSession(String cashierName, double openingCash) async {
     final userId = ref.read(authProvider).valueOrNull?.user?.id;
-    await ref.read(posRepositoryProvider).openSession(cashierName, openingCash, userId);
+    await ref
+        .read(posRepositoryProvider)
+        .openSession(cashierName, openingCash, userId);
     ref.invalidateSelf();
   }
 
   Future<Map<String, dynamic>> closeSession(double closingCash) async {
     final session = state.valueOrNull;
     if (session == null) return {};
-    final summary = await ref.read(posRepositoryProvider).getSessionSummary(session.id);
+    final summary =
+        await ref.read(posRepositoryProvider).getSessionSummary(session.id);
     await ref.read(posRepositoryProvider).closeSession(session.id, closingCash);
     ref.invalidateSelf();
     return summary;
@@ -47,7 +49,8 @@ class PosSessionNotifier extends AsyncNotifier<PosSession?> {
 }
 
 final posSessionProvider =
-    AsyncNotifierProvider<PosSessionNotifier, PosSession?>(PosSessionNotifier.new);
+    AsyncNotifierProvider<PosSessionNotifier, PosSession?>(
+        PosSessionNotifier.new);
 
 // ---- Cart State ----
 class CartState {
@@ -55,7 +58,7 @@ class CartState {
   final int activeCartId;
   final bool restoredFromStorage;
 
-  const CartState({
+  CartState({
     required this.carts,
     required this.activeCartId,
     this.restoredFromStorage = false,
@@ -89,30 +92,31 @@ class CartState {
 }
 
 class CartNotifier extends Notifier<CartState> {
-  static const _kStorageKey = 'pos_carts_v1';
-  static const _kActiveIdKey = 'pos_active_cart_id_v1';
+  static const _kStorageKey = 'pos_carts';
+  static const _kActiveIdKey = 'pos_active_cart';
 
   PricingEngine get _engine => ref.read(pricingEngineProvider);
 
   @override
   CartState build() {
     final userId = ref.read(authProvider).valueOrNull?.user?.id;
+
     final firstCart = CartSession(
       id: 1,
       createdAt: DateTime.now(),
       createdByUserId: userId,
       lastModifiedByUserId: userId,
     );
+
     final defaultState = CartState(
       carts: {1: firstCart},
       activeCartId: 1,
     );
-    // Kick off async restore — will update state when ready.
-    // Errors are caught inside so this never throws.
+
     Future.microtask(() => _loadCartsFromStorage());
+
     return defaultState;
   }
-
   // ── Persistence ───────────────────────────────────────────────────────
 
   Future<void> _saveCartsToStorage() async {
@@ -261,7 +265,7 @@ class CartNotifier extends Notifier<CartState> {
     final allItems = [...withoutFree];
     for (final entry in freeMap.entries) {
       final productId = entry.key;
-      final freeQty   = entry.value;
+      final freeQty = entry.value;
       // Find product model from existing paid items
       final base = paidItems.firstWhere(
         (i) => i.product.id == productId,
@@ -278,7 +282,7 @@ class CartNotifier extends Notifier<CartState> {
     }
 
     _updateActiveCart(state.activeCart.copyWith(
-      items: allItems, 
+      items: allItems,
       selectedIndex: state.selectedIndex,
     ));
   }
@@ -299,7 +303,8 @@ class CartNotifier extends Notifier<CartState> {
     } else {
       final newItem = _applyPricing(product, qty);
       items = [...active.items, newItem];
-      _updateActiveCart(active.copyWith(items: items, selectedIndex: items.length - 1));
+      _updateActiveCart(
+          active.copyWith(items: items, selectedIndex: items.length - 1));
     }
     _syncFreeItems(state.items);
     _saveCartsToStorage();
@@ -324,7 +329,7 @@ class CartNotifier extends Notifier<CartState> {
   void incrementQty(int index) {
     final active = state.activeCart;
     final items = [...active.items];
-    final item  = items[index];
+    final item = items[index];
     if (!item.isFreeItem) {
       final newQty = item.quantity + 1;
       items[index] = _applyPricing(item.product, newQty);
@@ -337,8 +342,9 @@ class CartNotifier extends Notifier<CartState> {
     final active = state.activeCart;
     final items = [...active.items];
     final item = items[index];
-    if (item.isFreeItem) return; // Cannot return algorithmic free items directly
-    
+    if (item.isFreeItem)
+      return; // Cannot return algorithmic free items directly
+
     items[index] = item.copyWith(isReturn: !item.isReturn);
     _updateActiveCart(active.copyWith(items: items));
     _saveCartsToStorage();
@@ -436,7 +442,7 @@ class CartNotifier extends Notifier<CartState> {
   }) async {
     final saleService = ref.read(posSaleServiceProvider);
     final active = state.activeCart;
-    final authUser = ref.read(authProvider).valueOrNull?.user;
+    //final authUser = ref.read(authProvider).valueOrNull?.user;
 
     final sale = SalesInvoicesCompanion(
       sessionId: Value(sessionId),
@@ -454,14 +460,16 @@ class CartNotifier extends Notifier<CartState> {
       customerId: Value(active.selectedCustomer?.id),
     );
 
-    final itemCompanions = active.items.map((item) => SaleItemsCompanion(
-      productId: Value(item.product.id!),
-      quantity: Value(item.effectiveQuantity),
-      unitPrice: Value(item.unitPrice),
-      unitCost: Value(item.product.costPrice),
-      discountAmount: Value(item.discount),
-      total: Value(item.lineTotal),
-    )).toList();
+    final itemCompanions = active.items
+        .map((item) => SaleItemsCompanion(
+              productId: Value(item.product.id!),
+              quantity: Value(item.effectiveQuantity),
+              unitPrice: Value(item.unitPrice),
+              unitCost: Value(item.product.costPrice),
+              discountAmount: Value(item.discount),
+              total: Value(item.lineTotal),
+            ))
+        .toList();
 
     await saleService.processSale(
       invoice: sale,
@@ -473,73 +481,17 @@ class CartNotifier extends Notifier<CartState> {
       approvedByUserId: approvedByUserId,
     );
 
-    final paidAmount = (active.total - payment.debtAmount).clamp(0.0, active.total);
-    final remainingAmount = payment.debtAmount.clamp(0.0, active.total);
-    final invoiceData = InvoiceGenerator().generateInvoiceData(
-      invoiceNumber: invoiceNumber,
-      date: DateTime.now(),
-      cashierName: authUser?.fullName ?? authUser?.username ?? 'Unknown Cashier',
-      items: active.items
-          .map(
-            (item) => <String, dynamic>{
-              'name': item.product.name,
-              'quantity': item.effectiveQuantity,
-              'price': item.unitPrice,
-              'total': item.lineTotal,
-            },
-          )
-          .toList(),
-      total: active.total,
-      paid: paidAmount,
-      remaining: remainingAmount,
-      customerName: active.selectedCustomer?.name,
-      loyaltyPoints:
-          active.loyaltyPointsUsed > 0 ? active.loyaltyPointsUsed.round() : null,
-    );
-    print('INVOICE DATA: $invoiceData');
+    //final paidAmount = (active.total - payment.debtAmount).clamp(0.0, active.total);
+    // ---- Clean PDF Printing ----
+  } // نهاية checkout
+} // نهاية CartNotifier
 
-    /// Printing is non-blocking and should not affect sale success
-    try {
-      final invoiceItems = (invoiceData['items'] as List<dynamic>)
-          .map(
-            (item) => InvoiceItemData(
-              name: item['name'] as String? ?? '',
-              quantity: (item['quantity'] as num?)?.toDouble() ?? 0,
-              price: (item['price'] as num?)?.toDouble() ?? 0,
-              total: (item['total'] as num?)?.toDouble() ?? 0,
-            ),
-          )
-          .toList();
+final cartProvider = NotifierProvider<CartNotifier, CartState>(
+  CartNotifier.new,
+);
 
-      final pdfInvoiceData = InvoiceData(
-        invoiceNumber: invoiceData['invoiceNumber'] as String? ?? invoiceNumber,
-        date: invoiceData['date'] as DateTime? ?? DateTime.now(),
-        cashierName: invoiceData['cashierName'] as String? ?? '',
-        items: invoiceItems,
-        total: (invoiceData['total'] as num?)?.toDouble() ?? 0,
-        paid: (invoiceData['paid'] as num?)?.toDouble() ?? 0,
-        remaining: (invoiceData['remaining'] as num?)?.toDouble() ?? 0,
-        customerName: invoiceData['customerName'] as String?,
-        loyaltyPoints: invoiceData['loyaltyPoints'] as int?,
-      );
+Future<String> generateInvoiceNumber() async {
+  final invoiceNumberService = InvoiceNumberService(AppDatabase.instance);
 
-      final pdfBytes = await InvoicePdfBuilder().build(pdfInvoiceData);
-      await Printing.layoutPdf(
-        onLayout: (format) async => pdfBytes,
-      );
-    } catch (e) {
-      print('PRINT ERROR: $e');
-    }
-  }
-}
-
-
-final cartProvider = NotifierProvider<CartNotifier, CartState>(CartNotifier.new);
-
-// ---- Invoice Number Generator ----
-int _invoiceCounter = 1;
-String generateInvoiceNumber() {
-  final now = DateTime.now();
-  final prefix = '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}';
-  return '$prefix-${(_invoiceCounter++).toString().padLeft(4, '0')}';
+  return await invoiceNumberService.next();
 }

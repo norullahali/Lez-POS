@@ -9,7 +9,7 @@ class AppLocalizationsKu extends AppLocalizations {
   AppLocalizationsKu([String locale = 'ku']) : super(locale);
 
   @override
-  String get appName => 'ليز POS';
+  String get appName => 'Lez POS';
 
   @override
   String get ok => '';

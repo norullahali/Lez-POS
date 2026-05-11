@@ -2,16 +2,19 @@
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import 'side_nav.dart';
+import 'package:go_router/go_router.dart';
 
 class AppShell extends StatelessWidget {
   final Widget child;
   final String currentRoute;
   final String? title;
 
-  const AppShell({super.key, required this.child, required this.currentRoute, this.title});
+  const AppShell(
+      {super.key, required this.child, required this.currentRoute, this.title});
 
   @override
   Widget build(BuildContext context) {
+    debugPrint('CURRENT ROUTE: $currentRoute');
     return Scaffold(
       backgroundColor: AppColors.background,
       body: Row(
@@ -59,12 +62,15 @@ class _TopBar extends StatelessWidget {
       '/roles': 'الأدوار والصلاحيات',
       '/backup': 'النسخ الاحتياطي',
     };
-    return titles[route] ?? 'ليز POS';
+    return titles[route] ?? 'Lez POS';
   }
 
   @override
   Widget build(BuildContext context) {
-    final canPop = Navigator.of(context).canPop();
+    // 🧠 نحدد هل نظهر زر الرجوع أم لا
+    final showBack = currentRoute.startsWith('/suppliers/') ||
+        currentRoute.startsWith('/customers/') ||
+        currentRoute.startsWith('/purchases/');
 
     return Container(
       height: 56,
@@ -72,10 +78,21 @@ class _TopBar extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
         children: [
-          if (canPop)
+          if (showBack)
             IconButton(
-              icon: const Icon(Icons.arrow_back_rounded, color: AppColors.textPrimary),
-              onPressed: () => Navigator.of(context).pop(),
+              icon: const Icon(Icons.arrow_back_rounded,
+                  color: AppColors.textPrimary),
+
+              // 🚀 الرجوع الصحيح (بدون pop نهائياً)
+              onPressed: () {
+                if (currentRoute == '/pos') {
+                  context.go('/dashboard'); // مهم جداً
+                } else if (context.canPop()) {
+                  context.pop();
+                } else {
+                  context.go('/dashboard');
+                }
+              },
             ),
           const SizedBox(width: 8),
           Text(
@@ -88,7 +105,7 @@ class _TopBar extends StatelessWidget {
           ),
           const Spacer(),
           Text(
-            'ليز POS',
+            'Lez POS',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: AppColors.textHint,
                 ),

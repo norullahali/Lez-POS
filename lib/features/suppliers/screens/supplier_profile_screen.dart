@@ -55,7 +55,14 @@ class _SupplierProfileScreenState extends ConsumerState<SupplierProfileScreen> {
                 children: [
                   IconButton(
                     icon: const Icon(Icons.arrow_back_rounded),
-                    onPressed: () => context.pop(),
+                    onPressed: () {
+                      print('POP CLICK');
+                      if (context.canPop()) {
+                        context.pop();
+                      } else {
+                        context.go('/suppliers');
+                      }
+                    },
                   ),
                   const SizedBox(width: 8),
                   Text(
@@ -88,18 +95,19 @@ class _SupplierProfileScreenState extends ConsumerState<SupplierProfileScreen> {
                   ),
                   const Spacer(),
                   ElevatedButton.icon(
-                    onPressed: () =>
-                        context.go('/suppliers/payments/${supplier.id}'),
+                    onPressed: () {
+                      context.push('/suppliers/payments/${supplier.id}');
+                    },
                     icon: const Icon(Icons.payments_rounded, size: 20),
-                    label: const Text('تسجيل دفعة / تسديد',
-                        style: TextStyle(fontWeight: FontWeight.w700)),
+                    label: const Text('تسجيل دفعة / تسديد'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.orange,
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10)),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
                     ),
-                  ),
+                  )
                 ],
               ),
               const SizedBox(height: 24),

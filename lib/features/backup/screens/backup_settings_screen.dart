@@ -1,14 +1,19 @@
-// lib/features/backup/screens/backup_settings_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../providers/backup_provider.dart';
 
-class BackupSettingsScreen extends ConsumerWidget {
+class BackupSettingsScreen extends ConsumerStatefulWidget {
   const BackupSettingsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<BackupSettingsScreen> createState() =>
+      _BackupSettingsScreenState();
+}
+
+class _BackupSettingsScreenState extends ConsumerState<BackupSettingsScreen> {
+  @override
+  Widget build(BuildContext context) {
     final settingsAsync = ref.watch(backupSettingsProvider);
 
     return settingsAsync.when(
@@ -32,26 +37,35 @@ class BackupSettingsScreen extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    /// 🔄 Backup Settings
                     SwitchListTile(
-                      title: const Text('تفعيل النسخ التلقائي',
-                          style: TextStyle(fontWeight: FontWeight.bold)),
+                      title: const Text(
+                        'تفعيل النسخ التلقائي',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
                       subtitle: const Text(
-                          'إجراء نسخة احتياطية دورية للنظام (يحتفظ بآخر 14 نسخة فقط).'),
+                        'إجراء نسخة احتياطية دورية للنظام.',
+                      ),
                       value: settings.isAutoBackupEnabled,
                       activeThumbColor: AppColors.success,
                       onChanged: (val) => notifier.toggleAutoBackup(val),
                     ),
-                    const Divider(color: AppColors.border, height: 32),
+
+                    const Divider(height: 32),
+
                     ListTile(
-                      title: const Text('تكرار النسخ',
-                          style: TextStyle(fontWeight: FontWeight.bold)),
-                      subtitle: const Text('كم مرة ترغب في أن يقوم النظام بنسخ البيانات؟'),
+                      title: const Text(
+                        'تكرار النسخ',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
                       trailing: DropdownButton<String>(
                         value: settings.backupFrequency,
                         underline: const SizedBox(),
                         items: const [
-                          DropdownMenuItem(value: 'DAILY', child: Text('يومياً')),
-                          DropdownMenuItem(value: 'WEEKLY', child: Text('أسبوعياً')),
+                          DropdownMenuItem(
+                              value: 'DAILY', child: Text('يومياً')),
+                          DropdownMenuItem(
+                              value: 'WEEKLY', child: Text('أسبوعياً')),
                         ],
                         onChanged: settings.isAutoBackupEnabled
                             ? (val) {
@@ -60,20 +74,18 @@ class BackupSettingsScreen extends ConsumerWidget {
                             : null,
                       ),
                     ),
-                    const Divider(color: AppColors.border, height: 32),
+
+                    const Divider(height: 32),
+
                     ListTile(
-                      title: const Text('مجلد الحفظ',
-                          style: TextStyle(fontWeight: FontWeight.bold)),
+                      title: const Text(
+                        'مجلد الحفظ',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
                       subtitle: Text(
                         settings.customBackupFolder ??
                             'المجلد الافتراضي: Documents/LezPOS/Backups/',
                         style: const TextStyle(color: AppColors.textSecondary),
-                      ),
-                      trailing: ElevatedButton.icon(
-                        icon: const Icon(Icons.folder_open_rounded, size: 20),
-                        label: const Text('تغيير المسار (قريباً)'),
-                        onPressed:
-                            null, // Custom path feature could be expanded later via file_picker package
                       ),
                     ),
                   ],

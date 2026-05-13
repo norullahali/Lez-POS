@@ -193,7 +193,7 @@ class _StockOverviewTab extends ConsumerWidget {
                         cells: [
                           DataCell(Text(item.name, style: const TextStyle(fontWeight: FontWeight.w600))),
                           DataCell(Text(item.barcode.isEmpty ? '-' : item.barcode, style: const TextStyle(fontFamily: 'monospace', fontSize: 12))),
-                          DataCell(Text('${nf.format(item.currentStock)} ${item.unit}', style: TextStyle(color: item.isLowStock ? AppColors.error : AppColors.success, fontWeight: FontWeight.w700))),
+                          DataCell(Text('${nf.format(item.safeStock)} ${item.unit}', style: TextStyle(color: item.isLowStock ? AppColors.error : AppColors.success, fontWeight: FontWeight.w700))),
                           DataCell(Text(nf.format(item.minStock))),
                           DataCell(Text('${nf.format(item.costPrice)} د.ع')),
                           DataCell(Text('${NumberFormat('#,##0').format(item.stockValue)} د.ع', style: const TextStyle(fontWeight: FontWeight.w600))),
@@ -374,7 +374,7 @@ class _AdjustmentsTab extends ConsumerWidget {
                           return ListTile(
                             leading: const Icon(Icons.inventory_2_outlined, color: AppColors.primary),
                             title: Text(p.name, style: const TextStyle(fontWeight: FontWeight.w600)),
-                            subtitle: Text('المخزون: ${nf.format(p.currentStock)} ${p.unit}'),
+                            subtitle: Text('المخزون: ${nf.format(p.safeStock)} ${p.unit}'),
                             trailing: IconButton(
                               icon: const Icon(Icons.tune_rounded, color: AppColors.primary),
                               onPressed: () => onAdjust(p.id!, p.name, p.unit),

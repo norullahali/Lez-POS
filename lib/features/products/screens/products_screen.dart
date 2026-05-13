@@ -118,7 +118,7 @@ class ProductsScreen extends ConsumerWidget {
   }
 
   DataRow _buildRow(BuildContext context, WidgetRef ref, ProductModel p) {
-    final isLow = p.currentStock <= p.minStock && p.minStock > 0;
+    final isLow = p.safeStock <= p.minStock && p.minStock > 0;
     return DataRow(cells: [
       DataCell(
         Column(
@@ -141,7 +141,7 @@ class ProductsScreen extends ConsumerWidget {
             borderRadius: BorderRadius.circular(20),
           ),
           child: Text(
-            p.currentStock.toStringAsFixed(1),
+            p.safeStock.toStringAsFixed(1),
             style: TextStyle(color: isLow ? AppColors.error : AppColors.success, fontWeight: FontWeight.w600, fontSize: 13),
           ),
         ),

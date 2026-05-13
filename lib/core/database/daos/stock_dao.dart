@@ -67,12 +67,15 @@ class StockDao extends DatabaseAccessor<AppDatabase> with _$StockDaoMixin {
         ..orderBy([(l) => OrderingTerm.desc(l.createdAt)]))
           .get();
 
-  // Get low stock products — compares products.current_stock directly (no ledger join)
+  // Get low stock products — compares products.current_stock directly (no ledger join).
+  // current_stock in the result is clamped to 0 via CASE WHEN so callers never
+  // receive negative values in the map, keeping display logic simple.
   Future<List<Map<String, dynamic>>> getLowStockProducts() async {
     try {
       debugPrint('[StockDao] getLowStockProducts: querying...');
       return await customSelect('''
-        SELECT id, name, barcode, min_stock, unit, category_id, current_stock
+        SELECT id, name, barcode, min_stock, unit, category_id,
+               CASE WHEN current_stock < 0 THEN 0 ELSE current_stock END AS current_stock
         FROM products
         WHERE is_active = 1 AND current_stock <= min_stock
         ORDER BY current_stock ASC
@@ -85,10 +88,12 @@ class StockDao extends DatabaseAccessor<AppDatabase> with _$StockDaoMixin {
     }
   }
 
-  // Reactive stream of low stock products — re-emits whenever products.current_stock changes
+  // Reactive stream of low stock products — re-emits whenever products.current_stock changes.
+  // current_stock in each emitted map is clamped to 0 (never negative).
   Stream<List<Map<String, dynamic>>> watchLowStockProducts() {
     return customSelect('''
-      SELECT id, name, barcode, min_stock, unit, category_id, current_stock
+      SELECT id, name, barcode, min_stock, unit, category_id,
+             CASE WHEN current_stock < 0 THEN 0 ELSE current_stock END AS current_stock
       FROM products
       WHERE is_active = 1 AND current_stock <= min_stock
       ORDER BY current_stock ASC

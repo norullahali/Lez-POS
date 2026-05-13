@@ -409,7 +409,7 @@ class _SearchResultRow extends ConsumerWidget {
     // the same realtime state as the product grid.
     final availableStock = p.id != null
         ? ref.watch(availableStockProvider(p.id!))
-        : p.currentStock;
+        : p.safeStock;
     final isLow = availableStock <= 0;
 
     return GestureDetector(

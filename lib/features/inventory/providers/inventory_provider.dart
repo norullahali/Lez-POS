@@ -32,7 +32,10 @@ class StockOverviewItem {
     required this.stockValue,
   });
 
-  bool get isLowStock => currentStock <= minStock;
+  /// Clamps raw DB value to 0; historical negative values never appear in UI.
+  double get safeStock => currentStock < 0 ? 0 : currentStock;
+
+  bool get isLowStock => safeStock <= minStock;
 }
 
 /// Reactive notifier — auto-updates whenever products.current_stock changes in the DB.

@@ -42,17 +42,22 @@ class InventoryRepository {
     return _db.stockDao.watchLowStockProducts();
   }
 
-  StockOverviewItem _toOverviewItem(Product p) => StockOverviewItem(
-        productId: p.id,
-        name: p.name,
-        barcode: p.barcode,
-        currentStock: p.currentStock,
-        minStock: p.minStock,
-        unit: p.unit,
-        costPrice: p.costPrice,
-        sellPrice: p.sellPrice,
-        stockValue: p.currentStock * p.costPrice,
-      );
+  StockOverviewItem _toOverviewItem(Product p) {
+    // Clamp raw DB value to 0 so negative legacy stock never inflates/deflates
+    // the displayed total stock value shown in the inventory overview card.
+    final safeStock = p.currentStock < 0 ? 0.0 : p.currentStock;
+    return StockOverviewItem(
+      productId: p.id,
+      name: p.name,
+      barcode: p.barcode,
+      currentStock: p.currentStock,
+      minStock: p.minStock,
+      unit: p.unit,
+      costPrice: p.costPrice,
+      sellPrice: p.sellPrice,
+      stockValue: safeStock * p.costPrice,
+    );
+  }
 
   Future<List<Map<String, dynamic>>> getExpiringProducts(int withinDays) async {
     try {

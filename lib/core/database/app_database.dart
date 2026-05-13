@@ -112,7 +112,7 @@ class AppDatabase extends _$AppDatabase {
   late final pricingDao = PricingDao(this);
 
   @override
-  int get schemaVersion => 18;
+  int get schemaVersion => 19;
 
   @override
   MigrationStrategy get migration {
@@ -522,6 +522,22 @@ class AppDatabase extends _$AppDatabase {
             debugPrint('[Migration] v18: barcode normalisation complete');
           } catch (e) {
             debugPrint('[Migration] v18: barcode normalisation error: $e');
+          }
+        }
+
+        if (from < 19) {
+          // One-time cleanup: reset any negative stock values to 0.
+          // StockGuard (added previously) prevents new negative writes, but
+          // historical data may still have negative current_stock values.
+          // This migration makes the DB consistent with the UI safeStock guard.
+          debugPrint('[Migration] v19: clamping negative current_stock values to 0...');
+          try {
+            await customStatement(
+              'UPDATE products SET current_stock = 0 WHERE current_stock < 0',
+            );
+            debugPrint('[Migration] v19: negative stock cleanup complete');
+          } catch (e) {
+            debugPrint('[Migration] v19: cleanup error (non-fatal): $e');
           }
         }
       },

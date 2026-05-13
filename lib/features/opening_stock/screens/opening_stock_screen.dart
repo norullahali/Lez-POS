@@ -97,7 +97,7 @@ class _OpeningStockScreenState extends ConsumerState<OpeningStockScreen> {
                                   return ListTile(
                                     dense: true,
                                     title: Text(p.name, style: TextStyle(fontWeight: isAdded ? FontWeight.w700 : FontWeight.w400, color: isAdded ? AppColors.primary : null)),
-                                    subtitle: Text('المخزون الحالي: ${p.currentStock.toStringAsFixed(1)} ${p.unit}'),
+                                    subtitle: Text('المخزون الحالي: ${p.safeStock.toStringAsFixed(1)} ${p.unit}'),
                                     trailing: isAdded ? const Icon(Icons.check_circle_rounded, color: AppColors.success) : const Icon(Icons.add_circle_outline_rounded, color: AppColors.primary),
                                     onTap: () => _showAddDialog(p.id!, p.name, p.unit, p.costPrice),
                                   );

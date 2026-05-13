@@ -1353,7 +1353,7 @@ class _ProductCard extends ConsumerWidget {
     final productId = product.id;
     final availableStock = productId != null
         ? ref.watch(availableStockProvider(productId))
-        : product.currentStock;
+        : product.safeStock;
     final isLow = availableStock <= 0;
 
     return MouseRegion(

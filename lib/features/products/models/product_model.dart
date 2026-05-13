@@ -35,7 +35,13 @@ class ProductModel {
     this.currentStock = 0,
   });
 
-  bool get isLowStock => currentStock <= minStock;
+  /// Display-safe stock: clamps the raw DB value to 0 so negative values
+  /// caused by historical data never surface in any UI widget.
+  double get safeStock => currentStock < 0 ? 0 : currentStock;
+
+  /// Uses safeStock so a product already at -1 correctly shows as low-stock
+  /// rather than appearing to have 0-based parity with minStock = 0 products.
+  bool get isLowStock => safeStock <= minStock;
 
   ProductModel copyWith({
     int? id,

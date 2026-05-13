@@ -7,6 +7,7 @@ import '../tables/sale_items_table.dart';
 import '../tables/pos_sessions_table.dart';
 import '../tables/stock_ledger_table.dart';
 import '../../constants/movement_types.dart';
+import '../../services/stock_guard.dart';
 
 part 'sales_dao.g.dart';
 
@@ -178,11 +179,12 @@ class SalesDao extends DatabaseAccessor<AppDatabase> with _$SalesDaoMixin {
           ),
         );
 
-        // Decrement current stock
-        await customUpdate(
-          'UPDATE products SET current_stock = current_stock - ? WHERE id = ?',
-          variables: [Variable.withReal(qty), Variable.withInt(productId)],
-          updates: {db.products},
+        // Guard-protected deduction — prevents negative stock.
+        // Must be inside the enclosing transaction for atomicity.
+        await StockGuard.deductStock(
+          db: attachedDatabase,
+          productId: productId,
+          quantity: qty,
         );
       }
       return invoiceId;

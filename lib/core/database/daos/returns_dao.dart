@@ -5,6 +5,7 @@ import '../tables/customer_returns_table.dart';
 import '../tables/supplier_returns_table.dart';
 import '../tables/stock_ledger_table.dart';
 import '../../constants/movement_types.dart';
+import '../../services/stock_guard.dart';
 
 part 'returns_dao.g.dart';
 
@@ -121,11 +122,12 @@ class ReturnsDao extends DatabaseAccessor<AppDatabase> with _$ReturnsDaoMixin {
           ),
         );
 
-        // Decrement current stock
-        await customUpdate(
-          'UPDATE products SET current_stock = current_stock - ? WHERE id = ?',
-          variables: [Variable.withReal(qty), Variable.withInt(productId)],
-          updates: {db.products},
+        // Guard-protected deduction — supplier return reduces stock.
+        // Must be inside the enclosing transaction for atomicity.
+        await StockGuard.deductStock(
+          db: attachedDatabase,
+          productId: productId,
+          quantity: qty,
         );
       }
       return returnId;

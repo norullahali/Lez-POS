@@ -3,6 +3,7 @@ import 'package:drift/drift.dart';
 import '../database/app_database.dart';
 import '../constants/movement_types.dart';
 import '../services/settings_service.dart';
+import '../services/stock_guard.dart';
 import '../../features/loyalty/services/loyalty_service.dart';
 
 /// Service to handle POS sales and returns orchestration.
@@ -78,16 +79,27 @@ class PosSaleService {
           }
         });
 
-        // Decrement current_stock for each item (negative qty handles returns-within-sale)
+        // Update stock for each item inside the transaction.
+        // Positive qty  = regular sale   → guarded deduction (never goes negative).
+        // Negative qty  = return-in-sale → safe increment back into stock.
         for (final item in items) {
-          await db.customUpdate(
-            'UPDATE products SET current_stock = current_stock - ? WHERE id = ?',
-            variables: [
-              Variable.withReal(item.quantity.value),
-              Variable.withInt(item.productId.value),
-            ],
-            updates: {db.products},
-          );
+          final qty = item.quantity.value;
+          if (qty > 0) {
+            await StockGuard.deductStock(
+              db: db,
+              productId: item.productId.value,
+              quantity: qty,
+            );
+          } else if (qty < 0) {
+            await db.customUpdate(
+              'UPDATE products SET current_stock = current_stock + ? WHERE id = ?',
+              variables: [
+                Variable.withReal(qty.abs()),
+                Variable.withInt(item.productId.value),
+              ],
+              updates: {db.products},
+            );
+          }
         }
 
         // 3. Update CustomerAccount balance/debt if provided

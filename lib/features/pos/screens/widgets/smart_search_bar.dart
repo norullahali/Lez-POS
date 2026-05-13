@@ -21,6 +21,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../products/models/product_model.dart';
 import '../../models/search_result.dart';
 import '../../providers/pos_products_provider.dart';
+import '../../providers/cart_stock_provider.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Providers for overlay state (kept outside the widget so siblings can read)
@@ -41,10 +42,15 @@ class SmartSearchBar extends ConsumerStatefulWidget {
   final void Function(ProductModel) onProductSelected;
   final void Function(String barcode) onBarcodeSubmit;
 
+  /// Optional focus node owned by the parent (e.g. POS screen).
+  /// When provided, the parent controls when the field gets focus (F1 shortcut).
+  final FocusNode? externalFocusNode;
+
   const SmartSearchBar({
     super.key,
     required this.onProductSelected,
     required this.onBarcodeSubmit,
+    this.externalFocusNode,
   });
 
   @override
@@ -53,7 +59,8 @@ class SmartSearchBar extends ConsumerStatefulWidget {
 
 class _SmartSearchBarState extends ConsumerState<SmartSearchBar> {
   final _ctrl = TextEditingController();
-  final _fieldFocusNode = FocusNode();
+  late final FocusNode _fieldFocusNode;
+  bool _ownsFieldFocusNode = false;
   final _overlayLayerLink = LayerLink();
 
   OverlayEntry? _overlayEntry;
@@ -64,6 +71,13 @@ class _SmartSearchBarState extends ConsumerState<SmartSearchBar> {
   @override
   void initState() {
     super.initState();
+    if (widget.externalFocusNode != null) {
+      _fieldFocusNode = widget.externalFocusNode!;
+      _ownsFieldFocusNode = false;
+    } else {
+      _fieldFocusNode = FocusNode();
+      _ownsFieldFocusNode = true;
+    }
     _fieldFocusNode.addListener(_onFocusChange);
   }
 
@@ -72,7 +86,7 @@ class _SmartSearchBarState extends ConsumerState<SmartSearchBar> {
     _debounce?.cancel();
     _ctrl.dispose();
     _fieldFocusNode.removeListener(_onFocusChange);
-    _fieldFocusNode.dispose();
+    if (_ownsFieldFocusNode) _fieldFocusNode.dispose();
     _removeOverlay();
     super.dispose();
   }
@@ -124,6 +138,16 @@ class _SmartSearchBarState extends ConsumerState<SmartSearchBar> {
   KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent) return KeyEventResult.ignored;
 
+    // ESC: clear if there is content/overlay; otherwise let it bubble up so the
+    // parent's _DismissIntent action can unfocus the field.
+    if (event.logicalKey == LogicalKeyboardKey.escape) {
+      if (_ctrl.text.isNotEmpty || _overlayEntry != null) {
+        _clearSearch();
+        return KeyEventResult.handled;
+      }
+      return KeyEventResult.ignored;
+    }
+
     final results = ref.read(smartSearchResultsProvider);
     if (results.isEmpty) return KeyEventResult.ignored;
 
@@ -140,11 +164,6 @@ class _SmartSearchBarState extends ConsumerState<SmartSearchBar> {
       final prev = (currentIdx - 1).clamp(0, results.length - 1);
       ref.read(_searchFocusedIndexProvider.notifier).state = prev;
       _refreshOverlay();
-      return KeyEventResult.handled;
-    }
-
-    if (event.logicalKey == LogicalKeyboardKey.escape) {
-      _clearSearch();
       return KeyEventResult.handled;
     }
 
@@ -210,21 +229,14 @@ class _SmartSearchBarState extends ConsumerState<SmartSearchBar> {
       padding: const EdgeInsets.all(12),
       child: CompositedTransformTarget(
         link: _overlayLayerLink,
-        child: KeyboardListener(
-          focusNode: FocusNode(skipTraversal: true),
-          onKeyEvent: (e) {
-            if (e is KeyDownEvent && e.logicalKey == LogicalKeyboardKey.f2) {
-              _fieldFocusNode.requestFocus();
-            }
-          },
-          child: Focus(
-            onKeyEvent: _handleKeyEvent,
-            child: TextField(
-              controller: _ctrl,
-              focusNode: _fieldFocusNode,
-              style: const TextStyle(color: Colors.white, fontSize: 15),
-              decoration: InputDecoration(
-                hintText: 'ابحث باسم المنتج أو الباركود أو الفئة... (F2)',
+        child: Focus(
+          onKeyEvent: _handleKeyEvent,
+          child: TextField(
+            controller: _ctrl,
+            focusNode: _fieldFocusNode,
+            style: const TextStyle(color: Colors.white, fontSize: 15),
+            decoration: InputDecoration(
+              hintText: 'ابحث باسم المنتج أو الباركود أو الفئة... (F1)',
                 hintStyle: const TextStyle(color: Colors.white38),
                 prefixIcon: const Icon(Icons.search_rounded, color: Colors.white54),
                 suffixIcon: _ctrl.text.isNotEmpty
@@ -249,10 +261,10 @@ class _SmartSearchBarState extends ConsumerState<SmartSearchBar> {
             ),
           ),
         ),
-      ),
     );
   }
 }
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // _SearchOverlay – the floating dropdown beneath the search field
@@ -379,7 +391,7 @@ class _SearchOverlay extends ConsumerWidget {
 // _SearchResultRow – a single row in the dropdown
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _SearchResultRow extends StatelessWidget {
+class _SearchResultRow extends ConsumerWidget {
   final SearchResult result;
   final bool isSelected;
   final VoidCallback onTap;
@@ -391,9 +403,14 @@ class _SearchResultRow extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final p = result.product;
-    final isLow = p.currentStock <= 0;
+    // Show available stock (DB stock - cart reserved) so the dropdown reflects
+    // the same realtime state as the product grid.
+    final availableStock = p.id != null
+        ? ref.watch(availableStockProvider(p.id!))
+        : p.currentStock;
+    final isLow = availableStock <= 0;
 
     return GestureDetector(
       onTap: isLow ? null : onTap,
@@ -444,7 +461,7 @@ class _SearchResultRow extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 2),
-                _StockBadge(stock: p.currentStock, isLow: isLow),
+                _StockBadge(stock: availableStock, isLow: isLow),
               ],
             ),
           ],

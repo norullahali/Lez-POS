@@ -14,6 +14,7 @@ import '../../loyalty/providers/loyalty_provider.dart';
 import '../../products/models/product_model.dart';
 import '../../products/providers/products_provider.dart';
 import '../providers/pos_products_provider.dart';
+import '../providers/cart_stock_provider.dart';
 import '../models/cart_item.dart';
 import '../models/cart_session.dart';
 import '../providers/pos_provider.dart';
@@ -27,6 +28,23 @@ import 'widgets/smart_search_bar.dart';
 import 'package:lez_pos/core/services/receipt_service.dart';
 
 import '../models/invoice_models.dart';
+
+// ─── Last invoice snapshot used by Ctrl+P re-print ────────────────────────
+class _LastInvoiceData {
+  final String invoiceNumber;
+  final List<InvoiceItem> items;
+  const _LastInvoiceData({required this.invoiceNumber, required this.items});
+}
+
+// ─── Keyboard shortcut intents ─────────────────────────────────────────────
+class _FocusSearchIntent extends Intent { const _FocusSearchIntent(); }
+class _OpenPaymentIntent extends Intent { const _OpenPaymentIntent(); }
+class _ClearCartIntent extends Intent { const _ClearCartIntent(); }
+class _FocusCustomerIntent extends Intent { const _FocusCustomerIntent(); }
+class _RefreshProductsIntent extends Intent { const _RefreshProductsIntent(); }
+class _ApplyDiscountIntent extends Intent { const _ApplyDiscountIntent(); }
+class _PrintLastInvoiceIntent extends Intent { const _PrintLastInvoiceIntent(); }
+class _DismissIntent extends Intent { const _DismissIntent(); }
 
 final posNfProvider = Provider<NumberFormat>((ref) => NumberFormat('#,##0.##'));
 
@@ -69,13 +87,112 @@ class PosScreen extends ConsumerStatefulWidget {
 }
 
 class _PosScreenState extends ConsumerState<PosScreen> {
+  late final FocusNode _searchFocusNode;
+  late final FocusNode _discountFocusNode;
+  final _checkoutTrigger = ValueNotifier<int>(0);
+  _LastInvoiceData? _lastInvoice;
+
   @override
   void initState() {
     super.initState();
+    _searchFocusNode = FocusNode(debugLabel: 'POS Search');
+    _discountFocusNode = FocusNode(debugLabel: 'POS Discount');
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkSession();
       ref.read(posProductsProvider);
+      _searchFocusNode.requestFocus();
     });
+  }
+
+  @override
+  void dispose() {
+    _searchFocusNode.dispose();
+    _discountFocusNode.dispose();
+    _checkoutTrigger.dispose();
+    super.dispose();
+  }
+
+  // ── Shortcut action handlers ───────────────────────────────────────────────
+
+  void _triggerCheckout() => _checkoutTrigger.value++;
+
+  void _onCheckoutComplete(_LastInvoiceData data) {
+    if (mounted) setState(() => _lastInvoice = data);
+  }
+
+  Future<void> _clearCartWithConfirmation() async {
+    final cart = ref.read(cartProvider);
+    if (cart.items.isEmpty) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.posPanel,
+        title: const Text('مسح العربة', style: TextStyle(color: Colors.white)),
+        content: const Text(
+          'هل تريد مسح جميع المنتجات من العربة؟',
+          style: TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('إلغاء'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('مسح'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && mounted) {
+      ref.read(cartProvider.notifier).clearCart();
+    }
+  }
+
+  Future<void> _openCustomerModal() async {
+    final result = await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const CustomerSelectionModal(),
+    );
+    if (result != null && mounted) {
+      ref.read(cartProvider.notifier).selectCustomer(result);
+      ref.read(cartProvider.notifier).clearLoyaltyPoints();
+    }
+  }
+
+  void _refreshProducts() {
+    ref.invalidate(posProductsProvider);
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+      content: Text('جاري تحديث المنتجات...'),
+      duration: Duration(seconds: 2),
+    ));
+  }
+
+  Future<void> _printLastInvoice() async {
+    final invoice = _lastInvoice;
+    if (invoice == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('لا توجد فاتورة سابقة للطباعة'),
+        backgroundColor: AppColors.warning,
+      ));
+      return;
+    }
+    try {
+      await printSale(
+        invoiceNumber: invoice.invoiceNumber,
+        items: invoice.items,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('خطأ في الطباعة: $e'),
+        backgroundColor: AppColors.error,
+      ));
+    }
   }
 
   Future<void> _checkSession() async {
@@ -91,39 +208,148 @@ class _PosScreenState extends ConsumerState<PosScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.posBackground,
-      body: Column(
-        children: [
-          const _PosTopBar(),
-          Expanded(
-            child: Row(
+    return Shortcuts(
+      shortcuts: <ShortcutActivator, Intent>{
+        const SingleActivator(LogicalKeyboardKey.f1): const _FocusSearchIntent(),
+        const SingleActivator(LogicalKeyboardKey.f2): const _OpenPaymentIntent(),
+        const SingleActivator(LogicalKeyboardKey.f3): const _ClearCartIntent(),
+        const SingleActivator(LogicalKeyboardKey.f4): const _FocusCustomerIntent(),
+        const SingleActivator(LogicalKeyboardKey.f5): const _RefreshProductsIntent(),
+        const SingleActivator(LogicalKeyboardKey.keyD, control: true):
+            const _ApplyDiscountIntent(),
+        const SingleActivator(LogicalKeyboardKey.keyP, control: true):
+            const _PrintLastInvoiceIntent(),
+        const SingleActivator(LogicalKeyboardKey.escape): const _DismissIntent(),
+      },
+      child: Actions(
+        actions: <Type, Action<Intent>>{
+          _FocusSearchIntent: CallbackAction<_FocusSearchIntent>(
+            onInvoke: (_) {
+              _searchFocusNode.requestFocus();
+              return null;
+            },
+          ),
+          _OpenPaymentIntent: CallbackAction<_OpenPaymentIntent>(
+            onInvoke: (_) {
+              _triggerCheckout();
+              return null;
+            },
+          ),
+          _ClearCartIntent: CallbackAction<_ClearCartIntent>(
+            onInvoke: (_) {
+              _clearCartWithConfirmation();
+              return null;
+            },
+          ),
+          _FocusCustomerIntent: CallbackAction<_FocusCustomerIntent>(
+            onInvoke: (_) {
+              _openCustomerModal();
+              return null;
+            },
+          ),
+          _RefreshProductsIntent: CallbackAction<_RefreshProductsIntent>(
+            onInvoke: (_) {
+              _refreshProducts();
+              return null;
+            },
+          ),
+          _ApplyDiscountIntent: CallbackAction<_ApplyDiscountIntent>(
+            onInvoke: (_) {
+              _discountFocusNode.requestFocus();
+              return null;
+            },
+          ),
+          _PrintLastInvoiceIntent: CallbackAction<_PrintLastInvoiceIntent>(
+            onInvoke: (_) {
+              _printLastInvoice();
+              return null;
+            },
+          ),
+          _DismissIntent: CallbackAction<_DismissIntent>(
+            onInvoke: (_) {
+              primaryFocus?.unfocus();
+              return null;
+            },
+          ),
+        },
+        child: Focus(
+          autofocus: true,
+          child: Scaffold(
+            backgroundColor: AppColors.posBackground,
+            body: Column(
               children: [
+                const _PosTopBar(),
                 Expanded(
-                  flex: 6,
-                  child: Column(
+                  child: Row(
                     children: [
-                      SmartSearchBar(
-                        onProductSelected: (product) {
-                          ref.read(cartProvider.notifier).addProduct(product);
-                        },
-                        onBarcodeSubmit: (barcode) {},
+                      Expanded(
+                        flex: 6,
+                        child: Column(
+                          children: [
+                            SmartSearchBar(
+                              externalFocusNode: _searchFocusNode,
+                              onProductSelected: (product) {
+                                final productId = product.id;
+                                if (productId != null) {
+                                  final available = ref.read(
+                                      availableStockProvider(productId));
+                                  if (available <= 0) {
+                                    ScaffoldMessenger.of(context)
+                                      ..clearSnackBars()
+                                      ..showSnackBar(SnackBar(
+                                        content: Text(
+                                            'نفذ المخزون: ${product.name}'),
+                                        backgroundColor: AppColors.warning,
+                                        duration:
+                                            const Duration(seconds: 2),
+                                      ));
+                                    return;
+                                  }
+                                }
+                                ref
+                                    .read(cartProvider.notifier)
+                                    .addProduct(product);
+                                // Notify when the last unit was just taken
+                                if (productId != null &&
+                                    ref.read(availableStockProvider(
+                                            productId)) <=
+                                        0) {
+                                  ScaffoldMessenger.of(context)
+                                    ..clearSnackBars()
+                                    ..showSnackBar(SnackBar(
+                                      content: Text(
+                                          'نفذ المخزون: ${product.name}'),
+                                      backgroundColor: AppColors.warning,
+                                      duration:
+                                          const Duration(seconds: 2),
+                                    ));
+                                }
+                              },
+                              onBarcodeSubmit: (barcode) {},
+                            ),
+                            _CategoryTabsPanel(),
+                            const SizedBox(height: 8),
+                            Expanded(child: _ProductGridPanel()),
+                          ],
+                        ),
                       ),
-                      _CategoryTabsPanel(),
-                      SizedBox(height: 8),
-                      Expanded(child: _ProductGridPanel()),
+                      Container(
+                        width: 380,
+                        color: AppColors.posCartBg,
+                        child: _CartPanel(
+                          checkoutTrigger: _checkoutTrigger,
+                          onCheckoutComplete: _onCheckoutComplete,
+                          discountFocusNode: _discountFocusNode,
+                        ),
+                      ),
                     ],
                   ),
                 ),
-                Container(
-                  width: 380,
-                  color: AppColors.posCartBg,
-                  child: const _CartPanel(),
-                ),
+                const _PosShortcutHintBar(),
               ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -168,19 +394,34 @@ class _ProductGridPanel extends ConsumerWidget {
   const _ProductGridPanel();
 
   void _addProduct(BuildContext context, WidgetRef ref, ProductModel product) {
-    final cart = ref.watch(cartProvider);
-    final currentQty = cart.items
-        .where((i) => i.product.id == product.id)
-        .fold(0.0, (s, i) => s + i.quantity);
-    if (product.currentStock <= currentQty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-            content: Text('المخزون غير كافٍ: ${product.name}'),
-            backgroundColor: AppColors.warning),
-      );
+    final productId = product.id;
+    if (productId == null) return;
+
+    // availableStock = DB currentStock - qty already in all carts (in-memory, no DB)
+    final available = ref.read(availableStockProvider(productId));
+    if (available <= 0) {
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(SnackBar(
+          content: Text('نفذ المخزون: ${product.name}'),
+          backgroundColor: AppColors.warning,
+          duration: const Duration(seconds: 2),
+        ));
       return;
     }
+
     ref.read(cartProvider.notifier).addProduct(product);
+
+    // Show "last unit taken" notification only when stock just hit zero
+    if (ref.read(availableStockProvider(productId)) <= 0) {
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(SnackBar(
+          content: Text('نفذ المخزون: ${product.name}'),
+          backgroundColor: AppColors.warning,
+          duration: const Duration(seconds: 2),
+        ));
+    }
   }
 
   @override
@@ -258,7 +499,16 @@ class _ProductGridPanel extends ConsumerWidget {
 }
 
 class _CartPanel extends ConsumerStatefulWidget {
-  const _CartPanel();
+  final ValueNotifier<int> checkoutTrigger;
+  final void Function(_LastInvoiceData) onCheckoutComplete;
+  final FocusNode discountFocusNode;
+
+  const _CartPanel({
+    required this.checkoutTrigger,
+    required this.onCheckoutComplete,
+    required this.discountFocusNode,
+  });
+
   @override
   ConsumerState<_CartPanel> createState() => _CartPanelState();
 }
@@ -267,9 +517,55 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
   final _invoiceDiscountCtrl = TextEditingController(text: '0');
 
   @override
+  void initState() {
+    super.initState();
+    widget.checkoutTrigger.addListener(_onCheckoutTriggered);
+  }
+
+  @override
   void dispose() {
+    widget.checkoutTrigger.removeListener(_onCheckoutTriggered);
     _invoiceDiscountCtrl.dispose();
     super.dispose();
+  }
+
+  void _onCheckoutTriggered() => _checkout();
+
+  /// Increment cart qty for [index] only if available stock allows it.
+  void _tryIncrementQty(int index) {
+    final items = ref.read(cartProvider).items;
+    if (index >= items.length) return;
+    final item = items[index];
+    if (item.isFreeItem || item.isReturn) return;
+
+    final productId = item.product.id;
+    if (productId != null) {
+      final available = ref.read(availableStockProvider(productId));
+      if (available <= 0) {
+        ScaffoldMessenger.of(context)
+          ..clearSnackBars()
+          ..showSnackBar(SnackBar(
+            content: Text('نفذ المخزون: ${item.product.name}'),
+            backgroundColor: AppColors.warning,
+            duration: const Duration(seconds: 2),
+          ));
+        return;
+      }
+    }
+
+    ref.read(cartProvider.notifier).incrementQty(index);
+
+    // Notify when this was the last available unit
+    if (productId != null &&
+        ref.read(availableStockProvider(productId)) <= 0) {
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(SnackBar(
+          content: Text('نفذ المخزون: ${item.product.name}'),
+          backgroundColor: AppColors.warning,
+          duration: const Duration(seconds: 2),
+        ));
+    }
   }
 
   /// Prints receipt from a CartSession snapshot.
@@ -323,23 +619,6 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
                       backgroundColor: AppColors.success,
                     ),
                     onPressed: () async {
-                      final cart = ref.watch(cartProvider);
-
-                      await printSale(
-                        invoiceNumber:
-                            DateTime.now().millisecondsSinceEpoch.toString(),
-                        items: cart.items.map((e) {
-                          return InvoiceItem(
-                            name: e.product.name,
-                            qty: e.quantity.toDouble(), // ✅ صححناها
-                            unitPrice: e.product.sellPrice,
-                            lineTotal: e.quantity * e.product.sellPrice,
-                          );
-                        }).toList(),
-                        paid: 0,
-                        change: 0,
-                      );
-
                       Navigator.pop(dialogCtx, true);
                     },
                     child: const Text('تأكيد الدفع'),
@@ -460,7 +739,36 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
 
       final items = activeCartSnapshot.items;
 
+      // Convert once; reused for both print and Ctrl+P re-print.
+      final invoiceItems = items
+          .map((e) => InvoiceItem(
+                name: e.product.name,
+                qty: e.quantity.toDouble(),
+                unitPrice: e.product.sellPrice,
+                lineTotal: e.quantity * e.product.sellPrice,
+              ))
+          .toList();
+
       // ✅ طباعة
+      debugPrint('=== BEFORE PRINT ===');
+
+      try {
+        await printSale(
+          invoiceNumber: invoiceNumber,
+          items: invoiceItems,
+        );
+
+        debugPrint('=== PRINT SUCCESS ===');
+      } catch (e, s) {
+        debugPrint('=== PRINT ERROR ===');
+        debugPrint(e.toString());
+        debugPrint(s.toString());
+      }
+
+      // Notify parent so Ctrl+P can re-print this invoice.
+      widget.onCheckoutComplete(
+        _LastInvoiceData(invoiceNumber: invoiceNumber, items: invoiceItems),
+      );
 
 // أو ترسله للطابعة / viewer
       final pointsBefore = selectedCustomer != null && selectedCustomer.id != 1
@@ -845,9 +1153,8 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
                                     ),
                                     _QtyBtn(
                                         icon: Icons.add_rounded,
-                                        onTap: () => ref
-                                            .read(cartProvider.notifier)
-                                            .incrementQty(i)),
+                                        onTap: () =>
+                                            _tryIncrementQty(i)),
                                   ],
                                 ),
                               ),
@@ -886,6 +1193,7 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
               // Invoice discount
               TextField(
                 controller: _invoiceDiscountCtrl,
+                focusNode: widget.discountFocusNode,
                 enabled: canDiscount,
                 style: TextStyle(
                     color: canDiscount ? Colors.white : AppColors.textHint),
@@ -977,7 +1285,7 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
                         borderRadius: BorderRadius.circular(12)),
                   ),
                   icon: const Icon(Icons.payment_rounded, size: 22),
-                  label: const Text('الدفع (F12)',
+                  label: const Text('الدفع (F2)',
                       style:
                           TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
                   onPressed: cart.items.isEmpty ? null : _checkout,
@@ -1030,7 +1338,7 @@ class _CategoryChip extends StatelessWidget {
   }
 }
 
-class _ProductCard extends StatelessWidget {
+class _ProductCard extends ConsumerWidget {
   final ProductModel product;
   final VoidCallback onTap;
   final NumberFormat nf;
@@ -1039,9 +1347,18 @@ class _ProductCard extends StatelessWidget {
       {required this.product, required this.onTap, required this.nf});
 
   @override
-  Widget build(BuildContext context) {
-    final isLow = product.currentStock <= 0;
-    return GestureDetector(
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Use in-memory available stock so the card reacts instantly to cart changes
+    // without requiring a database write or full-grid rebuild.
+    final productId = product.id;
+    final availableStock = productId != null
+        ? ref.watch(availableStockProvider(productId))
+        : product.currentStock;
+    final isLow = availableStock <= 0;
+
+    return MouseRegion(
+      cursor: isLow ? SystemMouseCursors.forbidden : MouseCursor.defer,
+      child: GestureDetector(
       onTap: isLow ? null : onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 100),
@@ -1092,7 +1409,8 @@ class _ProductCard extends StatelessWidget {
           ),
         ),
       ),
-    );
+      ),  // GestureDetector
+    );    // MouseRegion
   }
 }
 
@@ -1277,6 +1595,76 @@ class _QtyBtn extends StatelessWidget {
             color: AppColors.posPanelLight,
             borderRadius: BorderRadius.circular(6)),
         child: Icon(icon, color: Colors.white, size: 16),
+      ),
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// Shortcut Hint Bar  –  shown at the very bottom of the POS screen
+// ══════════════════════════════════════════════════════════════════════════
+
+class _PosShortcutHintBar extends StatelessWidget {
+  const _PosShortcutHintBar();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 26,
+      color: const Color(0xFF070C1F),
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: const SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            _ShortcutHint('F1', 'بحث'),
+            _ShortcutHint('F2', 'دفع'),
+            _ShortcutHint('F3', 'مسح'),
+            _ShortcutHint('F4', 'عميل'),
+            _ShortcutHint('F5', 'تحديث'),
+            _ShortcutHint('Ctrl+D', 'خصم'),
+            _ShortcutHint('Ctrl+P', 'طباعة'),
+            _ShortcutHint('ESC', 'إلغاء'),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ShortcutHint extends StatelessWidget {
+  final String shortcut;
+  final String label;
+
+  const _ShortcutHint(this.shortcut, this.label);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 16),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+            decoration: BoxDecoration(
+              color: Colors.white10,
+              borderRadius: BorderRadius.circular(3),
+              border: Border.all(color: Colors.white12),
+            ),
+            child: Text(
+              shortcut,
+              style: const TextStyle(
+                color: Colors.white54,
+                fontSize: 9,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          const SizedBox(width: 4),
+          Text(label,
+              style: const TextStyle(color: Colors.white30, fontSize: 10)),
+        ],
       ),
     );
   }

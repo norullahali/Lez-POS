@@ -6,6 +6,7 @@ import '../tables/stock_ledger_table.dart';
 import '../tables/stock_adjustments_table.dart';
 import '../tables/products_table.dart';
 import '../../constants/movement_types.dart';
+import '../../services/stock_guard.dart';
 
 part 'stock_dao.g.dart';
 
@@ -73,7 +74,7 @@ class StockDao extends DatabaseAccessor<AppDatabase> with _$StockDaoMixin {
       return await customSelect('''
         SELECT id, name, barcode, min_stock, unit, category_id, current_stock
         FROM products
-        WHERE is_active = 1 AND current_stock < min_stock
+        WHERE is_active = 1 AND current_stock <= min_stock
         ORDER BY current_stock ASC
       ''', readsFrom: {products}).get().then(
             (rows) => rows.map((r) => r.data).toList(),
@@ -89,7 +90,7 @@ class StockDao extends DatabaseAccessor<AppDatabase> with _$StockDaoMixin {
     return customSelect('''
       SELECT id, name, barcode, min_stock, unit, category_id, current_stock
       FROM products
-      WHERE is_active = 1 AND current_stock < min_stock
+      WHERE is_active = 1 AND current_stock <= min_stock
       ORDER BY current_stock ASC
     ''', readsFrom: {products}).watch().map(
           (rows) => rows.map((r) => r.data).toList(),
@@ -150,12 +151,22 @@ class StockDao extends DatabaseAccessor<AppDatabase> with _$StockDaoMixin {
         ),
       );
 
-      // Apply signed delta to current stock (positive = increase, negative = decrease)
-      await customUpdate(
-        'UPDATE products SET current_stock = current_stock + ? WHERE id = ?',
-        variables: [Variable.withReal(quantityChange), Variable.withInt(productId)],
-        updates: {products},
-      );
+      // Apply signed delta to current stock.
+      // Positive → safe increment; Negative → guarded deduction (never goes below 0).
+      if (quantityChange > 0) {
+        await customUpdate(
+          'UPDATE products SET current_stock = current_stock + ? WHERE id = ?',
+          variables: [Variable.withReal(quantityChange), Variable.withInt(productId)],
+          updates: {products},
+        );
+      } else if (quantityChange < 0) {
+        await StockGuard.deductStock(
+          db: attachedDatabase,
+          productId: productId,
+          quantity: quantityChange.abs(),
+        );
+      }
+      // quantityChange == 0: no-op, ledger entry already recorded above.
     });
   }
 

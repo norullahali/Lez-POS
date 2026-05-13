@@ -18,8 +18,10 @@ abstract class SettingsKeys {
   static const String phone = 'phone';
   static const String address = 'address';
   // Invoice display
-  static const String invoiceFooter = 'invoice_footer';
+  static const String invoiceFooter  = 'invoice_footer';
+  static const String invoiceFooter2 = 'invoice_footer2';
   static const String showTax = 'show_tax';
+  static const String showQr  = 'show_qr';
 }
 
 // ── Service ───────────────────────────────────────────────────────────────────
@@ -114,6 +116,17 @@ class SettingsService {
     }
   }
 
+  Future<String?> getInvoiceFooter2() => _getRaw(SettingsKeys.invoiceFooter2);
+
+  Future<void> setInvoiceFooter2(String? v) async {
+    if (v == null || v.isEmpty) {
+      await _db.customStatement(
+          'DELETE FROM app_settings WHERE key = ?', [SettingsKeys.invoiceFooter2]);
+    } else {
+      await _setRaw(SettingsKeys.invoiceFooter2, v);
+    }
+  }
+
   Future<bool> getShowTax() async {
     final v = await _getRaw(SettingsKeys.showTax);
     if (v == null) return true;
@@ -121,6 +134,14 @@ class SettingsService {
   }
 
   Future<void> setShowTax(bool v) => _setRaw(SettingsKeys.showTax, v ? '1' : '0');
+
+  Future<bool> getShowQr() async {
+    final v = await _getRaw(SettingsKeys.showQr);
+    if (v == null) return false;
+    return v == '1' || v.toLowerCase() == 'true';
+  }
+
+  Future<void> setShowQr(bool v) => _setRaw(SettingsKeys.showQr, v ? '1' : '0');
 
   // ── Low-level helpers ─────────────────────────────────────────────────────
 

@@ -1,43 +1,46 @@
 ﻿// lib/core/utils/invoice_pdf_builder_clean.dart
-//
-// Single source of truth for PDF invoice generation in Lez POS.
-// Used exclusively by PdfPrinterAdapter; never call directly from UI.
-//
-// Layout sections (top to bottom, RTL):
-//   1. Header     — logo, store name, phone, address
-//   2. Invoice info — number, date, customer, cashier
-//   3. Items table — name | qty | unit price | total
-//   4. Totals     — grand total (bold), paid, change
-//   5. Footer     — custom text, QR code, Lez POS branding
 
 import 'dart:typed_data';
+
 import 'package:flutter/services.dart';
 import 'package:pdf/widgets.dart' as pw;
 
 import '../../features/pos/models/invoice_models.dart';
-import 'receipt_paper_size.dart'; // Single canonical source — no duplicate enum here.
+import 'receipt_paper_size.dart';
 
 export 'receipt_paper_size.dart' show ReceiptPaperSize;
 
 class InvoicePdfBuilderClean {
-  /// Builds a complete invoice PDF and returns the raw bytes.
-  ///
-  /// [paperSize] defaults to 80 mm thermal width.
+  late final pw.Font regularFont;
+  late final pw.Font boldFont;
+
   Future<Uint8List> buildInvoice(
     InvoiceData data, {
     ReceiptPaperSize paperSize = ReceiptPaperSize.thermal80,
   }) async {
-    if (data.items.isEmpty) throw Exception('No items to print');
+    if (data.items.isEmpty) {
+      throw Exception('No items to print');
+    }
 
-    final fontData = await rootBundle.load('assets/fonts/Cairo-Regular.ttf');
+    // Arabic fonts
+    final regularFontData =
+        await rootBundle.load('assets/fonts/Cairo-Regular.ttf');
 
-    final font = pw.Font.ttf(fontData);
+    regularFont = pw.Font.ttf(regularFontData);
 
-    final pdf = pw.Document();
+    final boldFontData = await rootBundle.load('assets/fonts/Cairo-Bold.ttf');
+
+    boldFont = pw.Font.ttf(boldFontData);
+
+    final pdf = pw.Document(
+      theme: pw.ThemeData.withFont(
+        base: regularFont,
+        bold: boldFont,
+      ),
+    );
 
     pdf.addPage(
       pw.Page(
-        // Use the canonical extension from receipt_paper_size.dart.
         pageFormat: paperSize.toPageFormat(),
         build: (context) {
           return pw.Directionality(
@@ -45,22 +48,23 @@ class InvoicePdfBuilderClean {
             child: pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.stretch,
               children: [
-                _buildHeader(data, font),
-                _buildInvoiceInfo(data, font),
-                pw.SizedBox(height: 4),
-                _buildTable(data, font),
-                pw.SizedBox(height: 4),
+                _buildHeader(data),
+                pw.SizedBox(height: 6),
+                _buildInvoiceInfo(data),
+                pw.SizedBox(height: 6),
+                _buildTable(data),
+                pw.SizedBox(height: 6),
                 pw.Divider(),
-                _buildTotalSection(data, font),
-                _buildFooterSection(data, font),
-                pw.SizedBox(height: 4),
+                _buildTotalSection(data),
+                pw.SizedBox(height: 6),
+                _buildFooterSection(data),
+                pw.SizedBox(height: 6),
                 pw.Center(
                   child: pw.Text(
-                    'Lez POS by Birtij Software',
+                    'Lez POS by Birtij Software 07502721622',
                     style: pw.TextStyle(
-                      font: font,
+                      font: regularFont,
                       fontSize: 7,
-                      fontWeight: pw.FontWeight.bold,
                     ),
                   ),
                 ),
@@ -74,152 +78,191 @@ class InvoicePdfBuilderClean {
     return pdf.save();
   }
 
-  // ── Header ───────────────────────────────────────────────────────────────
+  // HEADER
 
-  pw.Widget _buildHeader(InvoiceData data, pw.Font font) {
+  pw.Widget _buildHeader(InvoiceData data) {
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.center,
       children: [
         if (data.logoBytes != null)
-          pw.Image(pw.MemoryImage(data.logoBytes!), height: 50),
+          pw.Image(
+            pw.MemoryImage(data.logoBytes!),
+            height: 50,
+          ),
         pw.SizedBox(height: 4),
         pw.Text(
-          data.storeName,
-          style: pw.TextStyle(
-            font: font,
-            fontSize: 16,
-            fontWeight: pw.FontWeight.bold,
-          ),
+          _safeArabic(data.storeName),
           textAlign: pw.TextAlign.center,
+          style: pw.TextStyle(
+            font: boldFont,
+            fontSize: 16,
+          ),
         ),
         if (data.phone != null)
-          pw.Text(data.phone!,
-              style: pw.TextStyle(
-                  font: font, fontSize: 9, fontWeight: pw.FontWeight.bold),
-              textAlign: pw.TextAlign.center),
+          pw.Text(
+            _safeArabic(data.phone!),
+            textAlign: pw.TextAlign.center,
+            style: pw.TextStyle(
+              font: regularFont,
+              fontSize: 9,
+            ),
+          ),
         if (data.address != null)
-          pw.Text(data.address!,
-              style: pw.TextStyle(
-                  font: font, fontSize: 9, fontWeight: pw.FontWeight.bold),
-              textAlign: pw.TextAlign.center),
+          pw.Text(
+            _safeArabic(data.address!),
+            textAlign: pw.TextAlign.center,
+            style: pw.TextStyle(
+              font: regularFont,
+              fontSize: 9,
+            ),
+          ),
         pw.SizedBox(height: 4),
         pw.Divider(),
       ],
     );
   }
 
-  // ── Invoice metadata ─────────────────────────────────────────────────────
+  // INVOICE INFO
 
-  pw.Widget _buildInvoiceInfo(InvoiceData data, pw.Font font) {
+  pw.Widget _buildInvoiceInfo(InvoiceData data) {
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.stretch,
       children: [
-        _kvRow('رقم الفاتورة', data.invoiceNumber, font),
-        _kvRow('التاريخ', _formatDate(data.date), font),
+        _kvRow('رقم الفاتورة', data.invoiceNumber),
+        _kvRow(
+          'التاريخ',
+          _formatDate(data.date),
+        ),
         if (data.customerName != null)
-          _kvRow('العميل', data.customerName!, font),
+          _kvRow(
+            'العميل',
+            _safeArabic(data.customerName!),
+          ),
         if (data.cashierName != null)
-          _kvRow('الكاشير', data.cashierName!, font),
+          _kvRow(
+            'الكاشير',
+            _safeArabic(data.cashierName!),
+          ),
       ],
     );
   }
 
-  // ── Items table ──────────────────────────────────────────────────────────
+  // TABLE
 
-  pw.Widget _buildTable(InvoiceData data, pw.Font font) {
+  pw.Widget _buildTable(InvoiceData data) {
     final items = data.items.where((e) => e.name.trim().isNotEmpty).toList();
 
     if (items.isEmpty) {
       return pw.Center(
-          child: pw.Text('لا توجد عناصر',
-              style: pw.TextStyle(font: font, fontWeight: pw.FontWeight.bold)));
+        child: pw.Text(
+          'لا توجد عناصر',
+          style: pw.TextStyle(
+            font: boldFont,
+            fontSize: 10,
+          ),
+        ),
+      );
     }
 
     return pw.Table(
-      border: pw.TableBorder(horizontalInside: const pw.BorderSide(width: 0.2)),
+      border: pw.TableBorder(
+        horizontalInside: const pw.BorderSide(width: 0.2),
+      ),
       columnWidths: const {
-        0: pw.FlexColumnWidth(3), // Product name
-        1: pw.FlexColumnWidth(1), // Qty
-        2: pw.FlexColumnWidth(1.5), // Unit price
-        3: pw.FlexColumnWidth(1.5), // Line total
+        0: pw.FlexColumnWidth(3),
+        1: pw.FlexColumnWidth(1),
+        2: pw.FlexColumnWidth(1.5),
+        3: pw.FlexColumnWidth(1.5),
       },
       children: [
-        // Header row
         pw.TableRow(
           decoration: const pw.BoxDecoration(
-              border: pw.Border(bottom: pw.BorderSide(width: 0.8))),
+            border: pw.Border(
+              bottom: pw.BorderSide(width: 0.8),
+            ),
+          ),
           children: [
-            _headerCell('المادة', font),
-            _headerCell('عدد', font),
-            _headerCell('السعر', font),
-            _headerCell('المجموع', font),
+            _headerCell('المادة'),
+            _headerCell('عدد'),
+            _headerCell('السعر'),
+            _headerCell('المجموع'),
           ],
         ),
-        // Data rows
-        ...items.map((item) => pw.TableRow(children: [
-              _cell(item.name, font),
-              _cell(_safe(item.qty), font),
-              _cell(_safe(item.unitPrice), font),
-              _cell(_safe(item.lineTotal), font),
-            ])),
+        ...items.map(
+          (item) => pw.TableRow(
+            children: [
+              _cell(_safeArabic(item.name)),
+              _cell(_safe(item.qty)),
+              _cell(_safe(item.unitPrice)),
+              _cell(_safe(item.lineTotal)),
+            ],
+          ),
+        ),
       ],
     );
   }
 
-  // ── Totals section (grand total, paid, change) ───────────────────────────
+  // TOTALS
 
-  pw.Widget _buildTotalSection(InvoiceData data, pw.Font font) {
+  pw.Widget _buildTotalSection(InvoiceData data) {
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.stretch,
       children: [
-        _kvRow('الإجمالي', '${data.total.toStringAsFixed(0)} د.ع', font,
-            bold: true),
+        _kvRow(
+          'الإجمالي',
+          '${data.total.toStringAsFixed(0)} د.ع',
+          bold: true,
+        ),
         if (data.paid != null)
-          _kvRow('المدفوع', '${data.paid!.toStringAsFixed(0)} د.ع', font),
+          _kvRow(
+            'المدفوع',
+            '${data.paid!.toStringAsFixed(0)} د.ع',
+          ),
         if (data.change != null && data.change! > 0)
-          _kvRow('الباقي', '${data.change!.toStringAsFixed(0)} د.ع', font),
-        if (data.loyaltyPoints != null && data.loyaltyPoints! > 0)
-          _kvRow('نقاط مستخدمة', _safe(data.loyaltyPoints), font),
+          _kvRow(
+            'الباقي',
+            '${data.change!.toStringAsFixed(0)} د.ع',
+          ),
       ],
     );
   }
 
-  // ── Footer section (custom text + QR) ───────────────────────────────────
+  // FOOTER
 
-  pw.Widget _buildFooterSection(InvoiceData data, pw.Font font) {
-    final hasFooter = data.footer != null && data.footer!.isNotEmpty;
+  pw.Widget _buildFooterSection(InvoiceData data) {
+    final hasFooter1 = data.footer  != null && data.footer!.isNotEmpty;
+    final hasFooter2 = data.footer2 != null && data.footer2!.isNotEmpty;
+
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.center,
       children: [
-        pw.SizedBox(height: 6),
-        if (hasFooter) ...[
-          pw.Divider(),
-          pw.SizedBox(height: 4),
+        if (hasFooter1)
           pw.Text(
-            data.footer!,
+            _safeArabic(data.footer!),
             textAlign: pw.TextAlign.center,
-            style: pw.TextStyle(
-                font: font, fontSize: 10, fontWeight: pw.FontWeight.bold),
+            style: pw.TextStyle(font: regularFont, fontSize: 9),
           ),
-          pw.SizedBox(height: 4),
+        if (hasFooter1 && hasFooter2) pw.SizedBox(height: 3),
+        if (hasFooter2)
+          pw.Text(
+            _safeArabic(data.footer2!),
+            textAlign: pw.TextAlign.center,
+            style: pw.TextStyle(font: regularFont, fontSize: 8),
+          ),
+        if (data.showQr) ...[
+          pw.SizedBox(height: 8),
+          _buildQr(data),
         ],
-        _buildQr(data),
-        pw.SizedBox(height: 4),
-        pw.Text(
-          'شكراً لتعاملكم معنا',
-          textAlign: pw.TextAlign.center,
-          style: pw.TextStyle(
-              font: font, fontSize: 9, fontWeight: pw.FontWeight.bold),
-        ),
       ],
     );
   }
 
-  // ── QR code ──────────────────────────────────────────────────────────────
+  // QR (only rendered when InvoiceData.showQr == true)
 
   pw.Widget _buildQr(InvoiceData data) {
     final qrData =
         '${data.invoiceNumber}|${data.total}|${data.date.toIso8601String()}';
+
     return pw.Center(
       child: pw.BarcodeWidget(
         barcode: pw.Barcode.qrCode(),
@@ -230,43 +273,49 @@ class InvoicePdfBuilderClean {
     );
   }
 
-  // ── Small helpers ────────────────────────────────────────────────────────
+  // HELPERS
 
-  pw.Widget _headerCell(String text, pw.Font font) {
+  pw.Widget _headerCell(String text) {
     return pw.Padding(
       padding: const pw.EdgeInsets.all(4),
       child: pw.Text(
         text,
         textAlign: pw.TextAlign.center,
         style: pw.TextStyle(
-          font: font,
+          font: boldFont,
           fontSize: 9,
-          fontWeight: pw.FontWeight.bold,
         ),
       ),
     );
   }
 
-  pw.Widget _cell(String text, pw.Font font) {
+  pw.Widget _cell(String text) {
     return pw.Padding(
-      padding: const pw.EdgeInsets.symmetric(vertical: 2, horizontal: 4),
-      child: pw.Text(text,
-          textAlign: pw.TextAlign.center,
-          style: pw.TextStyle(
-              font: font, fontSize: 8, fontWeight: pw.FontWeight.bold)),
+      padding: const pw.EdgeInsets.symmetric(
+        vertical: 2,
+        horizontal: 4,
+      ),
+      child: pw.Text(
+        text,
+        textAlign: pw.TextAlign.center,
+        style: pw.TextStyle(
+          font: regularFont,
+          fontSize: 8,
+        ),
+      ),
     );
   }
 
   pw.Widget _kvRow(
     String label,
-    String value,
-    pw.Font font, {
+    String value, {
     bool bold = false,
   }) {
     final style = pw.TextStyle(
-      font: font,
+      font: bold ? boldFont : regularFont,
+      fontSize: 9,
     );
-    // value on left, label: on right (RTL layout)
+
     return pw.Row(
       mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
       children: [
@@ -276,10 +325,18 @@ class InvoicePdfBuilderClean {
     );
   }
 
-  String _formatDate(DateTime date) =>
-      '${date.year}/${date.month.toString().padLeft(2, "0")}'
-      '/${date.day.toString().padLeft(2, "0")} '
-      '${date.hour.toString().padLeft(2, "0")}:${date.minute.toString().padLeft(2, "0")}';
+  String _formatDate(DateTime date) {
+    return '${date.year}/${date.month.toString().padLeft(2, "0")}'
+        '/${date.day.toString().padLeft(2, "0")} '
+        '${date.hour.toString().padLeft(2, "0")}:'
+        '${date.minute.toString().padLeft(2, "0")}';
+  }
+}
 
-  String _safe(num? value) => (value ?? 0).toStringAsFixed(0);
+String _safeArabic(String text) {
+  return text.replaceAll('ي', 'ﻱ').replaceAll('ك', 'ﻙ');
+}
+
+String _safe(num? value) {
+  return (value ?? 0).toStringAsFixed(0);
 }

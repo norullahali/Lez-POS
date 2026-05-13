@@ -28,8 +28,13 @@ class InvoiceData {
   final Uint8List? logoBytes;
   final String? customerName;
   final String? cashierName;
+  /// Primary footer text (line 1).
   final String? footer;
+  /// Optional second footer line, shown below [footer].
+  final String? footer2;
   final bool showTax;
+  /// Whether to print a QR code at the end of the receipt.
+  final bool showQr;
 
   InvoiceData({
     this.paid,
@@ -45,7 +50,9 @@ class InvoiceData {
     this.customerName,
     this.cashierName,
     this.footer,
+    this.footer2,
     this.showTax = true,
+    this.showQr = false,
     DateTime? date,
   }) : date = date ?? DateTime.now();
 }

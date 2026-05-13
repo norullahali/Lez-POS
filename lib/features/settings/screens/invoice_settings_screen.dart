@@ -1,4 +1,5 @@
 ﻿import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -83,24 +84,52 @@ class _InvoiceSettingsScreenState extends State<InvoiceSettingsScreen> {
   // ── Persistence ────────────────────────────────────────────────────────────
 
   Future<void> _loadSettings() async {
-    final prefs = await SharedPreferences.getInstance();
-    logoPath               = prefs.getString('store_logo');
-    _storeNameCtrl.text    = prefs.getString('store_name') ?? '';
-    _phoneCtrl.text        = prefs.getString('store_phone') ?? '';
-    _addressCtrl.text      = prefs.getString('store_address') ?? '';
-    _footerCtrl.text       = prefs.getString('invoice_footer') ?? '';
-    _footer2Ctrl.text      = prefs.getString('invoice_footer2') ?? '';
-    showTax                = prefs.getBool('show_tax') ?? true;
-    showQr                 = prefs.getBool('show_qr') ?? false;
+    final svc = SettingsService(AppDatabase.instance);
 
-    // Printer config — loaded via SettingsService (DB-backed).
-    final svc    = SettingsService(AppDatabase.instance);
+    // ── Load from DB (primary source) ─────────────────────────────────────
+    final dbPhone = await svc.getPhone();
+
+    if (dbPhone == null) {
+      // DB is empty → first launch after update.  Migrate from SharedPreferences
+      // (legacy storage used by older app versions) into the DB so that the
+      // print paths (which read DB) and the preview stay in sync from now on.
+      final prefs = await SharedPreferences.getInstance();
+      final legacyName    = prefs.getString('store_name')      ?? '';
+      final legacyPhone   = prefs.getString('store_phone')     ?? '';
+      final legacyAddress = prefs.getString('store_address')   ?? '';
+      final legacyLogo    = prefs.getString('store_logo');
+      final legacyFooter  = prefs.getString('invoice_footer')  ?? '';
+      final legacyFooter2 = prefs.getString('invoice_footer2') ?? '';
+      final legacyTax     = prefs.getBool('show_tax')          ?? true;
+      final legacyQr      = prefs.getBool('show_qr')           ?? false;
+
+      // Persist legacy values into DB so future reads are consistent.
+      if (legacyName.isNotEmpty)    await svc.setStoreName(legacyName);
+      if (legacyPhone.isNotEmpty)   await svc.setPhone(legacyPhone);
+      if (legacyAddress.isNotEmpty) await svc.setAddress(legacyAddress);
+      if (legacyLogo != null)       await svc.setStoreLogoPath(legacyLogo);
+      if (legacyFooter.isNotEmpty)  await svc.setInvoiceFooter(legacyFooter);
+      if (legacyFooter2.isNotEmpty) await svc.setInvoiceFooter2(legacyFooter2);
+      await svc.setShowTax(legacyTax);
+      await svc.setShowQr(legacyQr);
+    }
+
+    // ── Read final values from DB ──────────────────────────────────────────
+    logoPath              = await svc.getStoreLogoPath();
+    _storeNameCtrl.text   = await svc.getStoreName();
+    _phoneCtrl.text       = await svc.getPhone()            ?? '';
+    _addressCtrl.text     = await svc.getAddress()          ?? '';
+    _footerCtrl.text      = await svc.getInvoiceFooter()    ?? '';
+    _footer2Ctrl.text     = await svc.getInvoiceFooter2()   ?? '';
+    showTax               = await svc.getShowTax();
+    showQr                = await svc.getShowQr();
+
+    // ── Printer config (always DB-backed) ──────────────────────────────────
     final config = await svc.getPrinterConfig();
-
-    _printerType = config.type;
-    _paperSize   = config.paperSize;
-    _printerNameCtrl.text = config.printerName ?? '';
-    _printerIpCtrl.text   = config.printerIp   ?? '';
+    _printerType          = config.type;
+    _paperSize            = config.paperSize;
+    _printerNameCtrl.text = config.printerName      ?? '';
+    _printerIpCtrl.text   = config.printerIp        ?? '';
     _printerPortCtrl.text = config.printerPort.toString();
     _btDeviceIdCtrl.text  = config.bluetoothDeviceId ?? '';
 
@@ -108,26 +137,26 @@ class _InvoiceSettingsScreenState extends State<InvoiceSettingsScreen> {
   }
 
   Future<void> _saveSettings() async {
-    // Invoice settings → SharedPreferences (legacy, keeps existing behaviour).
-    final prefs = await SharedPreferences.getInstance();
-    if (logoPath != null) await prefs.setString('store_logo', logoPath!);
-    await prefs.setString('store_name',     _storeNameCtrl.text);
-    await prefs.setString('store_phone',    _phoneCtrl.text);
-    await prefs.setString('store_address',  _addressCtrl.text);
-    await prefs.setString('invoice_footer', _footerCtrl.text);
-    await prefs.setString('invoice_footer2', _footer2Ctrl.text);
-    await prefs.setBool('show_tax', showTax);
-    await prefs.setBool('show_qr',  showQr);
-
-    // Printer config → DB via SettingsService.
     final svc = SettingsService(AppDatabase.instance);
+
+    // ── Invoice settings → DB (single source of truth for printing) ────────
+    await svc.setStoreName(_storeNameCtrl.text.trim());
+    await svc.setPhone(_phoneCtrl.text.trim().isEmpty        ? null : _phoneCtrl.text.trim());
+    await svc.setAddress(_addressCtrl.text.trim().isEmpty    ? null : _addressCtrl.text.trim());
+    await svc.setStoreLogoPath(logoPath);
+    await svc.setInvoiceFooter(_footerCtrl.text.trim().isEmpty  ? null : _footerCtrl.text.trim());
+    await svc.setInvoiceFooter2(_footer2Ctrl.text.trim().isEmpty ? null : _footer2Ctrl.text.trim());
+    await svc.setShowTax(showTax);
+    await svc.setShowQr(showQr);
+
+    // ── Printer config → DB ────────────────────────────────────────────────
     await svc.savePrinterConfig(PrinterConfig(
-      type:             _printerType,
-      paperSize:        _paperSize,
-      printerName:      _printerNameCtrl.text.trim().isEmpty ? null : _printerNameCtrl.text.trim(),
-      printerIp:        _printerIpCtrl.text.trim().isEmpty   ? null : _printerIpCtrl.text.trim(),
-      printerPort:      int.tryParse(_printerPortCtrl.text.trim()) ?? 9100,
-      bluetoothDeviceId: _btDeviceIdCtrl.text.trim().isEmpty ? null : _btDeviceIdCtrl.text.trim(),
+      type:              _printerType,
+      paperSize:         _paperSize,
+      printerName:       _printerNameCtrl.text.trim().isEmpty ? null : _printerNameCtrl.text.trim(),
+      printerIp:         _printerIpCtrl.text.trim().isEmpty   ? null : _printerIpCtrl.text.trim(),
+      printerPort:       int.tryParse(_printerPortCtrl.text.trim()) ?? 9100,
+      bluetoothDeviceId: _btDeviceIdCtrl.text.trim().isEmpty  ? null : _btDeviceIdCtrl.text.trim(),
     ));
 
     if (!mounted) return;
@@ -148,13 +177,23 @@ class _InvoiceSettingsScreenState extends State<InvoiceSettingsScreen> {
   Future<void> _testPrint() async {
     setState(() => _isTesting = true);
     try {
+      // Load logo bytes so the test print matches the live preview exactly.
+      Uint8List? logoBytes;
+      if (logoPath != null) {
+        final file = File(logoPath!);
+        if (await file.exists()) logoBytes = await file.readAsBytes();
+      }
+
       final invoice = InvoiceData(
         invoiceNumber: 'TEST-001',
         storeName:     _storeNameCtrl.text.isEmpty ? 'Lez POS' : _storeNameCtrl.text,
-        phone:         _phoneCtrl.text.isEmpty   ? null : _phoneCtrl.text,
-        address:       _addressCtrl.text.isEmpty ? null : _addressCtrl.text,
-        footer:        _footerCtrl.text.isEmpty  ? null : _footerCtrl.text,
+        phone:         _phoneCtrl.text.isEmpty    ? null : _phoneCtrl.text,
+        address:       _addressCtrl.text.isEmpty  ? null : _addressCtrl.text,
+        logoBytes:     logoBytes,
+        footer:        _footerCtrl.text.isEmpty   ? null : _footerCtrl.text,
+        footer2:       _footer2Ctrl.text.isEmpty  ? null : _footer2Ctrl.text,
         showTax:       showTax,
+        showQr:        showQr,
         total:         15000,
         paid:          20000,
         change:        5000,

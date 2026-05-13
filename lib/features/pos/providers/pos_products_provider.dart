@@ -51,6 +51,36 @@ class PosProductsNotifier extends AsyncNotifier<PosProductsState> {
     final initialBatch = await repo.getLimit(100);
     _integrateBatch(initialBatch);
 
+    // ── Reactive DB sync ────────────────────────────────────────────────────
+    // Keep the in-memory cache live whenever products.current_stock (or any
+    // product field) changes — covers ALL write paths:
+    //   • POS sale      (StockGuard.deductStock → customUpdate → products)
+    //   • Purchase      (purchases_dao  → customUpdate → products)
+    //   • Return        (returns_dao    → customUpdate → products)
+    //   • Adjustment    (stock_dao      → customUpdate → products)
+    //   • Opening stock (opening_stock_repository → customUpdate → products)
+    //
+    // Drift marks the `products` table on every customUpdate, which re-emits
+    // watchAllProducts() → productsStreamProvider → this listener.
+    //
+    // ref.listen (NOT ref.watch) is used so stream emissions do NOT re-run
+    // build() — they only merge the delta into the existing cached state.
+    ref.listen<AsyncValue<List<ProductModel>>>(
+      productsStreamProvider,
+      (_, next) {
+        if (!next.hasValue) return;
+        _integrateBatch(next.value!);
+        final st = state.valueOrNull;
+        if (st == null) return;
+        // Emit a new state so availableStockProvider recomputes and all
+        // _ProductCard widgets that watch it rebuild immediately.
+        state = AsyncValue.data(st.copyWith(
+          productsMap: Map.of(_internalMap),
+          barcodeIndex: Map.of(_internalBarcodeIndex),
+        ));
+      },
+    );
+
     // Step 2: Spawn background load for the rest
     _startBackgroundLoad();
 

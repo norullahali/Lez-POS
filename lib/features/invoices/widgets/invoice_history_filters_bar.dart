@@ -3,170 +3,136 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 
 import '../../../core/theme/app_colors.dart';
+import '../data/invoice_history_query.dart';
 import '../providers/invoice_history_provider.dart';
 
-class InvoiceHistoryFiltersBar extends ConsumerWidget {
-  final TextEditingController searchController;
-  final VoidCallback onApplyFilters;
+class InvoiceHistoryFiltersBar extends ConsumerStatefulWidget {
+  const InvoiceHistoryFiltersBar({super.key});
 
-  const InvoiceHistoryFiltersBar({
-    super.key,
-    required this.searchController,
-    required this.onApplyFilters,
-  });
+  @override
+  ConsumerState<InvoiceHistoryFiltersBar> createState() =>
+      _InvoiceHistoryFiltersBarState();
+}
 
+class _InvoiceHistoryFiltersBarState
+    extends ConsumerState<InvoiceHistoryFiltersBar> {
+  final _search = TextEditingController();
   static final _df = DateFormat('yyyy/MM/dd');
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  String _dateLabel(InvoiceHistoryQuery q) {
+    if (q.dateFrom == null && q.dateTo == null) {
+      return 'كل التواريخ';
+    }
+    final a = q.dateFrom != null ? _df.format(q.dateFrom!) : '…';
+    final b = q.dateTo != null ? _df.format(q.dateTo!) : '…';
+    return '$a — $b';
+  }
+
+  Future<void> _pickRange(InvoiceHistoryQuery q) async {
+    final now = DateTime.now();
+    final initial = (q.dateFrom != null && q.dateTo != null)
+        ? DateTimeRange(start: q.dateFrom!, end: q.dateTo!)
+        : DateTimeRange(
+            start: now.subtract(const Duration(days: 30)),
+            end: DateTime(now.year, now.month, now.day),
+          );
+    final picked = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2018),
+      lastDate: DateTime(now.year + 1),
+      initialDateRange: initial,
+      builder: (ctx, child) => Theme(
+        data: Theme.of(ctx).copyWith(
+          colorScheme: const ColorScheme.light(
+            primary: AppColors.primary,
+            surface: Colors.white,
+          ),
+        ),
+        child: child!,
+      ),
+    );
+    if (picked != null) {
+      ref.read(invoiceHistoryUiProvider.notifier).setDateRange(
+            picked.start,
+            picked.end,
+          );
+      ref.invalidate(invoiceHistoryPageProvider);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final q = ref.watch(invoiceHistoryUiProvider);
     final cashiersAsync = ref.watch(invoiceHistoryCashiersProvider);
 
-    String dateLabel() {
-      if (q.dateFrom == null && q.dateTo == null) {
-        return 'كل التواريخ';
-      }
-      final a = q.dateFrom != null ? _df.format(q.dateFrom!) : '…';
-      final b = q.dateTo != null ? _df.format(q.dateTo!) : '…';
-      return '$a — $b';
-    }
-
-    Future<void> pickRange() async {
-      final now = DateTime.now();
-      final picked = await showDateRangePicker(
-        context: context,
-        firstDate: DateTime(2018),
-        lastDate: DateTime(now.year + 1),
-        initialDateRange: q.dateFrom != null && q.dateTo != null
-            ? DateTimeRange(start: q.dateFrom!, end: q.dateTo!)
-            : DateTimeRange(
-                start: now.subtract(const Duration(days: 30)),
-                end: now,
-              ),
-        builder: (ctx, child) {
-          return Theme(
-            data: Theme.of(ctx).copyWith(
-              colorScheme: ColorScheme.light(
-                primary: AppColors.primary,
-                surface: Colors.white,
-              ),
-            ),
-            child: child!,
-          );
-        },
-      );
-      if (picked == null) return;
-      ref.read(invoiceHistoryUiProvider.notifier).setDateRange(
-            from: picked.start,
-            to: picked.end,
-          );
-      onApplyFilters();
-    }
-
     return Material(
-      color: Colors.white,
+      color: AppColors.surface,
       elevation: 0,
+      borderRadius: BorderRadius.circular(12),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Expanded(
               flex: 2,
               child: TextField(
-                controller: searchController,
+                controller: _search,
                 textDirection: TextDirection.rtl,
                 decoration: const InputDecoration(
+                  hintText: 'بحث برقم الفاتورة أو اسم العميل…',
+                  prefixIcon: Icon(Icons.search_rounded),
                   isDense: true,
-                  hintText: 'بحث: رقم الفاتورة أو اسم العميل',
-                  prefixIcon: Icon(Icons.search_rounded, size: 22),
-                  border: OutlineInputBorder(),
-                  contentPadding:
-                      EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                 ),
-                onSubmitted: (_) {
-                  ref
-                      .read(invoiceHistoryUiProvider.notifier)
-                      .applySearch(searchController.text);
-                  onApplyFilters();
+                onSubmitted: (v) {
+                  ref.read(invoiceHistoryUiProvider.notifier).applySearch(v);
+                  ref.invalidate(invoiceHistoryPageProvider);
                 },
               ),
             ),
             const SizedBox(width: 12),
             OutlinedButton.icon(
-              onPressed: pickRange,
+              onPressed: () => _pickRange(q),
               icon: const Icon(Icons.date_range_rounded, size: 20),
-              label: Text(
-                dateLabel(),
-                overflow: TextOverflow.ellipsis,
-              ),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.textPrimary,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-              ),
-            ),
-            const SizedBox(width: 8),
-            PopupMenuButton<String>(
-              tooltip: 'خيارات سريعة',
-              icon:
-                  Icon(Icons.more_vert_rounded, color: AppColors.textSecondary),
-              itemBuilder: (ctx) => const [
-                PopupMenuItem(value: 'all', child: Text('كل التواريخ')),
-                PopupMenuItem(value: '30', child: Text('آخر 30 يوماً')),
-              ],
-              onSelected: (v) {
-                final n = DateTime.now();
-                if (v == 'all') {
-                  ref
-                      .read(invoiceHistoryUiProvider.notifier)
-                      .setDateRange(clear: true);
-                } else {
-                  final to = DateTime(n.year, n.month, n.day);
-                  final from = to.subtract(const Duration(days: 30));
-                  ref.read(invoiceHistoryUiProvider.notifier).setDateRange(
-                        from: from,
-                        to: to,
-                      );
-                }
-                onApplyFilters();
-              },
+              label: Text(_dateLabel(q)),
             ),
             const SizedBox(width: 12),
             SizedBox(
               width: 200,
               child: cashiersAsync.when(
                 loading: () => const LinearProgressIndicator(minHeight: 2),
-                error: (_, __) => const Text(
-                  'تعذر تحميل الكاشيرين',
-                  style: TextStyle(fontSize: 12),
-                ),
+                error: (_, __) => const Text('تعذر تحميل الكاشير'),
                 data: (names) {
+                  final cashierVal = q.cashierName != null &&
+                          names.contains(q.cashierName)
+                      ? q.cashierName
+                      : null;
                   return DropdownButtonFormField<String?>(
-                    value: _dropdownCashierValue(q.cashierName, names),
+                    key: ValueKey<String?>('cashier_$cashierVal'),
+                    isExpanded: true,
+                    initialValue: cashierVal,
                     decoration: const InputDecoration(
                       labelText: 'الكاشير',
                       isDense: true,
-                      border: OutlineInputBorder(),
-                      contentPadding:
-                          EdgeInsets.symmetric(horizontal: 10, vertical: 10),
                     ),
-                    isExpanded: true,
                     items: [
                       const DropdownMenuItem<String?>(
                         value: null,
                         child: Text('الكل'),
                       ),
                       ...names.map(
-                        (n) => DropdownMenuItem<String?>(
-                          value: n,
-                          child: Text(n, overflow: TextOverflow.ellipsis),
-                        ),
+                        (n) => DropdownMenuItem(value: n, child: Text(n)),
                       ),
                     ],
                     onChanged: (v) {
                       ref.read(invoiceHistoryUiProvider.notifier).setCashier(v);
-                      onApplyFilters();
+                      ref.invalidate(invoiceHistoryPageProvider);
                     },
                   );
                 },
@@ -176,61 +142,52 @@ class InvoiceHistoryFiltersBar extends ConsumerWidget {
             SizedBox(
               width: 160,
               child: DropdownButtonFormField<String?>(
-                value: (q.paymentMethod == null || q.paymentMethod!.isEmpty)
-                    ? null
-                    : q.paymentMethod,
-                decoration: const InputDecoration(
-                  labelText: 'طريقة الدفع',
-                  isDense: true,
-                  border: OutlineInputBorder(),
-                  contentPadding:
-                      EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                ),
+                key: ValueKey<String?>('pay_${q.paymentMethod}'),
                 isExpanded: true,
+                initialValue: q.paymentMethod,
+                decoration: const InputDecoration(
+                  labelText: 'الدفع',
+                  isDense: true,
+                ),
                 items: const [
-                  DropdownMenuItem<String?>(value: null, child: Text('الكل')),
+                  DropdownMenuItem(value: null, child: Text('الكل')),
                   DropdownMenuItem(value: 'CASH', child: Text('نقدي')),
                   DropdownMenuItem(value: 'CARD', child: Text('بطاقة')),
-                  DropdownMenuItem(value: 'DEBT', child: Text('آجل')),
+                  DropdownMenuItem(value: 'DEBT', child: Text('دين')),
                   DropdownMenuItem(value: 'MIXED', child: Text('مختلط')),
                 ],
                 onChanged: (v) {
                   ref
                       .read(invoiceHistoryUiProvider.notifier)
                       .setPaymentMethod(v);
-                  onApplyFilters();
+                  ref.invalidate(invoiceHistoryPageProvider);
                 },
               ),
             ),
-            const SizedBox(width: 12),
-            FilledButton.icon(
+            const SizedBox(width: 8),
+            IconButton.filledTonal(
+              tooltip: 'تطبيق البحث',
               onPressed: () {
                 ref
                     .read(invoiceHistoryUiProvider.notifier)
-                    .applySearch(searchController.text);
-                ref.invalidate(invoiceHistoryCashiersProvider);
-                onApplyFilters();
+                    .applySearch(_search.text);
+                ref.invalidate(invoiceHistoryPageProvider);
               },
-              icon: const Icon(Icons.refresh_rounded, size: 20),
-              label: const Text('تحديث'),
-              style: FilledButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-              ),
+              icon: const Icon(Icons.manage_search_rounded),
+            ),
+            IconButton(
+              tooltip: 'إعادة ضبط الفلاتر',
+              onPressed: () {
+                ref.read(invoiceHistoryUiProvider.notifier).resetToDefaultRange();
+                _search.clear();
+                ref.invalidate(invoiceHistoryCashiersProvider);
+                ref.invalidate(invoiceHistoryPageProvider);
+              },
+              icon: const Icon(Icons.restart_alt_rounded),
             ),
           ],
         ),
       ),
     );
-  }
-
-  static String? _dropdownCashierValue(
-    String? selected,
-    List<String> names,
-  ) {
-    if (selected == null || selected.isEmpty) return null;
-    final i = names.indexWhere((e) => e == selected);
-    return i >= 0 ? selected : null;
   }
 }

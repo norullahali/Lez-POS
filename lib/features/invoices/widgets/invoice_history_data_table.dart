@@ -4,82 +4,102 @@ import 'package:intl/intl.dart' hide TextDirection;
 import '../../../core/theme/app_colors.dart';
 import '../models/invoice_history_row.dart';
 
+typedef InvoiceRowOpenCallback = void Function(int invoiceId);
+
 class InvoiceHistoryDataTable extends StatelessWidget {
   final List<InvoiceHistoryRow> rows;
   final NumberFormat nf;
-  final DateFormat df;
+  final InvoiceRowOpenCallback onOpenInvoice;
 
   const InvoiceHistoryDataTable({
     super.key,
     required this.rows,
     required this.nf,
-    required this.df,
+    required this.onOpenInvoice,
   });
+
+  static final _df = DateFormat('yyyy/MM/dd HH:mm');
 
   @override
   Widget build(BuildContext context) {
-    final baseStyle = Theme.of(context).textTheme.bodyMedium?.copyWith(
-          fontSize: 13,
+    final baseText = Theme.of(context).textTheme.bodyMedium;
+    final headingStyle = Theme.of(context).textTheme.titleSmall?.copyWith(
+          fontWeight: FontWeight.w700,
+          color: AppColors.textPrimary,
         );
 
-    DataRow buildRow(InvoiceHistoryRow r, int i) {
-      return DataRow(
-        color: WidgetStateProperty.resolveWith((s) {
-          if (s.contains(WidgetState.hovered)) {
-            return AppColors.primary.withValues(alpha: 0.06);
-          }
-          return i.isEven
-              ? Colors.grey.shade50
-              : Colors.white;
-        }),
-        cells: [
-          DataCell(Text(r.invoiceNumber, style: baseStyle)),
-          DataCell(Text(df.format(r.saleDate), style: baseStyle)),
-          DataCell(Text(r.customerName, style: baseStyle)),
-          DataCell(Text(r.cashierName, style: baseStyle)),
-          DataCell(Text(nf.format(r.itemCount), style: baseStyle)),
-          DataCell(Text('${nf.format(r.total)} د.ع', style: baseStyle)),
-          DataCell(
-              Text(invoicePaymentLabelAr(r.paymentMethod), style: baseStyle)),
-          DataCell(Text(r.status, style: baseStyle)),
-        ],
-      );
-    }
-
-    return ScrollConfiguration(
-      behavior: ScrollConfiguration.of(context).copyWith(
-        scrollbars: true,
-        physics: const AlwaysScrollableScrollPhysics(),
-      ),
+    return Card(
+      margin: EdgeInsets.zero,
+      clipBehavior: Clip.antiAlias,
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: SingleChildScrollView(
-          child: DataTable(
-            headingRowColor: WidgetStateProperty.all(
-              AppColors.primary.withValues(alpha: 0.12),
-            ),
-            horizontalMargin: 20,
-            columnSpacing: 28,
-            dataRowMinHeight: 44,
-            dataRowMaxHeight: 52,
-            headingTextStyle: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
+            child: DataTable(
+              showCheckboxColumn: false,
+              headingRowColor: WidgetStateProperty.all(AppColors.primarySurface),
+              dataRowMinHeight: 44,
+              dataRowMaxHeight: 52,
+              columnSpacing: 28,
+              horizontalMargin: 20,
+              columns: [
+                DataColumn(
+                  label: Text('رقم الفاتورة', style: headingStyle),
                 ),
-            columns: const [
-              DataColumn(label: Text('رقم الفاتورة')),
-              DataColumn(label: Text('التاريخ والوقت')),
-              DataColumn(label: Text('العميل')),
-              DataColumn(label: Text('الكاشير')),
-              DataColumn(label: Text('عدد الأصناف')),
-              DataColumn(label: Text('الإجمالي')),
-              DataColumn(label: Text('طريقة الدفع')),
-              DataColumn(label: Text('الحالة')),
-            ],
-            rows: List.generate(rows.length, (i) => buildRow(rows[i], i)),
+                DataColumn(
+                  label: Text('التاريخ', style: headingStyle),
+                ),
+                DataColumn(
+                  label: Text('العميل', style: headingStyle),
+                ),
+                DataColumn(
+                  label: Text('الكاشير', style: headingStyle),
+                ),
+                DataColumn(
+                  label: Text('الأصناف', style: headingStyle),
+                ),
+                DataColumn(
+                  label: Text('الإجمالي', style: headingStyle),
+                ),
+                DataColumn(
+                  label: Text('الدفع', style: headingStyle),
+                ),
+                DataColumn(
+                  label: Text('الحالة', style: headingStyle),
+                ),
+              ],
+              rows: [
+                for (var i = 0; i < rows.length; i++)
+                  DataRow(
+                    color: WidgetStateProperty.resolveWith((states) {
+                      if (states.contains(WidgetState.hovered)) {
+                        return AppColors.surfaceVariant
+                            .withValues(alpha: 0.85);
+                      }
+                      if (i.isEven) {
+                        return AppColors.surfaceVariant.withValues(alpha: 0.35);
+                      }
+                      return null;
+                    }),
+                    onSelectChanged: (_) => onOpenInvoice(rows[i].id),
+                    cells: [
+                      DataCell(Text(rows[i].invoiceNumber, style: baseText)),
+                      DataCell(Text(_df.format(rows[i].saleDate), style: baseText)),
+                      DataCell(Text(rows[i].customerName, style: baseText)),
+                      DataCell(Text(rows[i].cashierName, style: baseText)),
+                      DataCell(Text('${rows[i].itemCount}', style: baseText)),
+                      DataCell(Text('${nf.format(rows[i].total)} د.ع',
+                          style: baseText)),
+                      DataCell(Text(
+                        invoicePaymentLabelAr(rows[i].paymentMethod),
+                        style: baseText,
+                      )),
+                      DataCell(Text(rows[i].status, style: baseText)),
+                    ],
+                  ),
+              ],
+            ),
           ),
         ),
-      ),
     );
   }
 }

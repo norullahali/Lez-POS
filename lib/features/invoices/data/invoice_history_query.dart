@@ -1,7 +1,4 @@
-import 'package:flutter/foundation.dart';
-
-/// Server-side filters + pagination for invoice history list.
-@immutable
+/// Server-side filters + pagination for the invoice history list.
 class InvoiceHistoryQuery {
   final String search;
   final DateTime? dateFrom;
@@ -25,13 +22,13 @@ class InvoiceHistoryQuery {
     String? search,
     DateTime? dateFrom,
     DateTime? dateTo,
-    bool clearDateRange = false,
     String? cashierName,
     bool clearCashier = false,
     String? paymentMethod,
     bool clearPayment = false,
     int? page,
     int? pageSize,
+    bool clearDateRange = false,
   }) {
     return InvoiceHistoryQuery(
       search: search ?? this.search,

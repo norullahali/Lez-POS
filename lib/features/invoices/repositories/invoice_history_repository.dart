@@ -1,22 +1,18 @@
 import 'package:drift/drift.dart';
 
 import '../../../core/database/app_database.dart';
+import '../../../core/services/settings_service.dart';
 import '../data/invoice_history_query.dart';
+import '../models/invoice_detail.dart';
 import '../models/invoice_history_row.dart';
 
 class InvoiceHistoryRepository {
-  final AppDatabase _db;
-
   InvoiceHistoryRepository(this._db);
+
+  final AppDatabase _db;
 
   static const _completedStatus = 'مكتملة';
 
-  /// Interprets [sale_date] from [customSelect] for SQLite datetime columns.
-  ///
-  /// Drift/sqlite3 may return a [DateTime], an integral Unix epoch, or a string.
-  /// SQLite often stores datetimes as **seconds** since 1970-01-01 UTC; treating
-  /// those as **milliseconds** yields dates around 1970-01-xx (root cause of
-  /// the wrong display).
   static DateTime _parseSaleDate(dynamic raw) {
     if (raw == null) {
       return DateTime.fromMillisecondsSinceEpoch(0, isUtc: true).toLocal();
@@ -29,8 +25,7 @@ class InvoiceHistoryRepository {
     }
     if (raw is num) {
       final v = raw.toInt();
-      // Heuristic: values below this are Unix **seconds**; above = milliseconds.
-      const threshold = 100000000000; // 1e11
+      const threshold = 100000000000;
       if (v.abs() < threshold) {
         return DateTime.fromMillisecondsSinceEpoch(v * 1000, isUtc: true)
             .toLocal();
@@ -40,7 +35,6 @@ class InvoiceHistoryRepository {
     throw ArgumentError('Unsupported sale_date type: ${raw.runtimeType}');
   }
 
-  /// Distinct cashier display names (user full name or session cashier).
   Future<List<String>> listCashierNames() async {
     final rows = await _db.customSelect(
       '''
@@ -53,11 +47,7 @@ SELECT DISTINCT trim_key AS cashier_key FROM (
 WHERE LENGTH(trim_key) > 0
 ORDER BY trim_key COLLATE NOCASE
 ''',
-      readsFrom: {
-        _db.salesInvoices,
-        _db.usersTable,
-        _db.posSessions,
-      },
+      readsFrom: {_db.salesInvoices, _db.usersTable, _db.posSessions},
     ).get();
 
     return rows
@@ -190,6 +180,105 @@ LIMIT ? OFFSET ?
       totalCount: totalCount,
       page: q.page,
       pageSize: q.pageSize,
+    );
+  }
+
+  Future<InvoiceDetailData> fetchInvoiceDetail(int invoiceId) async {
+    final settings = SettingsService(_db);
+    final showTax = await settings.getShowTax();
+
+    final headerRows = await _db.customSelect(
+      '''
+SELECT
+  si.id AS id,
+  si.invoice_number AS invoice_number,
+  si.sale_date AS sale_date,
+  si.subtotal AS subtotal,
+  si.discount_amount AS discount_amount,
+  si.total AS total,
+  si.payment_method AS payment_method,
+  si.cash_paid AS cash_paid,
+  si.card_paid AS card_paid,
+  si.change_amount AS change_amount,
+  CASE
+    WHEN si.customer_id IS NULL THEN 'زبون عام'
+    ELSE IFNULL(c.name, 'زبون عام')
+  END AS customer_name,
+  TRIM(COALESCE(u.full_name, ps.cashier_name, '')) AS cashier_raw
+FROM sales_invoices si
+LEFT JOIN customers c ON c.id = si.customer_id
+LEFT JOIN users u ON u.id = si.created_by_user_id
+LEFT JOIN pos_sessions ps ON ps.id = si.session_id
+WHERE si.id = ?
+''',
+      variables: [Variable.withInt(invoiceId)],
+      readsFrom: {
+        _db.salesInvoices,
+        _db.customers,
+        _db.usersTable,
+        _db.posSessions,
+      },
+    ).get();
+
+    if (headerRows.isEmpty) {
+      throw StateError('Invoice not found: $invoiceId');
+    }
+
+    final h = headerRows.first.data;
+    final rawCashier = h['cashier_raw'] as String? ?? '';
+    final cashier = rawCashier.trim().isEmpty ? '—' : rawCashier.trim();
+
+    final header = InvoiceDetailHeader(
+      id: (h['id'] as num).toInt(),
+      invoiceNumber: h['invoice_number'] as String,
+      saleDate: _parseSaleDate(h['sale_date']),
+      customerName: h['customer_name'] as String,
+      cashierName: cashier,
+      paymentMethod: h['payment_method'] as String? ?? '',
+      status: _completedStatus,
+      subtotal: (h['subtotal'] as num).toDouble(),
+      discountTotal: (h['discount_amount'] as num).toDouble(),
+      total: (h['total'] as num).toDouble(),
+      cashPaid: (h['cash_paid'] as num).toDouble(),
+      cardPaid: (h['card_paid'] as num).toDouble(),
+      changeAmount: (h['change_amount'] as num).toDouble(),
+    );
+
+    final lineRows = await _db.customSelect(
+      '''
+SELECT
+  p.name AS product_name,
+  s.quantity AS quantity,
+  s.unit_price AS unit_price,
+  s.discount_amount AS discount_amount,
+  s.total AS line_total
+FROM sale_items s
+JOIN products p ON p.id = s.product_id
+WHERE s.invoice_id = ?
+ORDER BY s.id ASC
+''',
+      variables: [Variable.withInt(invoiceId)],
+      readsFrom: {
+        _db.saleItems,
+        _db.products,
+      },
+    ).get();
+
+    final lines = lineRows.map((r) {
+      final m = r.data;
+      return InvoiceDetailLine(
+        productName: m['product_name'] as String,
+        quantity: (m['quantity'] as num).toDouble(),
+        unitPrice: (m['unit_price'] as num).toDouble(),
+        discount: (m['discount_amount'] as num).toDouble(),
+        lineTotal: (m['line_total'] as num).toDouble(),
+      );
+    }).toList();
+
+    return InvoiceDetailData(
+      header: header,
+      lines: lines,
+      showTax: showTax,
     );
   }
 }

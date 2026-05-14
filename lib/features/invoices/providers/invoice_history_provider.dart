@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/database/app_database.dart';
 import '../data/invoice_history_query.dart';
+import '../models/invoice_detail.dart';
 import '../models/invoice_history_row.dart';
 import '../repositories/invoice_history_repository.dart';
 
@@ -9,6 +10,11 @@ final invoiceHistoryRepositoryProvider =
     Provider<InvoiceHistoryRepository>((ref) {
   return InvoiceHistoryRepository(AppDatabase.instance);
 });
+
+final invoiceHistoryUiProvider =
+    NotifierProvider<InvoiceHistoryUiNotifier, InvoiceHistoryQuery>(
+  InvoiceHistoryUiNotifier.new,
+);
 
 final invoiceHistoryPageProvider =
     FutureProvider.autoDispose<InvoiceHistoryPage>((ref) async {
@@ -21,6 +27,13 @@ final invoiceHistoryCashiersProvider =
   return ref.read(invoiceHistoryRepositoryProvider).listCashierNames();
 });
 
+final invoiceDetailProvider = FutureProvider.autoDispose
+    .family<InvoiceDetailData, int>((ref, invoiceId) async {
+  return ref
+      .read(invoiceHistoryRepositoryProvider)
+      .fetchInvoiceDetail(invoiceId);
+});
+
 class InvoiceHistoryUiNotifier extends Notifier<InvoiceHistoryQuery> {
   @override
   InvoiceHistoryQuery build() {
@@ -30,30 +43,23 @@ class InvoiceHistoryUiNotifier extends Notifier<InvoiceHistoryQuery> {
     return InvoiceHistoryQuery(dateFrom: from, dateTo: to);
   }
 
-  void applySearch(String s) =>
-      state = state.copyWith(search: s.trim(), page: 0);
+  void applySearch(String s) {
+    state = state.copyWith(search: s.trim(), page: 0);
+  }
 
-  void setDateRange({DateTime? from, DateTime? to, bool clear = false}) {
+  void setDateRange(DateTime? from, DateTime? to, {bool clear = false}) {
     if (clear) {
       state = state.copyWith(clearDateRange: true, page: 0);
       return;
     }
-    state = state.copyWith(
-      dateFrom: from,
-      dateTo: to,
-      page: 0,
-    );
+    state = state.copyWith(dateFrom: from, dateTo: to, page: 0);
   }
 
   void setCashier(String? name) {
-    if (name == null || name.isEmpty) {
+    if (name == null || name.trim().isEmpty) {
       state = state.copyWith(clearCashier: true, page: 0);
     } else {
-      state = state.copyWith(
-        cashierName: name,
-        clearCashier: false,
-        page: 0,
-      );
+      state = state.copyWith(cashierName: name.trim(), page: 0);
     }
   }
 
@@ -61,15 +67,13 @@ class InvoiceHistoryUiNotifier extends Notifier<InvoiceHistoryQuery> {
     if (code == null || code.isEmpty) {
       state = state.copyWith(clearPayment: true, page: 0);
     } else {
-      state = state.copyWith(
-        paymentMethod: code,
-        clearPayment: false,
-        page: 0,
-      );
+      state = state.copyWith(paymentMethod: code, page: 0);
     }
   }
 
-  void setPage(int page) => state = state.copyWith(page: page);
+  void setPage(int page) {
+    state = state.copyWith(page: page);
+  }
 
   void resetToDefaultRange() {
     final now = DateTime.now();
@@ -78,8 +82,3 @@ class InvoiceHistoryUiNotifier extends Notifier<InvoiceHistoryQuery> {
     state = InvoiceHistoryQuery(dateFrom: from, dateTo: to);
   }
 }
-
-final invoiceHistoryUiProvider =
-    NotifierProvider<InvoiceHistoryUiNotifier, InvoiceHistoryQuery>(
-  InvoiceHistoryUiNotifier.new,
-);

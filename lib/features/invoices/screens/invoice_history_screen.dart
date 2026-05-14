@@ -4,88 +4,80 @@ import 'package:intl/intl.dart' hide TextDirection;
 
 import '../../../core/theme/app_colors.dart';
 import '../providers/invoice_history_provider.dart';
+import '../widgets/invoice_details_dialog.dart';
 import '../widgets/invoice_history_data_table.dart';
 import '../widgets/invoice_history_filters_bar.dart';
 import '../widgets/invoice_history_pagination_bar.dart';
 
-class InvoiceHistoryScreen extends ConsumerStatefulWidget {
+class InvoiceHistoryScreen extends ConsumerWidget {
   const InvoiceHistoryScreen({super.key});
 
-  @override
-  ConsumerState<InvoiceHistoryScreen> createState() =>
-      _InvoiceHistoryScreenState();
-}
-
-class _InvoiceHistoryScreenState extends ConsumerState<InvoiceHistoryScreen> {
-  late final TextEditingController _search;
-
-  final _nf = NumberFormat('#,##0');
-  final _df = DateFormat('yyyy/MM/dd HH:mm');
-
-  @override
-  void initState() {
-    super.initState();
-    _search = TextEditingController();
+  void _openDetail(BuildContext context, int invoiceId) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => InvoiceDetailsDialog(invoiceId: invoiceId),
+    );
   }
 
   @override
-  void dispose() {
-    _search.dispose();
-    super.dispose();
-  }
+  Widget build(BuildContext context, WidgetRef ref) {
+    final pageAsync = ref.watch(invoiceHistoryPageProvider);
+    final nf = NumberFormat('#,##0.##');
 
-  void _reloadList() {
-    ref.invalidate(invoiceHistoryPageProvider);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        InvoiceHistoryFiltersBar(
-          searchController: _search,
-          onApplyFilters: _reloadList,
-        ),
-        const Divider(height: 1),
-        Expanded(
-          child: Container(
-            color: AppColors.background,
-            child: ref.watch(invoiceHistoryPageProvider).when(
-                  loading: () =>
-                      const Center(child: CircularProgressIndicator()),
-                  error: (e, _) => Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: SelectableText(
-                        'تعذر تحميل الفواتير:\n$e',
-                        textDirection: TextDirection.rtl,
-                        style: const TextStyle(color: AppColors.error),
-                      ),
-                    ),
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'سجل المبيعات / الفواتير',
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
                   ),
-                  data: (page) {
-                    if (page.rows.isEmpty) {
-                      return const Center(
-                        child: Text(
-                          'لا توجد فواتير مطابقة للفلتر الحالي',
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      );
-                    }
-                    return InvoiceHistoryDataTable(
-                      rows: page.rows,
-                      nf: _nf,
-                      df: _df,
-                    );
-                  },
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'انقر على صف لعرض تفاصيل الفاتورة.',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+            ),
+            const SizedBox(height: 20),
+            const InvoiceHistoryFiltersBar(),
+            const SizedBox(height: 16),
+            Expanded(
+              child: pageAsync.when(
+                loading: () => const Center(
+                  child: CircularProgressIndicator(),
                 ),
-          ),
+                error: (e, _) => Center(
+                  child: SelectableText(
+                    'تعذر تحميل الفواتير:\n$e',
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+                data: (page) {
+                  if (page.rows.isEmpty) {
+                    return const Center(
+                      child: Text('لا توجد فواتير مطابقة للفلاتر الحالية.'),
+                    );
+                  }
+                  return InvoiceHistoryDataTable(
+                    rows: page.rows,
+                    nf: nf,
+                    onOpenInvoice: (id) => _openDetail(context, id),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 12),
+            const InvoiceHistoryPaginationBar(),
+          ],
         ),
-        const InvoiceHistoryPaginationBar(),
-      ],
+      ),
     );
   }
 }

@@ -40,10 +40,10 @@ class InvoiceHistoryPage {
   });
 
   int get totalPages =>
-      totalCount == 0 ? 1 : (totalCount + pageSize - 1) ~/ pageSize;
+      totalCount <= 0 ? 1 : (totalCount + pageSize - 1) ~/ pageSize;
 }
 
-/// Maps raw [payment_method] DB codes to Arabic labels for the UI.
+/// Maps stored [payment_method] codes to short Arabic labels for the UI.
 String invoicePaymentLabelAr(String code) {
   switch (code.toUpperCase()) {
     case 'CASH':
@@ -51,10 +51,10 @@ String invoicePaymentLabelAr(String code) {
     case 'CARD':
       return 'بطاقة';
     case 'DEBT':
-      return 'آجل';
+      return 'دين';
     case 'MIXED':
       return 'مختلط';
     default:
-      return code;
+      return code.trim().isEmpty ? '—' : code;
   }
 }

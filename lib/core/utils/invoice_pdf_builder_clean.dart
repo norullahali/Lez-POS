@@ -84,37 +84,30 @@ class InvoicePdfBuilderClean {
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.center,
       children: [
+        // Logo — centered, capped at 50 pt height, scaled to page width.
         if (data.logoBytes != null)
           pw.Image(
             pw.MemoryImage(data.logoBytes!),
             height: 50,
+            fit: pw.BoxFit.contain,
           ),
         pw.SizedBox(height: 4),
         pw.Text(
           _safeArabic(data.storeName),
           textAlign: pw.TextAlign.center,
-          style: pw.TextStyle(
-            font: boldFont,
-            fontSize: 16,
-          ),
+          style: pw.TextStyle(font: boldFont, fontSize: 16),
         ),
-        if (data.phone != null)
+        if (data.phone != null && data.phone!.isNotEmpty)
           pw.Text(
-            _safeArabic(data.phone!),
+            _safeArabic('هاتف: ${data.phone!}'),
             textAlign: pw.TextAlign.center,
-            style: pw.TextStyle(
-              font: regularFont,
-              fontSize: 9,
-            ),
+            style: pw.TextStyle(font: regularFont, fontSize: 9),
           ),
-        if (data.address != null)
+        if (data.address != null && data.address!.isNotEmpty)
           pw.Text(
-            _safeArabic(data.address!),
+            _safeArabic('العنوان: ${data.address!}'),
             textAlign: pw.TextAlign.center,
-            style: pw.TextStyle(
-              font: regularFont,
-              fontSize: 9,
-            ),
+            style: pw.TextStyle(font: regularFont, fontSize: 9),
           ),
         pw.SizedBox(height: 4),
         pw.Divider(),
@@ -128,21 +121,14 @@ class InvoicePdfBuilderClean {
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.stretch,
       children: [
-        _kvRow('رقم الفاتورة', data.invoiceNumber),
-        _kvRow(
-          'التاريخ',
-          _formatDate(data.date),
-        ),
-        if (data.customerName != null)
-          _kvRow(
-            'العميل',
-            _safeArabic(data.customerName!),
-          ),
-        if (data.cashierName != null)
-          _kvRow(
-            'الكاشير',
-            _safeArabic(data.cashierName!),
-          ),
+        // Info rows use _infoRow so the label appears on the RIGHT
+        // and the value on the LEFT — matching the preview's _meta widget.
+        _infoRow('رقم الفاتورة', data.invoiceNumber),
+        _infoRow('التاريخ', _formatDate(data.date)),
+        if (data.cashierName != null && data.cashierName!.isNotEmpty)
+          _infoRow('الكاشير', _safeArabic(data.cashierName!)),
+        if (data.customerName != null && data.customerName!.isNotEmpty)
+          _infoRow('العميل', _safeArabic(data.customerName!)),
       ],
     );
   }
@@ -205,24 +191,28 @@ class InvoicePdfBuilderClean {
   // TOTALS
 
   pw.Widget _buildTotalSection(InvoiceData data) {
+    final subtotal = data.items.fold(0.0, (s, i) => s + i.lineTotal);
+    final tax      = data.showTax ? subtotal * 0.15 : 0.0;
+    final total    = data.showTax ? subtotal + tax : data.total;
+
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.stretch,
       children: [
+        // Subtotal row — always shown so the breakdown is visible.
+        _kvRow('المجموع الفرعي', '${subtotal.toStringAsFixed(0)} د.ع'),
+        // Tax row — only when showTax is enabled (matches preview).
+        if (data.showTax)
+          _kvRow('ضريبة 15%', '${tax.toStringAsFixed(0)} د.ع'),
+        // Grand total — bold highlight, matches preview's grand-total box.
         _kvRow(
           'الإجمالي',
-          '${data.total.toStringAsFixed(0)} د.ع',
+          '${total.toStringAsFixed(0)} د.ع',
           bold: true,
         ),
         if (data.paid != null)
-          _kvRow(
-            'المدفوع',
-            '${data.paid!.toStringAsFixed(0)} د.ع',
-          ),
+          _kvRow('المدفوع', '${data.paid!.toStringAsFixed(0)} د.ع'),
         if (data.change != null && data.change! > 0)
-          _kvRow(
-            'الباقي',
-            '${data.change!.toStringAsFixed(0)} د.ع',
-          ),
+          _kvRow('الباقي', '${data.change!.toStringAsFixed(0)} د.ع'),
       ],
     );
   }
@@ -306,20 +296,46 @@ class InvoicePdfBuilderClean {
     );
   }
 
-  pw.Widget _kvRow(
-    String label,
-    String value, {
-    bool bold = false,
-  }) {
+  // ── Row helpers ──────────────────────────────────────────────────────────
+  //
+  // In pw.Directionality(rtl) the FIRST child of a Row appears on the RIGHT
+  // and the LAST child on the LEFT.
+  //
+  //  _infoRow  — label: RIGHT, value LEFT  (mirrors preview _meta widget)
+  //              Used for: invoice number, date, cashier, customer.
+  //
+  //  _kvRow    — label: LEFT,  value RIGHT (mirrors preview _trow widget)
+  //              Used for: subtotal, tax, grand total, paid, change.
+
+  /// Info row: `label: RIGHT` — `value LEFT`  (preview _meta style)
+  pw.Widget _infoRow(String label, String value, {bool bold = false}) {
     final style = pw.TextStyle(
       font: bold ? boldFont : regularFont,
       fontSize: 9,
     );
-
     return pw.Row(
       mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
       children: [
+        // In RTL: first child → RIGHT  →  label: on the right ✓
+        pw.Text('$label:', style: style),
+        // second child → LEFT  →  value on the left ✓
         pw.Text(value, style: style),
+      ],
+    );
+  }
+
+  /// Total row: `label: LEFT` — `value RIGHT`  (preview _trow style)
+  pw.Widget _kvRow(String label, String value, {bool bold = false}) {
+    final style = pw.TextStyle(
+      font: bold ? boldFont : regularFont,
+      fontSize: 9,
+    );
+    return pw.Row(
+      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+      children: [
+        // In RTL: first child → RIGHT  →  value on the right ✓
+        pw.Text(value, style: style),
+        // second child → LEFT  →  label: on the left ✓
         pw.Text('$label:', style: style),
       ],
     );

@@ -153,7 +153,10 @@ class EscPosBuilder {
 
   /// Print a key-value row aligned to [lineWidth] columns.
   ///
-  /// Layout: `label<spaces>value`
+  /// Layout (LTR / totals style): `label<spaces>value`
+  ///
+  /// Use this for total rows — matches the preview's `_trow` widget where
+  /// label appears on the visual LEFT and value on the visual RIGHT.
   EscPosBuilder kvRow(
     String label,
     String value, {
@@ -162,6 +165,27 @@ class EscPosBuilder {
     final gap = lineWidth - label.length - value.length;
     final spaces = gap > 0 ? ' ' * gap : ' ';
     final row = '$label$spaces$value';
+    final trimmed =
+        row.length > lineWidth ? row.substring(0, lineWidth) : row;
+    _buf.addAll(trimmed.codeUnits);
+    _buf.add(_LF);
+    return this;
+  }
+
+  /// Print a key-value row in RTL order: `value<spaces>label:`
+  ///
+  /// Use this for invoice **info** rows (invoice number, date, cashier,
+  /// customer).  Mirrors the preview's `_meta` widget where value appears on
+  /// the visual LEFT and the label appears on the visual RIGHT.
+  EscPosBuilder rtlInfoRow(
+    String label,
+    String value, {
+    int lineWidth = 48,
+  }) {
+    final tag = '$label:';
+    final gap = lineWidth - value.length - tag.length;
+    final spaces = gap > 0 ? ' ' * gap : ' ';
+    final row = '$value$spaces$tag'; // value LEFT  →  label: RIGHT
     final trimmed =
         row.length > lineWidth ? row.substring(0, lineWidth) : row;
     _buf.addAll(trimmed.codeUnits);
@@ -242,26 +266,27 @@ class EscPosBuilder {
 
     b.separator(width: w);
 
-    // ── Invoice metadata ─────────────────────────────────────────────────
+    // ── Invoice metadata (RTL order: value LEFT, label: RIGHT) ───────────
+    // Matches the preview's _meta widget layout.
     b.alignLeft();
-    b.kvRow('رقم الفاتورة', data.invoiceNumber,    lineWidth: w);
-    b.kvRow('التاريخ',      _fmtDate(data.date),   lineWidth: w);
+    b.rtlInfoRow('رقم الفاتورة', data.invoiceNumber,  lineWidth: w);
+    b.rtlInfoRow('التاريخ',      _fmtDate(data.date), lineWidth: w);
     if (data.cashierName != null && data.cashierName!.isNotEmpty) {
-      b.kvRow('الكاشير', data.cashierName!, lineWidth: w);
+      b.rtlInfoRow('الكاشير', data.cashierName!, lineWidth: w);
     }
     if (data.customerName != null && data.customerName!.isNotEmpty) {
-      b.kvRow('العميل', data.customerName!, lineWidth: w);
+      b.rtlInfoRow('العميل', data.customerName!, lineWidth: w);
     }
 
     b.separator(width: w);
 
-    // ── Items table ──────────────────────────────────────────────────────
-    b.boldOn().line(_tableHeader(w)).boldOff();
+    // ── Items table (RTL column order: المجموع | السعر | الكمية | المادة) ─
+    b.boldOn().line(_rtlTableHeader(w)).boldOff();
     b.separator(width: w, char: '.');
 
     for (final item in data.items) {
       if (item.name.trim().isEmpty) continue;
-      b.line(_tableRow(item.name, item.qty, item.unitPrice, item.lineTotal, w));
+      b.line(_rtlTableRow(item.name, item.qty, item.unitPrice, item.lineTotal, w));
     }
 
     b.separator(width: w);
@@ -318,35 +343,53 @@ class EscPosBuilder {
       '${d.year}/${d.month.toString().padLeft(2, "0")}/${d.day.toString().padLeft(2, "0")} '
       '${d.hour.toString().padLeft(2, "0")}:${d.minute.toString().padLeft(2, "0")}';
 
-  static String _tableHeader(int w) {
-    final nw = (w * 0.40).floor();
-    final qw = (w * 0.15).floor();
-    final pw = (w * 0.20).floor();
-    final tw = w - nw - qw - pw;
-    return 'Item'.padRight(nw) +
-        'Qty'.padLeft(qw) +
-        'Price'.padLeft(pw) +
-        'Total'.padLeft(tw);
+  // ── RTL table helpers ─────────────────────────────────────────────────────
+  //
+  // Visual (left → right on paper):  المجموع | السعر | الكمية | المادة
+  //
+  // Column proportions match the preview flex values
+  //   المادة=4  الكمية=2  السعر=2  المجموع=3  (total flex=11)
+  //
+  // Printing is LTR so the "leftmost" column is printed first in the string.
+  // Arabic text inside each cell is correct as long as the firmware supports
+  // the active code page (CP1256 / UTF-8).
+
+  /// Fit [s] into exactly [width] character columns (pad right, truncate).
+  static String _col(String s, int width) {
+    if (s.length >= width) return s.substring(0, width);
+    return s + ' ' * (width - s.length);
   }
 
-  static String _tableRow(
+  /// Arabic RTL table header.
+  /// Left-to-right order: [المجموع][السعر][الكمية][المادة]
+  static String _rtlTableHeader(int w) {
+    final tw = (w * 3 ~/ 11);       // المجموع
+    final pw = (w * 2 ~/ 11);       // السعر
+    final qw = (w * 2 ~/ 11);       // الكمية
+    final nw = w - tw - pw - qw;    // المادة (remainder)
+    return _col('المجموع', tw) +
+           _col('السعر',   pw) +
+           _col('الكمية',  qw) +
+           _col('المادة',  nw);
+  }
+
+  /// Arabic RTL table data row.
+  /// Left-to-right order: [total][price][qty][name]
+  static String _rtlTableRow(
     String name,
     num? qty,
     num? price,
     num? total,
     int w,
   ) {
-    final nw = (w * 0.40).floor();
-    final qw = (w * 0.15).floor();
-    final pw = (w * 0.20).floor();
-    final tw = w - nw - qw - pw;
-
-    String trim(String s, int len) =>
-        s.length > len ? '${s.substring(0, len - 1)}.' : s;
-
-    return trim(name, nw).padRight(nw) +
-        _fmt(qty ?? 0).padLeft(qw) +
-        _fmt(price ?? 0).padLeft(pw) +
-        _fmt(total ?? 0).padLeft(tw);
+    final tw = (w * 3 ~/ 11);
+    final pw = (w * 2 ~/ 11);
+    final qw = (w * 2 ~/ 11);
+    final nw = w - tw - pw - qw;
+    final safeName = name.length > nw ? name.substring(0, nw) : name;
+    return _col(_fmt(total ?? 0),  tw) +
+           _col(_fmt(price ?? 0),  pw) +
+           _col(_fmt(qty   ?? 0),  qw) +
+           _col(safeName,          nw);
   }
 }

@@ -11,6 +11,35 @@ class InvoiceHistoryRepository {
 
   static const _completedStatus = 'مكتملة';
 
+  /// Interprets [sale_date] from [customSelect] for SQLite datetime columns.
+  ///
+  /// Drift/sqlite3 may return a [DateTime], an integral Unix epoch, or a string.
+  /// SQLite often stores datetimes as **seconds** since 1970-01-01 UTC; treating
+  /// those as **milliseconds** yields dates around 1970-01-xx (root cause of
+  /// the wrong display).
+  static DateTime _parseSaleDate(dynamic raw) {
+    if (raw == null) {
+      return DateTime.fromMillisecondsSinceEpoch(0, isUtc: true).toLocal();
+    }
+    if (raw is DateTime) {
+      return raw.isUtc ? raw.toLocal() : raw;
+    }
+    if (raw is String) {
+      return DateTime.parse(raw).toLocal();
+    }
+    if (raw is num) {
+      final v = raw.toInt();
+      // Heuristic: values below this are Unix **seconds**; above = milliseconds.
+      const threshold = 100000000000; // 1e11
+      if (v.abs() < threshold) {
+        return DateTime.fromMillisecondsSinceEpoch(v * 1000, isUtc: true)
+            .toLocal();
+      }
+      return DateTime.fromMillisecondsSinceEpoch(v, isUtc: true).toLocal();
+    }
+    throw ArgumentError('Unsupported sale_date type: ${raw.runtimeType}');
+  }
+
   /// Distinct cashier display names (user full name or session cashier).
   Future<List<String>> listCashierNames() async {
     final rows = await _db.customSelect(
@@ -53,7 +82,8 @@ ORDER BY trim_key COLLATE NOCASE
     }
 
     if (q.dateFrom != null) {
-      final start = DateTime(q.dateFrom!.year, q.dateFrom!.month, q.dateFrom!.day);
+      final start =
+          DateTime(q.dateFrom!.year, q.dateFrom!.month, q.dateFrom!.day);
       where.write(' AND si.sale_date >= ?');
       variables.add(Variable.withDateTime(start));
     }
@@ -76,7 +106,7 @@ ORDER BY trim_key COLLATE NOCASE
       variables.add(Variable.withString(q.paymentMethod!));
     }
 
-    final joinFrom = '''
+    const joinFrom = '''
 FROM sales_invoices si
 LEFT JOIN customers c ON c.id = si.customer_id
 LEFT JOIN users u ON u.id = si.created_by_user_id
@@ -86,8 +116,7 @@ LEFT JOIN (
 ) ic ON ic.invoice_id = si.id
 ''';
 
-    final countSql =
-        'SELECT COUNT(*) AS cnt $joinFrom ${where.toString()}';
+    final countSql = 'SELECT COUNT(*) AS cnt $joinFrom ${where.toString()}';
     final countRow = await _db.customSelect(
       countSql,
       variables: variables,
@@ -141,18 +170,12 @@ LIMIT ? OFFSET ?
 
     final rows = dataRows.map((r) {
       final rawCashier = r.data['cashier_raw'] as String? ?? '';
-      final cashier =
-          rawCashier.trim().isEmpty ? '—' : rawCashier.trim();
-
-      final sd = r.data['sale_date'];
-      final saleDate = sd is DateTime
-          ? sd
-          : DateTime.fromMillisecondsSinceEpoch((sd as num).toInt());
+      final cashier = rawCashier.trim().isEmpty ? '—' : rawCashier.trim();
 
       return InvoiceHistoryRow(
         id: (r.data['id'] as num).toInt(),
         invoiceNumber: r.data['invoice_number'] as String,
-        saleDate: saleDate,
+        saleDate: _parseSaleDate(r.data['sale_date']),
         customerName: r.data['customer_name'] as String,
         cashierName: cashier,
         itemCount: (r.data['item_count'] as num?)?.toInt() ?? 0,

@@ -268,15 +268,18 @@ class EscPosBuilder {
 
     // ── Invoice metadata (RTL order: value LEFT, label: RIGHT) ───────────
     // Matches the preview's _meta widget layout.
+    // ── Invoice metadata ─────────────────────────────────────────────────
+    // الكاشير and العميل are ALWAYS shown; null values fall back to defaults
+    // so the receipt always has a complete header regardless of login state.
     b.alignLeft();
-    b.rtlInfoRow('رقم الفاتورة', data.invoiceNumber,  lineWidth: w);
-    b.rtlInfoRow('التاريخ',      _fmtDate(data.date), lineWidth: w);
-    if (data.cashierName != null && data.cashierName!.isNotEmpty) {
-      b.rtlInfoRow('الكاشير', data.cashierName!, lineWidth: w);
-    }
-    if (data.customerName != null && data.customerName!.isNotEmpty) {
-      b.rtlInfoRow('العميل', data.customerName!, lineWidth: w);
-    }
+    b.rtlInfoRow('رقم الفاتورة', data.invoiceNumber,                                          lineWidth: w);
+    b.rtlInfoRow('التاريخ',      _fmtDate(data.date),                                         lineWidth: w);
+    b.rtlInfoRow('الكاشير',      data.cashierName?.trim().isNotEmpty == true
+                                     ? data.cashierName!
+                                     : 'مدير النظام',                                         lineWidth: w);
+    b.rtlInfoRow('العميل',       data.customerName?.trim().isNotEmpty == true
+                                     ? data.customerName!
+                                     : 'زبون عام',                                            lineWidth: w);
 
     b.separator(width: w);
 

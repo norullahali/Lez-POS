@@ -33,7 +33,14 @@ import '../models/invoice_models.dart';
 class _LastInvoiceData {
   final String invoiceNumber;
   final List<InvoiceItem> items;
-  const _LastInvoiceData({required this.invoiceNumber, required this.items});
+  final String? cashierName;
+  final String? customerName;
+  const _LastInvoiceData({
+    required this.invoiceNumber,
+    required this.items,
+    this.cashierName,
+    this.customerName,
+  });
 }
 
 // ─── Keyboard shortcut intents ─────────────────────────────────────────────
@@ -185,6 +192,8 @@ class _PosScreenState extends ConsumerState<PosScreen> {
       await printSale(
         invoiceNumber: invoice.invoiceNumber,
         items: invoice.items,
+        cashierName: invoice.cashierName,
+        customerName: invoice.customerName,
       );
     } catch (e) {
       if (!mounted) return;
@@ -749,6 +758,16 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
               ))
           .toList();
 
+      // Resolve cashier and customer names for the receipt.
+      // Computed before the print call so the same values are reused for
+      // both the immediate print and any Ctrl+P re-print.
+      final _fullName = user?.fullName ?? '';
+      final printCashierName = _fullName.isNotEmpty ? _fullName : session.cashierName;
+      final printCustomerName =
+          selectedCustomer != null && selectedCustomer.id != 1
+              ? selectedCustomer.name
+              : null; // renderer will fall back to 'زبون عام'
+
       // ✅ طباعة
       debugPrint('=== BEFORE PRINT ===');
 
@@ -756,6 +775,8 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
         await printSale(
           invoiceNumber: invoiceNumber,
           items: invoiceItems,
+          cashierName: printCashierName,
+          customerName: printCustomerName,
         );
 
         debugPrint('=== PRINT SUCCESS ===');
@@ -765,9 +786,14 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
         debugPrint(s.toString());
       }
 
-      // Notify parent so Ctrl+P can re-print this invoice.
+      // Notify parent so Ctrl+P can re-print this invoice (with same names).
       widget.onCheckoutComplete(
-        _LastInvoiceData(invoiceNumber: invoiceNumber, items: invoiceItems),
+        _LastInvoiceData(
+          invoiceNumber: invoiceNumber,
+          items: invoiceItems,
+          cashierName: printCashierName,
+          customerName: printCustomerName,
+        ),
       );
 
 // أو ترسله للطابعة / viewer

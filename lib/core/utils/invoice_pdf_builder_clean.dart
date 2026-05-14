@@ -121,14 +121,18 @@ class InvoicePdfBuilderClean {
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.stretch,
       children: [
-        // Info rows use _infoRow so the label appears on the RIGHT
-        // and the value on the LEFT — matching the preview's _meta widget.
+        // Info rows: label RIGHT, value LEFT (from ambient pw.Directionality rtl).
+        // الكاشير and العميل are ALWAYS rendered; null falls back to defaults.
         _infoRow('رقم الفاتورة', data.invoiceNumber),
-        _infoRow('التاريخ', _formatDate(data.date)),
-        if (data.cashierName != null && data.cashierName!.isNotEmpty)
-          _infoRow('الكاشير', _safeArabic(data.cashierName!)),
-        if (data.customerName != null && data.customerName!.isNotEmpty)
-          _infoRow('العميل', _safeArabic(data.customerName!)),
+        _infoRow('التاريخ',      _formatDate(data.date)),
+        _infoRow('الكاشير',
+          _safeArabic(data.cashierName?.trim().isNotEmpty == true
+              ? data.cashierName!
+              : 'مدير النظام')),
+        _infoRow('العميل',
+          _safeArabic(data.customerName?.trim().isNotEmpty == true
+              ? data.customerName!
+              : 'زبون عام')),
       ],
     );
   }

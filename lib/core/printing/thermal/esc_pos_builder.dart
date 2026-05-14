@@ -280,7 +280,7 @@ class EscPosBuilder {
 
     b.separator(width: w);
 
-    // ── Items table (RTL column order: المجموع | السعر | الكمية | المادة) ─
+    // ── Items table: [المادة] [العدد] [السعر] [المجموع] (left → right) ─────
     b.boldOn().line(_rtlTableHeader(w)).boldOff();
     b.separator(width: w, char: '.');
 
@@ -343,38 +343,47 @@ class EscPosBuilder {
       '${d.year}/${d.month.toString().padLeft(2, "0")}/${d.day.toString().padLeft(2, "0")} '
       '${d.hour.toString().padLeft(2, "0")}:${d.minute.toString().padLeft(2, "0")}';
 
-  // ── RTL table helpers ─────────────────────────────────────────────────────
+  // ── Arabic accounting table helpers ──────────────────────────────────────
   //
-  // Visual (left → right on paper):  المجموع | السعر | الكمية | المادة
+  // Standard Arabic thermal POS column order (physical left → right on paper):
   //
-  // Column proportions match the preview flex values
-  //   المادة=4  الكمية=2  السعر=2  المجموع=3  (total flex=11)
+  //   [المادة]  [العدد]  [السعر]  [المجموع]
+  //   (name)    (qty)   (price)   (total)
   //
-  // Printing is LTR so the "leftmost" column is printed first in the string.
-  // Arabic text inside each cell is correct as long as the firmware supports
-  // the active code page (CP1256 / UTF-8).
+  // This matches Arabic accounting convention used on physical thermal receipts:
+  //   • المادة gets the widest column on the LEFT (long Arabic product names).
+  //   • Numeric columns (العدد, السعر, المجموع) are narrower and sit to the right.
+  //   • An Arabic reader scans the receipt from right to left, encountering
+  //     المجموع first, then السعر, then العدد, then المادة — the natural
+  //     Arabic POS reading sequence.
+  //
+  // Column proportions mirror the preview's flex values
+  //   المادة=4  العدد=2  السعر=2  المجموع=3  (total flex=11)
+  //
+  // Thermal printing is LTR so "leftmost" = first character in the string.
 
-  /// Fit [s] into exactly [width] character columns (pad right, truncate).
+  /// Fit [s] into exactly [width] character columns.
+  /// Pads with spaces on the right; truncates if too long.
   static String _col(String s, int width) {
     if (s.length >= width) return s.substring(0, width);
     return s + ' ' * (width - s.length);
   }
 
-  /// Arabic RTL table header.
-  /// Left-to-right order: [المجموع][السعر][الكمية][المادة]
+  /// Arabic table header — left-to-right on paper:
+  ///   [المادة] [العدد] [السعر] [المجموع]
   static String _rtlTableHeader(int w) {
-    final tw = (w * 3 ~/ 11);       // المجموع
-    final pw = (w * 2 ~/ 11);       // السعر
-    final qw = (w * 2 ~/ 11);       // الكمية
-    final nw = w - tw - pw - qw;    // المادة (remainder)
-    return _col('المجموع', tw) +
+    final nw = (w * 4 ~/ 11);     // المادة  — widest (product name)
+    final qw = (w * 2 ~/ 11);     // العدد
+    final pw = (w * 2 ~/ 11);     // السعر
+    final tw = w - nw - qw - pw;  // المجموع — remainder
+    return _col('المادة',  nw) +
+           _col('العدد',   qw) +
            _col('السعر',   pw) +
-           _col('الكمية',  qw) +
-           _col('المادة',  nw);
+           _col('المجموع', tw);
   }
 
-  /// Arabic RTL table data row.
-  /// Left-to-right order: [total][price][qty][name]
+  /// Arabic table data row — same left-to-right order as header:
+  ///   [name] [qty] [price] [total]
   static String _rtlTableRow(
     String name,
     num? qty,
@@ -382,14 +391,14 @@ class EscPosBuilder {
     num? total,
     int w,
   ) {
-    final tw = (w * 3 ~/ 11);
-    final pw = (w * 2 ~/ 11);
+    final nw = (w * 4 ~/ 11);
     final qw = (w * 2 ~/ 11);
-    final nw = w - tw - pw - qw;
+    final pw = (w * 2 ~/ 11);
+    final tw = w - nw - qw - pw;
     final safeName = name.length > nw ? name.substring(0, nw) : name;
-    return _col(_fmt(total ?? 0),  tw) +
-           _col(_fmt(price ?? 0),  pw) +
+    return _col(safeName,          nw) +
            _col(_fmt(qty   ?? 0),  qw) +
-           _col(safeName,          nw);
+           _col(_fmt(price ?? 0),  pw) +
+           _col(_fmt(total ?? 0),  tw);
   }
 }

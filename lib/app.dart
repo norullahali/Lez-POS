@@ -36,6 +36,7 @@ import 'features/settings/screens/loyalty_settings_screen.dart';
 import 'features/backup/screens/settings_screen.dart';
 import 'package:lez_pos/features/settings/screens/settings_home_screen.dart';
 import 'package:lez_pos/features/settings/screens/invoice_settings_screen.dart';
+import 'package:lez_pos/features/invoices/screens/invoice_history_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final authAsync = ref.watch(authProvider);
@@ -142,6 +143,10 @@ final routerProvider = Provider<GoRouter>((ref) {
               path: '/supplier-returns',
               builder: (_, __) => const SupplierReturnsScreen()),
           GoRoute(path: '/reports', builder: (_, __) => const ReportsScreen()),
+          GoRoute(
+            path: '/invoice-history',
+            builder: (_, __) => const InvoiceHistoryScreen(),
+          ),
           GoRoute(path: '/users', builder: (_, __) => const UsersScreen()),
           GoRoute(path: '/roles', builder: (_, __) => const RolesScreen()),
           GoRoute(

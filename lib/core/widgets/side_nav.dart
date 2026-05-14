@@ -82,6 +82,11 @@ const kNavItems = [
       permissionKey: 'settings.edit'),
   //vItem(route: '/loyalty-settings', icon: Icons.star_rounded, label: 'إعدادات النقاط', permissionKey: 'settings.edit'),
   NavItem(
+      route: '/invoice-history',
+      icon: Icons.receipt_long_rounded,
+      label: 'سجل الفواتير',
+      permissionKey: 'reports.view'),
+  NavItem(
       route: '/reports',
       icon: Icons.bar_chart_rounded,
       label: 'التقارير',

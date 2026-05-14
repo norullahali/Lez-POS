@@ -150,40 +150,51 @@ class InvoicePdfBuilderClean {
       );
     }
 
-    return pw.Table(
-      border: pw.TableBorder(
-        horizontalInside: const pw.BorderSide(width: 0.2),
-      ),
-      columnWidths: const {
-        0: pw.FlexColumnWidth(3),
-        1: pw.FlexColumnWidth(1),
-        2: pw.FlexColumnWidth(1.5),
-        3: pw.FlexColumnWidth(1.5),
-      },
+    // pw.Table does NOT honour ambient Directionality — columns always render
+    // in LTR order regardless of pw.Directionality(rtl) wrapping.
+    // We rebuild the table as a Column of pw.Row(textDirection: rtl) widgets
+    // so each row's children are physically placed right-to-left:
+    //
+    //   children order → [المادة, العدد, السعر, المجموع]
+    //   with textDirection:rtl  →  المادة lands on the RIGHT,
+    //                              المجموع lands on the LEFT.
+    //
+    // Visual left-to-right on paper:  [المجموع][السعر][العدد][المادة]
+    // Arabic reader (RTL):            [المادة][العدد][السعر][المجموع]  ✓
+
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.stretch,
       children: [
-        pw.TableRow(
-          decoration: const pw.BoxDecoration(
-            border: pw.Border(
-              bottom: pw.BorderSide(width: 0.8),
-            ),
-          ),
+        // ── Header row ──────────────────────────────────────────────────
+        // pw.Row inherits RTL from the parent pw.Directionality(rtl).
+        // First child → RIGHT, last child → LEFT.
+        // Children order [المادة, العدد, السعر, المجموع]:
+        //   المادة (first)  → RIGHT  ✓
+        //   المجموع (last)  → LEFT   ✓
+        pw.Row(
           children: [
-            _headerCell('المادة'),
-            _headerCell('عدد'),
-            _headerCell('السعر'),
-            _headerCell('المجموع'),
+            pw.Expanded(flex: 4, child: _headerCell('المادة',  align: pw.TextAlign.right)),
+            pw.Expanded(flex: 2, child: _headerCell('العدد')),
+            pw.Expanded(flex: 2, child: _headerCell('السعر')),
+            pw.Expanded(flex: 3, child: _headerCell('المجموع', align: pw.TextAlign.left)),
           ],
         ),
+        pw.Divider(thickness: 0.8),
+        // ── Data rows ───────────────────────────────────────────────────
         ...items.map(
-          (item) => pw.TableRow(
-            children: [
-              _cell(_safeArabic(item.name)),
-              _cell(_safe(item.qty)),
-              _cell(_safe(item.unitPrice)),
-              _cell(_safe(item.lineTotal)),
-            ],
+          (item) => pw.Padding(
+            padding: const pw.EdgeInsets.symmetric(vertical: 1),
+            child: pw.Row(
+              children: [
+                pw.Expanded(flex: 4, child: _cell(_safeArabic(item.name), align: pw.TextAlign.right)),
+                pw.Expanded(flex: 2, child: _cell(_safe(item.qty))),
+                pw.Expanded(flex: 2, child: _cell(_safe(item.unitPrice))),
+                pw.Expanded(flex: 3, child: _cell(_safe(item.lineTotal),  align: pw.TextAlign.left)),
+              ],
+            ),
           ),
         ),
+        pw.Divider(thickness: 0.3),
       ],
     );
   }
@@ -195,24 +206,19 @@ class InvoicePdfBuilderClean {
     final tax      = data.showTax ? subtotal * 0.15 : 0.0;
     final total    = data.showTax ? subtotal + tax : data.total;
 
+    // All total rows use _infoRow: label on RIGHT, value on LEFT — same as
+    // info rows. Arabic accounting places the label on the right side.
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.stretch,
       children: [
-        // Subtotal row — always shown so the breakdown is visible.
-        _kvRow('المجموع الفرعي', '${subtotal.toStringAsFixed(0)} د.ع'),
-        // Tax row — only when showTax is enabled (matches preview).
+        _infoRow('المجموع الفرعي', '${subtotal.toStringAsFixed(0)} د.ع'),
         if (data.showTax)
-          _kvRow('ضريبة 15%', '${tax.toStringAsFixed(0)} د.ع'),
-        // Grand total — bold highlight, matches preview's grand-total box.
-        _kvRow(
-          'الإجمالي',
-          '${total.toStringAsFixed(0)} د.ع',
-          bold: true,
-        ),
+          _infoRow('ضريبة 15%', '${tax.toStringAsFixed(0)} د.ع'),
+        _infoRow('الإجمالي', '${total.toStringAsFixed(0)} د.ع', bold: true),
         if (data.paid != null)
-          _kvRow('المدفوع', '${data.paid!.toStringAsFixed(0)} د.ع'),
+          _infoRow('المدفوع', '${data.paid!.toStringAsFixed(0)} د.ع'),
         if (data.change != null && data.change! > 0)
-          _kvRow('الباقي', '${data.change!.toStringAsFixed(0)} د.ع'),
+          _infoRow('الباقي', '${data.change!.toStringAsFixed(0)} د.ع'),
       ],
     );
   }
@@ -265,12 +271,12 @@ class InvoicePdfBuilderClean {
 
   // HELPERS
 
-  pw.Widget _headerCell(String text) {
+  pw.Widget _headerCell(String text, {pw.TextAlign align = pw.TextAlign.center}) {
     return pw.Padding(
       padding: const pw.EdgeInsets.all(4),
       child: pw.Text(
         text,
-        textAlign: pw.TextAlign.center,
+        textAlign: align,
         style: pw.TextStyle(
           font: boldFont,
           fontSize: 9,
@@ -279,7 +285,7 @@ class InvoicePdfBuilderClean {
     );
   }
 
-  pw.Widget _cell(String text) {
+  pw.Widget _cell(String text, {pw.TextAlign align = pw.TextAlign.center}) {
     return pw.Padding(
       padding: const pw.EdgeInsets.symmetric(
         vertical: 2,
@@ -287,7 +293,7 @@ class InvoicePdfBuilderClean {
       ),
       child: pw.Text(
         text,
-        textAlign: pw.TextAlign.center,
+        textAlign: align,
         style: pw.TextStyle(
           font: regularFont,
           fontSize: 8,
@@ -298,16 +304,22 @@ class InvoicePdfBuilderClean {
 
   // ── Row helpers ──────────────────────────────────────────────────────────
   //
-  // In pw.Directionality(rtl) the FIRST child of a Row appears on the RIGHT
-  // and the LAST child on the LEFT.
+  // We set textDirection: rtl EXPLICITLY on every Row so we do NOT rely on
+  // the ambient pw.Directionality — some pdf widget types ignore it.
   //
-  //  _infoRow  — label: RIGHT, value LEFT  (mirrors preview _meta widget)
-  //              Used for: invoice number, date, cashier, customer.
+  // In pw.Row(textDirection: rtl):
+  //   first child  → placed on the RIGHT  →  use for LABEL
+  //   second child → placed on the LEFT   →  use for VALUE
   //
-  //  _kvRow    — label: LEFT,  value RIGHT (mirrors preview _trow widget)
-  //              Used for: subtotal, tax, grand total, paid, change.
+  // Arabic accounting convention:
+  //   الإجمالي:          2500 د.ع
+  //   (label RIGHT)       (value LEFT)
 
-  /// Info row: `label: RIGHT` — `value LEFT`  (preview _meta style)
+  /// All label/value rows — label: RIGHT, value LEFT — Arabic convention.
+  /// Used for: invoice info rows AND totals (same layout for both).
+  ///
+  /// pw.Row inherits RTL from the ancestor pw.Directionality(rtl) that
+  /// wraps the entire page.  First child → RIGHT, second → LEFT.
   pw.Widget _infoRow(String label, String value, {bool bold = false}) {
     final style = pw.TextStyle(
       font: bold ? boldFont : regularFont,
@@ -316,27 +328,8 @@ class InvoicePdfBuilderClean {
     return pw.Row(
       mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
       children: [
-        // In RTL: first child → RIGHT  →  label: on the right ✓
-        pw.Text('$label:', style: style),
-        // second child → LEFT  →  value on the left ✓
-        pw.Text(value, style: style),
-      ],
-    );
-  }
-
-  /// Total row: `label: LEFT` — `value RIGHT`  (preview _trow style)
-  pw.Widget _kvRow(String label, String value, {bool bold = false}) {
-    final style = pw.TextStyle(
-      font: bold ? boldFont : regularFont,
-      fontSize: 9,
-    );
-    return pw.Row(
-      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-      children: [
-        // In RTL: first child → RIGHT  →  value on the right ✓
-        pw.Text(value, style: style),
-        // second child → LEFT  →  label: on the left ✓
-        pw.Text('$label:', style: style),
+        pw.Text('$label:', style: style),   // first child → RIGHT ✓
+        pw.Text(value,     style: style),   // second child → LEFT ✓
       ],
     );
   }

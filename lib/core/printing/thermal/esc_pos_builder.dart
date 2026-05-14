@@ -292,29 +292,30 @@ class EscPosBuilder {
     b.separator(width: w);
 
     // ── Totals ───────────────────────────────────────────────────────────
+    // Use rtlInfoRow for ALL totals: value on LEFT, label: on RIGHT.
+    // Arabic accounting: الإجمالي: (RIGHT)          2500 د.ع (LEFT)
     final subtotal = data.items.fold(0.0, (s, i) => s + i.lineTotal);
 
     if (data.showTax) {
-      // Show subtotal + 15% tax + grand total (mirrors the preview).
       final tax   = subtotal * 0.15;
       final total = subtotal + tax;
-      b.kvRow('المجموع الفرعي', '${_fmt(subtotal)} د.ع', lineWidth: w);
-      b.kvRow('ضريبة 15%',      '${_fmt(tax)}      د.ع', lineWidth: w);
+      b.rtlInfoRow('المجموع الفرعي', '${_fmt(subtotal)} د.ع', lineWidth: w);
+      b.rtlInfoRow('ضريبة 15%',      '${_fmt(tax)} د.ع',      lineWidth: w);
       b.boldOn().doubleSizeOn();
-      b.kvRow('الإجمالي',       '${_fmt(total)}    د.ع', lineWidth: w);
+      b.rtlInfoRow('الإجمالي',       '${_fmt(total)} د.ع',    lineWidth: w);
       b.normalSize().boldOff();
     } else {
-      b.kvRow('المجموع الفرعي', '${_fmt(subtotal)} د.ع', lineWidth: w);
+      b.rtlInfoRow('المجموع الفرعي', '${_fmt(subtotal)} د.ع',   lineWidth: w);
       b.boldOn().doubleSizeOn();
-      b.kvRow('الإجمالي',       '${_fmt(data.total)} د.ع', lineWidth: w);
+      b.rtlInfoRow('الإجمالي',       '${_fmt(data.total)} د.ع', lineWidth: w);
       b.normalSize().boldOff();
     }
 
     if (data.paid != null) {
-      b.kvRow('المدفوع', '${_fmt(data.paid!)} د.ع', lineWidth: w);
+      b.rtlInfoRow('المدفوع', '${_fmt(data.paid!)} د.ع',   lineWidth: w);
     }
     if (data.change != null && data.change! > 0) {
-      b.kvRow('الباقي', '${_fmt(data.change!)} د.ع', lineWidth: w);
+      b.rtlInfoRow('الباقي',  '${_fmt(data.change!)} د.ع', lineWidth: w);
     }
 
     b.separator(width: w);
@@ -345,22 +346,24 @@ class EscPosBuilder {
 
   // ── Arabic accounting table helpers ──────────────────────────────────────
   //
-  // Standard Arabic thermal POS column order (physical left → right on paper):
+  // Thermal printers print left-to-right, byte by byte.
+  // Arabic is read right-to-left.  To match Arabic reading order the columns
+  // must be physically laid out on paper as:
   //
-  //   [المادة]  [العدد]  [السعر]  [المجموع]
-  //   (name)    (qty)   (price)   (total)
+  //   Physical LEFT                              Physical RIGHT
+  //   [المجموع]  [السعر]  [العدد]  [المادة]
   //
-  // This matches Arabic accounting convention used on physical thermal receipts:
-  //   • المادة gets the widest column on the LEFT (long Arabic product names).
-  //   • Numeric columns (العدد, السعر, المجموع) are narrower and sit to the right.
-  //   • An Arabic reader scans the receipt from right to left, encountering
-  //     المجموع first, then السعر, then العدد, then المادة — the natural
-  //     Arabic POS reading sequence.
+  // An Arabic reader starts from the RIGHT and encounters:
+  //   المادة (name) → العدد (qty) → السعر (price) → المجموع (total) ✓
   //
-  // Column proportions mirror the preview's flex values
-  //   المادة=4  العدد=2  السعر=2  المجموع=3  (total flex=11)
+  // This is identical to reading the header children in RTL order:
+  //   RTL read: المادة | العدد | السعر | المجموع
   //
-  // Thermal printing is LTR so "leftmost" = first character in the string.
+  // Column widths (mirror preview flex values — total flex = 11):
+  //   المجموع : 3/11  (leftmost,  narrower)
+  //   السعر   : 2/11
+  //   العدد   : 2/11
+  //   المادة  : 4/11  (rightmost, widest — long Arabic product names)
 
   /// Fit [s] into exactly [width] character columns.
   /// Pads with spaces on the right; truncates if too long.
@@ -369,21 +372,21 @@ class EscPosBuilder {
     return s + ' ' * (width - s.length);
   }
 
-  /// Arabic table header — left-to-right on paper:
-  ///   [المادة] [العدد] [السعر] [المجموع]
+  /// Arabic table header — physical layout on paper:
+  ///   [المجموع LEFT] [السعر] [العدد] [المادة RIGHT]
   static String _rtlTableHeader(int w) {
-    final nw = (w * 4 ~/ 11);     // المادة  — widest (product name)
+    final tw = (w * 3 ~/ 11);     // المجموع — leftmost, narrower
+    final spw = (w * 2 ~/ 11);    // السعر
     final qw = (w * 2 ~/ 11);     // العدد
-    final pw = (w * 2 ~/ 11);     // السعر
-    final tw = w - nw - qw - pw;  // المجموع — remainder
-    return _col('المادة',  nw) +
-           _col('العدد',   qw) +
-           _col('السعر',   pw) +
-           _col('المجموع', tw);
+    final nw = w - tw - spw - qw; // المادة  — rightmost, widest (remainder)
+    return _col('المجموع', tw)  +
+           _col('السعر',   spw) +
+           _col('العدد',   qw)  +
+           _col('المادة',  nw);
   }
 
-  /// Arabic table data row — same left-to-right order as header:
-  ///   [name] [qty] [price] [total]
+  /// Arabic table data row — same physical layout as header:
+  ///   [total LEFT] [price] [qty] [name RIGHT]
   static String _rtlTableRow(
     String name,
     num? qty,
@@ -391,14 +394,14 @@ class EscPosBuilder {
     num? total,
     int w,
   ) {
-    final nw = (w * 4 ~/ 11);
-    final qw = (w * 2 ~/ 11);
-    final pw = (w * 2 ~/ 11);
-    final tw = w - nw - qw - pw;
+    final tw  = (w * 3 ~/ 11);
+    final spw = (w * 2 ~/ 11);
+    final qw  = (w * 2 ~/ 11);
+    final nw  = w - tw - spw - qw;
     final safeName = name.length > nw ? name.substring(0, nw) : name;
-    return _col(safeName,          nw) +
-           _col(_fmt(qty   ?? 0),  qw) +
-           _col(_fmt(price ?? 0),  pw) +
-           _col(_fmt(total ?? 0),  tw);
+    return _col(_fmt(total ?? 0), tw)  +
+           _col(_fmt(price ?? 0), spw) +
+           _col(_fmt(qty   ?? 0), qw)  +
+           _col(safeName,         nw);
   }
 }

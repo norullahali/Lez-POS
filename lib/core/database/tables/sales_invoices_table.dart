@@ -24,6 +24,12 @@ class SalesInvoices extends Table {
   TextColumn get invoiceStatus =>
       text().withDefault(const Constant('completed'))();
 
+  // ── Return metadata (nullable — only set when invoiceStatus = 'returned') ──
+  DateTimeColumn get returnDate => dateTime().nullable()();
+  TextColumn get returnNote => text().nullable()();
+  IntColumn get returnedByUserId =>
+      integer().nullable().customConstraint('NULL REFERENCES users(id)')();
+
   List<Index> get indexes => [
         Index('sales_date_idx', 'CREATE INDEX IF NOT EXISTS sales_date_idx ON sales_invoices (sale_date)'),
         Index('sales_number_idx', 'CREATE INDEX IF NOT EXISTS sales_number_idx ON sales_invoices (invoice_number)'),

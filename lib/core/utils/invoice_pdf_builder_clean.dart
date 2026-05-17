@@ -3,6 +3,7 @@
 import 'dart:typed_data';
 
 import 'package:flutter/services.dart';
+import 'package:pdf/pdf.dart' show PdfColors;
 import 'package:pdf/widgets.dart' as pw;
 
 import '../../features/pos/models/invoice_models.dart';
@@ -48,6 +49,8 @@ class InvoicePdfBuilderClean {
             child: pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.stretch,
               children: [
+                if (data.isReturned) _buildReturnBadge(data),
+                if (data.isReturned) pw.SizedBox(height: 6),
                 _buildHeader(data),
                 pw.SizedBox(height: 6),
                 _buildInvoiceInfo(data),
@@ -56,6 +59,11 @@ class InvoicePdfBuilderClean {
                 pw.SizedBox(height: 6),
                 pw.Divider(),
                 _buildTotalSection(data),
+                if (data.isReturned) ...[
+                  pw.SizedBox(height: 6),
+                  pw.Divider(),
+                  _buildReturnSection(data),
+                ],
                 pw.SizedBox(height: 6),
                 _buildFooterSection(data),
                 pw.SizedBox(height: 6),
@@ -343,6 +351,60 @@ class InvoicePdfBuilderClean {
         '/${date.day.toString().padLeft(2, "0")} '
         '${date.hour.toString().padLeft(2, "0")}:'
         '${date.minute.toString().padLeft(2, "0")}';
+  }
+
+  // ── Return metadata ───────────────────────────────────────────────────────
+
+  /// A prominent "RETURNED" banner shown at the top of the receipt.
+  pw.Widget _buildReturnBadge(InvoiceData data) {
+    return pw.Container(
+      padding: const pw.EdgeInsets.symmetric(vertical: 6, horizontal: 12),
+      decoration: pw.BoxDecoration(
+        color: PdfColors.amber100,
+        border: pw.Border.all(color: PdfColors.amber700, width: 1.5),
+        borderRadius: pw.BorderRadius.circular(4),
+      ),
+      child: pw.Center(
+        child: pw.Text(
+          'فاتورة مرتجعة',
+          textAlign: pw.TextAlign.center,
+          style: pw.TextStyle(
+            font: boldFont,
+            fontSize: 14,
+            color: PdfColors.amber900,
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Section printed below totals that shows return metadata.
+  pw.Widget _buildReturnSection(InvoiceData data) {
+    final rows = <pw.Widget>[];
+
+    if (data.returnDate != null) {
+      rows.add(_infoRow('تاريخ الإرجاع', _formatDate(data.returnDate!)));
+    }
+    if (data.returnedByName != null && data.returnedByName!.trim().isNotEmpty) {
+      rows.add(_infoRow('موظف الإرجاع', _safeArabic(data.returnedByName!)));
+    }
+    if (data.returnNote != null && data.returnNote!.trim().isNotEmpty) {
+      rows.add(_infoRow('سبب الإرجاع', _safeArabic(data.returnNote!)));
+    }
+
+    if (rows.isEmpty) return pw.SizedBox.shrink();
+
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+      children: [
+        pw.Text(
+          'بيانات الإرجاع',
+          style: pw.TextStyle(font: boldFont, fontSize: 10),
+        ),
+        pw.SizedBox(height: 4),
+        ...rows,
+      ],
+    );
   }
 }
 

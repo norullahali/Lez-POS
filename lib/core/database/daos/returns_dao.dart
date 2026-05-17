@@ -80,9 +80,15 @@ class ReturnsDao extends DatabaseAccessor<AppDatabase> with _$ReturnsDaoMixin {
 
   /// Full sale invoice return: restores stock, ledger rows, [CustomerReturns] record,
   /// reverses credit [debtAmount] on customer account when applicable,
-  /// sets original invoice [invoiceStatus] to [InvoiceLifecycleStatus.returned].
+  /// sets original invoice [invoiceStatus] to [InvoiceLifecycleStatus.returned]
+  /// and persists return metadata ([note], [returnedByUserId]).
+  ///
   /// Does not delete or rewrite original [SaleItems] or monetary totals on the sale.
-  Future<int> returnFullSaleInvoice(int invoiceId) async {
+  Future<int> returnFullSaleInvoice(
+    int invoiceId, {
+    required String note,
+    required int returnedByUserId,
+  }) async {
     return transaction(() async {
       final inv = await attachedDatabase.salesDao.getInvoiceById(invoiceId);
       if (inv == null) {
@@ -136,6 +142,25 @@ class ReturnsDao extends DatabaseAccessor<AppDatabase> with _$ReturnsDaoMixin {
         ),
       );
 
+      // Persist return metadata on the original invoice row.
+      final now = DateTime.now();
+      await customUpdate(
+        '''UPDATE sales_invoices
+           SET invoice_status      = ?,
+               return_date         = ?,
+               return_note         = ?,
+               returned_by_user_id = ?
+           WHERE id = ?''',
+        variables: [
+          Variable.withString(InvoiceLifecycleStatus.returned),
+          Variable.withInt(now.millisecondsSinceEpoch),
+          Variable.withString(note.trim()),
+          Variable.withInt(returnedByUserId),
+          Variable.withInt(invoiceId),
+        ],
+        updates: {attachedDatabase.salesInvoices},
+      );
+
       for (final item in itemPayloads) {
         final productId = item['productId'] as int;
         final qty = (item['qty'] as num).toDouble();
@@ -182,15 +207,6 @@ class ReturnsDao extends DatabaseAccessor<AppDatabase> with _$ReturnsDaoMixin {
           note: 'إرجاع فاتورة ${inv.invoiceNumber}',
         );
       }
-
-      await customUpdate(
-        'UPDATE sales_invoices SET invoice_status = ? WHERE id = ?',
-        variables: [
-          Variable.withString(InvoiceLifecycleStatus.returned),
-          Variable.withInt(invoiceId),
-        ],
-        updates: {attachedDatabase.salesInvoices},
-      );
 
       return returnId;
     });

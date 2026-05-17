@@ -206,6 +206,9 @@ SELECT
   si.card_paid AS card_paid,
   si.change_amount AS change_amount,
   IFNULL(si.invoice_status, 'completed') AS invoice_status,
+  si.return_date AS return_date,
+  si.return_note AS return_note,
+  TRIM(COALESCE(ru.full_name, '')) AS returned_by_name,
   CASE
     WHEN si.customer_id IS NULL THEN 'زبون عام'
     ELSE IFNULL(c.name, 'زبون عام')
@@ -214,6 +217,7 @@ SELECT
 FROM sales_invoices si
 LEFT JOIN customers c ON c.id = si.customer_id
 LEFT JOIN users u ON u.id = si.created_by_user_id
+LEFT JOIN users ru ON ru.id = si.returned_by_user_id
 LEFT JOIN pos_sessions ps ON ps.id = si.session_id
 WHERE si.id = ?
 ''',
@@ -236,6 +240,22 @@ WHERE si.id = ?
     final invSt = h['invoice_status'] as String? ??
         InvoiceLifecycleStatus.completed;
 
+    // Build return metadata (null-safe; old rows have no values).
+    ReturnMetadata? returnMeta;
+    if (invoiceIsReturned(invSt)) {
+      final rawReturnDate = h['return_date'];
+      final returnNote = h['return_note'] as String?;
+      final returnedByName = h['returned_by_name'] as String?;
+      returnMeta = ReturnMetadata(
+        returnDate: rawReturnDate == null ? null : _parseSaleDate(rawReturnDate),
+        returnNote:
+            returnNote != null && returnNote.trim().isNotEmpty ? returnNote : null,
+        returnedByName: returnedByName != null && returnedByName.trim().isNotEmpty
+            ? returnedByName
+            : null,
+      );
+    }
+
     final header = InvoiceDetailHeader(
       id: (h['id'] as num).toInt(),
       invoiceNumber: h['invoice_number'] as String,
@@ -250,6 +270,7 @@ WHERE si.id = ?
       cashPaid: (h['cash_paid'] as num).toDouble(),
       cardPaid: (h['card_paid'] as num).toDouble(),
       changeAmount: (h['change_amount'] as num).toDouble(),
+      returnMetadata: returnMeta,
     );
 
     final lineRows = await _db.customSelect(

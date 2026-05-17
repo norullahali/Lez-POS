@@ -112,7 +112,7 @@ class AppDatabase extends _$AppDatabase {
   late final pricingDao = PricingDao(this);
 
   @override
-  int get schemaVersion => 20;
+  int get schemaVersion => 21;
 
   @override
   MigrationStrategy get migration {
@@ -549,6 +549,21 @@ class AppDatabase extends _$AppDatabase {
             );
           } catch (e) {
             debugPrint('[Migration v20] alter sales_invoices invoice_status skip: $e');
+          }
+        }
+
+        if (from < 21) {
+          debugPrint('[Migration] v21: sales_invoices return metadata columns...');
+          for (final ddl in [
+            'ALTER TABLE sales_invoices ADD COLUMN return_date INTEGER',
+            'ALTER TABLE sales_invoices ADD COLUMN return_note TEXT',
+            'ALTER TABLE sales_invoices ADD COLUMN returned_by_user_id INTEGER',
+          ]) {
+            try {
+              await customStatement(ddl);
+            } catch (e) {
+              debugPrint('[Migration v21] skip: $e');
+            }
           }
         }
       },

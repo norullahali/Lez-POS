@@ -36,6 +36,12 @@ class InvoiceData {
   /// Whether to print a QR code at the end of the receipt.
   final bool showQr;
 
+  // ── Return metadata (null for non-returned invoices) ──────────────────────
+  final bool isReturned;
+  final DateTime? returnDate;
+  final String? returnNote;
+  final String? returnedByName;
+
   InvoiceData({
     this.paid,
     this.change,
@@ -53,6 +59,10 @@ class InvoiceData {
     this.footer2,
     this.showTax = true,
     this.showQr = false,
+    this.isReturned = false,
+    this.returnDate,
+    this.returnNote,
+    this.returnedByName,
     DateTime? date,
   }) : date = date ?? DateTime.now();
 }

@@ -2,6 +2,27 @@ import 'package:flutter/foundation.dart';
 
 import '../../../core/constants/invoice_lifecycle.dart';
 
+/// Metadata stored when an invoice is fully returned.
+/// All fields are nullable for backward compatibility with pre-v21 returns.
+@immutable
+class ReturnMetadata {
+  final DateTime? returnDate;
+  final String? returnNote;
+  /// Display name of the user who performed the return.
+  final String? returnedByName;
+
+  const ReturnMetadata({
+    this.returnDate,
+    this.returnNote,
+    this.returnedByName,
+  });
+
+  bool get hasData =>
+      returnDate != null ||
+      (returnNote != null && returnNote!.trim().isNotEmpty) ||
+      (returnedByName != null && returnedByName!.trim().isNotEmpty);
+}
+
 @immutable
 class InvoiceDetailHeader {
   final int id;
@@ -18,6 +39,8 @@ class InvoiceDetailHeader {
   final double cashPaid;
   final double cardPaid;
   final double changeAmount;
+  /// Non-null when [invoiceStatus] == `returned`.
+  final ReturnMetadata? returnMetadata;
 
   const InvoiceDetailHeader({
     required this.id,
@@ -33,6 +56,7 @@ class InvoiceDetailHeader {
     required this.cashPaid,
     required this.cardPaid,
     required this.changeAmount,
+    this.returnMetadata,
   });
 }
 
@@ -74,4 +98,6 @@ class InvoiceDetailData {
   double get grandTotal => header.total;
 
   bool get isReturned => invoiceIsReturned(header.invoiceStatus);
+
+  ReturnMetadata? get returnMetadata => header.returnMetadata;
 }

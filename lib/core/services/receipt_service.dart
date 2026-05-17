@@ -32,6 +32,11 @@ Future<void> printSale({
   double? loyaltyPoints,
   String? customerName,
   String? cashierName,
+  // ── Return metadata ─────────────────────────────────────────────────────
+  bool isReturned = false,
+  DateTime? returnDate,
+  String? returnNote,
+  String? returnedByName,
 }) async {
   debugPrint('[ReceiptService] printSale() called — invoice: $invoiceNumber');
 
@@ -75,6 +80,10 @@ Future<void> printSale({
     footer2: footer2,
     showTax: showTax,
     showQr: showQr,
+    isReturned: isReturned,
+    returnDate: returnDate,
+    returnNote: returnNote,
+    returnedByName: returnedByName,
   );
 
   // ── Route to the correct printer via PrintManager ──────────────────────────

@@ -35,6 +35,7 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
   Future<void> _reprint(BuildContext context, InvoiceDetailData data) async {
     final messenger = ScaffoldMessenger.maybeOf(context);
     final paid = data.header.cashPaid + data.header.cardPaid;
+    final meta = data.returnMetadata;
     try {
       await printSale(
         invoiceNumber: data.header.invoiceNumber,
@@ -49,13 +50,16 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
             )
             .toList(),
         paid: paid > 0 ? paid : null,
-        change:
-            data.header.changeAmount > 0 ? data.header.changeAmount : null,
+        change: data.header.changeAmount > 0 ? data.header.changeAmount : null,
         customerName: data.header.customerName == 'زبون عام'
             ? null
             : data.header.customerName,
         cashierName:
             data.header.cashierName == '—' ? null : data.header.cashierName,
+        isReturned: data.isReturned,
+        returnDate: meta?.returnDate,
+        returnNote: meta?.returnNote,
+        returnedByName: meta?.returnedByName,
       );
       if (!context.mounted) return;
       messenger?.showSnackBar(
@@ -72,58 +76,41 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
     }
   }
 
-  Future<void> _confirmFullReturn(BuildContext context) async {
-    final ok = await showDialog<bool>(
+  /// Shows confirmation dialog with a required [note] field.
+  /// Returns the entered note, or null if the user cancelled.
+  Future<String?> _showReturnConfirmDialog(BuildContext context) {
+    return showDialog<String>(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => Directionality(
-        textDirection: TextDirection.rtl,
-        child: AlertDialog(
-          title: const Text('تأكيد إرجاع الفاتورة'),
-          content: const SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text('سيتم تنفيذ الإرجاع الكامل لهذه الفاتورة وفق التالي:'),
-                SizedBox(height: 14),
-                Text('• إعادة جميع الكميات المباعة إلى المخزون.'),
-                SizedBox(height: 8),
-                Text('• تسجيل حركات إرجاع وترحيل صحيح للمخزون.'),
-                SizedBox(height: 8),
-                Text('• وسم الفاتورة كمرتجعة — لا يمكن تكرار الإرجاع.'),
-                SizedBox(height: 8),
-                Text(
-                  'لن يتم حذف الفاتورة الأصلية؛ تبقى محفوظة للمراجعة المحاسبية.',
-                  style: TextStyle(fontWeight: FontWeight.w600),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(false),
-              child: const Text('إلغاء'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(ctx).pop(true),
-              style: FilledButton.styleFrom(
-                backgroundColor: AppColors.warning,
-                foregroundColor: AppColors.textPrimary,
-              ),
-              child: const Text('تأكيد الإرجاع'),
-            ),
-          ],
-        ),
-      ),
+      builder: (ctx) => _ReturnConfirmDialog(),
     );
-    if (ok != true) return;
+  }
+
+  Future<void> _confirmFullReturn(BuildContext context) async {
+    final note = await _showReturnConfirmDialog(context);
+    if (note == null) return; // user cancelled
     if (!mounted) return;
+
+    final authState = ref.read(authProvider).valueOrNull;
+    final userId = authState?.user?.id;
+    if (userId == null) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        const SnackBar(
+          content: Text('تعذر التحقق من هوية المستخدم. الرجاء تسجيل الدخول مجدداً.'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
 
     setState(() => _returning = true);
     try {
-      await AppDatabase.instance.returnsDao
-          .returnFullSaleInvoice(widget.invoiceId);
+      await AppDatabase.instance.returnsDao.returnFullSaleInvoice(
+        widget.invoiceId,
+        note: note,
+        returnedByUserId: userId,
+      );
 
       ref.invalidate(invoiceDetailProvider(widget.invoiceId));
       ref.invalidate(invoiceHistoryPageProvider);
@@ -371,6 +358,12 @@ class _InvoiceDetailBody extends StatelessWidget {
                   _SectionTitle(text: 'الإجماليات', style: titleStyle),
                   const SizedBox(height: 8),
                   _TotalsCard(data: data),
+                  if (data.isReturned) ...[
+                    const SizedBox(height: 24),
+                    _SectionTitle(text: 'بيانات الإرجاع', style: titleStyle),
+                    const SizedBox(height: 8),
+                    _ReturnMetadataCard(data: data),
+                  ],
                 ],
               ),
             ),
@@ -616,6 +609,198 @@ class _TotalsCard extends StatelessWidget {
                 emphasize: true),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ── Return Metadata Card ───────────────────────────────────────────────────
+
+class _ReturnMetadataCard extends StatelessWidget {
+  const _ReturnMetadataCard({required this.data});
+
+  final InvoiceDetailData data;
+
+  static final _df = DateFormat('yyyy/MM/dd HH:mm');
+
+  @override
+  Widget build(BuildContext context) {
+    final meta = data.returnMetadata;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.warningLight.withValues(alpha: 0.55),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.warning.withValues(alpha: 0.45)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Row(
+              children: [
+                Icon(
+                  Icons.assignment_return_rounded,
+                  size: 18,
+                  color: AppColors.warning,
+                ),
+                SizedBox(width: 8),
+                Text(
+                  'هذه الفاتورة مرتجعة',
+                  style: TextStyle(
+                    color: AppColors.warning,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 14,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            if (meta?.returnDate != null)
+              _metaRow('تاريخ الإرجاع', _df.format(meta!.returnDate!)),
+            if (meta?.returnedByName != null &&
+                meta!.returnedByName!.trim().isNotEmpty)
+              _metaRow('تم بواسطة', meta.returnedByName!),
+            if (meta?.returnNote != null &&
+                meta!.returnNote!.trim().isNotEmpty)
+              _metaRow('سبب الإرجاع', meta.returnNote!),
+            if (meta == null || !meta.hasData)
+              const Text(
+                'لا تتوفر بيانات إضافية لهذا الإرجاع.',
+                style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _metaRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 120,
+            child: Text(
+              label,
+              style: const TextStyle(
+                fontWeight: FontWeight.w600,
+                color: AppColors.textSecondary,
+                fontSize: 13,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 13,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Return Confirmation Dialog (with required note) ────────────────────────
+
+class _ReturnConfirmDialog extends StatefulWidget {
+  @override
+  State<_ReturnConfirmDialog> createState() => _ReturnConfirmDialogState();
+}
+
+class _ReturnConfirmDialogState extends State<_ReturnConfirmDialog> {
+  final _noteController = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
+
+  @override
+  void dispose() {
+    _noteController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: AlertDialog(
+        title: const Text('تأكيد إرجاع الفاتورة'),
+        content: Form(
+          key: _formKey,
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'سيتم تنفيذ الإرجاع الكامل لهذه الفاتورة وفق التالي:',
+                ),
+                const SizedBox(height: 12),
+                const Text('• إعادة جميع الكميات المباعة إلى المخزون.'),
+                const SizedBox(height: 6),
+                const Text('• تسجيل حركات إرجاع وترحيل صحيح للمخزون.'),
+                const SizedBox(height: 6),
+                const Text('• وسم الفاتورة كمرتجعة — لا يمكن تكرار الإرجاع.'),
+                const SizedBox(height: 6),
+                const Text(
+                  'لن يتم حذف الفاتورة الأصلية؛ تبقى محفوظة للمراجعة المحاسبية.',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 20),
+                const Divider(),
+                const SizedBox(height: 12),
+                const Text(
+                  'سبب / ملاحظة الإرجاع *',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: _noteController,
+                  textDirection: TextDirection.rtl,
+                  maxLines: 3,
+                  decoration: InputDecoration(
+                    hintText: 'أدخل سبب الإرجاع...',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    filled: true,
+                    fillColor: AppColors.inputFill,
+                  ),
+                  validator: (v) {
+                    if (v == null || v.trim().isEmpty) {
+                      return 'هذا الحقل مطلوب';
+                    }
+                    return null;
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(null),
+            child: const Text('إلغاء'),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (_formKey.currentState!.validate()) {
+                Navigator.of(context).pop(_noteController.text.trim());
+              }
+            },
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.warning,
+              foregroundColor: AppColors.textPrimary,
+            ),
+            child: const Text('تأكيد الإرجاع'),
+          ),
+        ],
       ),
     );
   }

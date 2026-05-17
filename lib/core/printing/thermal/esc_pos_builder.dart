@@ -323,6 +323,22 @@ class EscPosBuilder {
 
     b.separator(width: w);
 
+    // ── Return metadata ───────────────────────────────────────────────────
+    if (data.isReturned) {
+      b.alignCenter().boldOn().line('** فاتورة مرتجعة **').boldOff();
+      b.alignLeft();
+      if (data.returnDate != null) {
+        b.rtlInfoRow('تاريخ الإرجاع', _fmtDate(data.returnDate!), lineWidth: w);
+      }
+      if (data.returnedByName != null && data.returnedByName!.trim().isNotEmpty) {
+        b.rtlInfoRow('موظف الإرجاع', data.returnedByName!, lineWidth: w);
+      }
+      if (data.returnNote != null && data.returnNote!.trim().isNotEmpty) {
+        b.rtlInfoRow('سبب الإرجاع', data.returnNote!, lineWidth: w);
+      }
+      b.separator(width: w);
+    }
+
     // ── Footer ───────────────────────────────────────────────────────────
     b.alignCenter();
     if (data.footer != null && data.footer!.isNotEmpty) {

@@ -65,8 +65,10 @@ ORDER BY trim_key COLLATE NOCASE
       final safe = search.replaceAll('%', '').replaceAll('_', '');
       final like = '%$safe%';
       where.write(
-        ' AND (si.invoice_number LIKE ? OR IFNULL(c.name, \'\') LIKE ?)',
+        ' AND (si.invoice_number LIKE ? OR IFNULL(c.name, \'\') LIKE ? '
+        'OR TRIM(COALESCE(u.full_name, ps.cashier_name, \'\')) LIKE ?)',
       );
+      variables.add(Variable.withString(like));
       variables.add(Variable.withString(like));
       variables.add(Variable.withString(like));
     }

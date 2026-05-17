@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart' hide TextDirection;
@@ -18,9 +20,30 @@ class _InvoiceHistoryFiltersBarState
     extends ConsumerState<InvoiceHistoryFiltersBar> {
   final _search = TextEditingController();
   static final _df = DateFormat('yyyy/MM/dd');
+  static const _debounceMs = 250;
+  Timer? _searchDebounce;
+
+  void _applySearchToState(String raw) {
+    ref.read(invoiceHistoryUiProvider.notifier).applySearch(raw);
+    ref.invalidate(invoiceHistoryPageProvider);
+  }
+
+  void _onSearchTextChanged(String raw) {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: _debounceMs), () {
+      if (!mounted) return;
+      _applySearchToState(raw);
+    });
+  }
+
+  void _flushSearchNow() {
+    _searchDebounce?.cancel();
+    _applySearchToState(_search.text);
+  }
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _search.dispose();
     super.dispose();
   }
@@ -86,14 +109,13 @@ class _InvoiceHistoryFiltersBarState
                 controller: _search,
                 textDirection: TextDirection.rtl,
                 decoration: const InputDecoration(
-                  hintText: 'بحث برقم الفاتورة أو اسم العميل…',
+                  hintText:
+                      'بحث مباشر برقم الفاتورة أو العميل أو الكاشير…',
                   prefixIcon: Icon(Icons.search_rounded),
                   isDense: true,
                 ),
-                onSubmitted: (v) {
-                  ref.read(invoiceHistoryUiProvider.notifier).applySearch(v);
-                  ref.invalidate(invoiceHistoryPageProvider);
-                },
+                onChanged: _onSearchTextChanged,
+                onSubmitted: (_) => _flushSearchNow(),
               ),
             ),
             const SizedBox(width: 12),
@@ -166,18 +188,14 @@ class _InvoiceHistoryFiltersBarState
             ),
             const SizedBox(width: 8),
             IconButton.filledTonal(
-              tooltip: 'تطبيق البحث',
-              onPressed: () {
-                ref
-                    .read(invoiceHistoryUiProvider.notifier)
-                    .applySearch(_search.text);
-                ref.invalidate(invoiceHistoryPageProvider);
-              },
+              tooltip: 'تطبيق البحث فوراً',
+              onPressed: _flushSearchNow,
               icon: const Icon(Icons.manage_search_rounded),
             ),
             IconButton(
               tooltip: 'إعادة ضبط الفلاتر',
               onPressed: () {
+                _searchDebounce?.cancel();
                 ref.read(invoiceHistoryUiProvider.notifier).resetToDefaultRange();
                 _search.clear();
                 ref.invalidate(invoiceHistoryCashiersProvider);

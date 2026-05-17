@@ -62,7 +62,7 @@ class InvoiceHistoryScreen extends ConsumerWidget {
                 data: (page) {
                   if (page.rows.isEmpty) {
                     return const Center(
-                      child: Text('لا توجد فواتير مطابقة للفلاتر الحالية.'),
+                      child: Text('لا توجد فواتير مطابقة'),
                     );
                   }
                   return InvoiceHistoryDataTable(

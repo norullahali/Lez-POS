@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 
+import '../../../core/constants/invoice_lifecycle.dart';
+
 @immutable
 class InvoiceDetailHeader {
   final int id;
@@ -8,7 +10,8 @@ class InvoiceDetailHeader {
   final String customerName;
   final String cashierName;
   final String paymentMethod;
-  final String status;
+  /// `completed` | `returned` — see [InvoiceLifecycleStatus].
+  final String invoiceStatus;
   final double subtotal;
   final double discountTotal;
   final double total;
@@ -23,7 +26,7 @@ class InvoiceDetailHeader {
     required this.customerName,
     required this.cashierName,
     required this.paymentMethod,
-    required this.status,
+    required this.invoiceStatus,
     required this.subtotal,
     required this.discountTotal,
     required this.total,
@@ -69,4 +72,6 @@ class InvoiceDetailData {
 
   /// Grand total shown: authoritative value from DB ([header.total]).
   double get grandTotal => header.total;
+
+  bool get isReturned => invoiceIsReturned(header.invoiceStatus);
 }

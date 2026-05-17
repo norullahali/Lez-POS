@@ -20,6 +20,9 @@ class SalesInvoices extends Table {
   IntColumn get createdByUserId => integer().nullable().customConstraint('NULL REFERENCES users(id)')();
   IntColumn get processedByUserId => integer().nullable().customConstraint('NULL REFERENCES users(id)')();
   TextColumn get notes => text().withDefault(const Constant(''))();
+  /// `completed` | `returned` — see [InvoiceLifecycleStatus].
+  TextColumn get invoiceStatus =>
+      text().withDefault(const Constant('completed'))();
 
   List<Index> get indexes => [
         Index('sales_date_idx', 'CREATE INDEX IF NOT EXISTS sales_date_idx ON sales_invoices (sale_date)'),

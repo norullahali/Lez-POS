@@ -71,9 +71,17 @@ class InvoiceHistoryDataTable extends StatelessWidget {
                 for (var i = 0; i < rows.length; i++)
                   DataRow(
                     color: WidgetStateProperty.resolveWith((states) {
+                      final returned = rows[i].isReturned;
                       if (states.contains(WidgetState.hovered)) {
+                        if (returned) {
+                          return AppColors.warningLight
+                              .withValues(alpha: 0.95);
+                        }
                         return AppColors.surfaceVariant
                             .withValues(alpha: 0.85);
+                      }
+                      if (returned) {
+                        return AppColors.warningLight.withValues(alpha: 0.72);
                       }
                       if (i.isEven) {
                         return AppColors.surfaceVariant.withValues(alpha: 0.35);
@@ -93,7 +101,17 @@ class InvoiceHistoryDataTable extends StatelessWidget {
                         invoicePaymentLabelAr(rows[i].paymentMethod),
                         style: baseText,
                       )),
-                      DataCell(Text(rows[i].status, style: baseText)),
+                      DataCell(
+                        Text(
+                          rows[i].status,
+                          style: rows[i].isReturned
+                              ? baseText?.copyWith(
+                                  color: AppColors.warning,
+                                  fontWeight: FontWeight.w800,
+                                )
+                              : baseText,
+                        ),
+                      ),
                     ],
                   ),
               ],

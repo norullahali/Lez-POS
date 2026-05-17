@@ -74,7 +74,8 @@ class SalesDao extends DatabaseAccessor<AppDatabase> with _$SalesDaoMixin {
          LEFT JOIN (
            SELECT invoice_id, SUM(quantity * unit_cost) as cost FROM sale_items GROUP BY invoice_id
          ) costs ON costs.invoice_id = si.id
-         WHERE si.sale_date >= ? AND si.sale_date < ?''',
+         WHERE si.sale_date >= ? AND si.sale_date < ?
+         AND IFNULL(si.invoice_status, 'completed') != 'returned' ''',
       variables: [Variable(start), Variable(end)],
       readsFrom: {salesInvoices, saleItems},
     ).getSingleOrNull();
@@ -100,6 +101,7 @@ class SalesDao extends DatabaseAccessor<AppDatabase> with _$SalesDaoMixin {
            SELECT invoice_id, SUM(quantity * unit_cost) as cost FROM sale_items GROUP BY invoice_id
          ) costs ON costs.invoice_id = si.id
          WHERE si.sale_date >= ? AND si.sale_date < ?
+         AND IFNULL(si.invoice_status, 'completed') != 'returned'
          GROUP BY strftime('%m', si.sale_date)
          ORDER BY month ASC''',
       variables: [Variable(start), Variable(end)],
@@ -118,6 +120,7 @@ class SalesDao extends DatabaseAccessor<AppDatabase> with _$SalesDaoMixin {
       JOIN products p ON p.id = si.product_id
       JOIN sales_invoices inv ON inv.id = si.invoice_id
       WHERE inv.sale_date >= ? AND inv.sale_date < ?
+      AND IFNULL(inv.invoice_status, 'completed') != 'returned'
       GROUP BY si.product_id
       ORDER BY total_qty DESC
       LIMIT ?
@@ -134,7 +137,7 @@ class SalesDao extends DatabaseAccessor<AppDatabase> with _$SalesDaoMixin {
     final result = await customSelect(
       '''SELECT COUNT(*) as count, COALESCE(SUM(total), 0) as total,
          COALESCE(SUM(cash_paid), 0) as cash, COALESCE(SUM(card_paid), 0) as card
-         FROM sales_invoices WHERE session_id = ?''',
+         FROM sales_invoices WHERE session_id = ? AND IFNULL(invoice_status, 'completed') != 'returned' ''',
       variables: [Variable.withInt(sessionId)],
       readsFrom: {salesInvoices},
     ).getSingleOrNull();

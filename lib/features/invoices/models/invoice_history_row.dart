@@ -10,7 +10,9 @@ class InvoiceHistoryRow {
   final int itemCount;
   final double total;
   final String paymentMethod;
+  /// Arabic label for invoice lifecycle (مكتملة / مرتجعة).
   final String status;
+  final bool isReturned;
 
   const InvoiceHistoryRow({
     required this.id,
@@ -22,6 +24,7 @@ class InvoiceHistoryRow {
     required this.total,
     required this.paymentMethod,
     required this.status,
+    required this.isReturned,
   });
 }
 

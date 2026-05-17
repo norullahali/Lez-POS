@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 
+import '../../../core/constants/invoice_lifecycle.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/services/settings_service.dart';
 import '../data/invoice_history_query.dart';
@@ -10,8 +11,6 @@ class InvoiceHistoryRepository {
   InvoiceHistoryRepository(this._db);
 
   final AppDatabase _db;
-
-  static const _completedStatus = 'مكتملة';
 
   static DateTime _parseSaleDate(dynamic raw) {
     if (raw == null) {
@@ -130,6 +129,7 @@ SELECT
   si.sale_date AS sale_date,
   si.total AS total,
   si.payment_method AS payment_method,
+  IFNULL(si.invoice_status, 'completed') AS invoice_status,
   CASE
     WHEN si.customer_id IS NULL THEN 'زبون عام'
     ELSE IFNULL(c.name, 'زبون عام')
@@ -163,6 +163,8 @@ LIMIT ? OFFSET ?
     final rows = dataRows.map((r) {
       final rawCashier = r.data['cashier_raw'] as String? ?? '';
       final cashier = rawCashier.trim().isEmpty ? '—' : rawCashier.trim();
+      final st = r.data['invoice_status'] as String? ??
+          InvoiceLifecycleStatus.completed;
 
       return InvoiceHistoryRow(
         id: (r.data['id'] as num).toInt(),
@@ -173,7 +175,8 @@ LIMIT ? OFFSET ?
         itemCount: (r.data['item_count'] as num?)?.toInt() ?? 0,
         total: (r.data['total'] as num).toDouble(),
         paymentMethod: r.data['payment_method'] as String? ?? '',
-        status: _completedStatus,
+        status: invoiceLifecycleLabelAr(st),
+        isReturned: invoiceIsReturned(st),
       );
     }).toList();
 
@@ -202,6 +205,7 @@ SELECT
   si.cash_paid AS cash_paid,
   si.card_paid AS card_paid,
   si.change_amount AS change_amount,
+  IFNULL(si.invoice_status, 'completed') AS invoice_status,
   CASE
     WHEN si.customer_id IS NULL THEN 'زبون عام'
     ELSE IFNULL(c.name, 'زبون عام')
@@ -229,6 +233,8 @@ WHERE si.id = ?
     final h = headerRows.first.data;
     final rawCashier = h['cashier_raw'] as String? ?? '';
     final cashier = rawCashier.trim().isEmpty ? '—' : rawCashier.trim();
+    final invSt = h['invoice_status'] as String? ??
+        InvoiceLifecycleStatus.completed;
 
     final header = InvoiceDetailHeader(
       id: (h['id'] as num).toInt(),
@@ -237,7 +243,7 @@ WHERE si.id = ?
       customerName: h['customer_name'] as String,
       cashierName: cashier,
       paymentMethod: h['payment_method'] as String? ?? '',
-      status: _completedStatus,
+      invoiceStatus: invSt,
       subtotal: (h['subtotal'] as num).toDouble(),
       discountTotal: (h['discount_amount'] as num).toDouble(),
       total: (h['total'] as num).toDouble(),

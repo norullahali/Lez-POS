@@ -112,7 +112,7 @@ class AppDatabase extends _$AppDatabase {
   late final pricingDao = PricingDao(this);
 
   @override
-  int get schemaVersion => 19;
+  int get schemaVersion => 20;
 
   @override
   MigrationStrategy get migration {
@@ -538,6 +538,17 @@ class AppDatabase extends _$AppDatabase {
             debugPrint('[Migration] v19: negative stock cleanup complete');
           } catch (e) {
             debugPrint('[Migration] v19: cleanup error (non-fatal): $e');
+          }
+        }
+
+        if (from < 20) {
+          debugPrint('[Migration] v20: sales_invoices.invoice_status...');
+          try {
+            await customStatement(
+              'ALTER TABLE sales_invoices ADD COLUMN invoice_status TEXT NOT NULL DEFAULT \'completed\'',
+            );
+          } catch (e) {
+            debugPrint('[Migration v20] alter sales_invoices invoice_status skip: $e');
           }
         }
       },

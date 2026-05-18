@@ -1,21 +1,32 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 
 import '../../../core/constants/invoice_lifecycle.dart';
 import '../../../core/database/app_database.dart';
+import '../../../core/services/partial_return_service.dart';
 import '../../../core/services/receipt_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../pos/models/invoice_models.dart';
 import '../../pos/providers/pos_products_provider.dart';
 import '../../products/providers/products_provider.dart';
+import '../../returns/providers/partial_return_provider.dart';
 import '../../returns/screens/customer_returns_screen.dart';
 import '../models/invoice_detail.dart';
 import '../models/invoice_history_row.dart' show invoicePaymentLabelAr;
 import '../providers/invoice_history_provider.dart';
 
-/// Read-only desktop dialog: header, line items, totals, full return, reprint + close.
+// ---------------------------------------------------------------------------
+// Provider: already-returned quantities per invoice (keyed by sale_item_id).
+// ---------------------------------------------------------------------------
+final _partialReturnQtysProvider = FutureProvider.autoDispose
+    .family<Map<int, double>, int>((ref, invoiceId) {
+  return ref.read(partialReturnServiceProvider).getReturnedQuantitiesForInvoice(invoiceId);
+});
+
+/// Read-only desktop dialog: header, line items, totals, full/partial return, reprint + close.
 class InvoiceDetailsDialog extends ConsumerStatefulWidget {
   const InvoiceDetailsDialog({super.key, required this.invoiceId});
 
@@ -76,8 +87,7 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
     }
   }
 
-  /// Shows confirmation dialog with a required [note] field.
-  /// Returns the entered note, or null if the user cancelled.
+  /// Shows the full-return confirmation dialog with a required note field.
   Future<String?> _showReturnConfirmDialog(BuildContext context) {
     return showDialog<String>(
       context: context,
@@ -88,7 +98,7 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
 
   Future<void> _confirmFullReturn(BuildContext context) async {
     final note = await _showReturnConfirmDialog(context);
-    if (note == null) return; // user cancelled
+    if (note == null) return;
     if (!mounted) return;
 
     final authState = ref.read(authProvider).valueOrNull;
@@ -146,6 +156,15 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
     }
   }
 
+  /// Called by [_PartialReturnSection] after a successful partial return.
+  void _onPartialReturnDone() {
+    ref.invalidate(invoiceDetailProvider(widget.invoiceId));
+    ref.invalidate(_partialReturnQtysProvider(widget.invoiceId));
+    ref.invalidate(invoiceHistoryPageProvider);
+    ref.invalidate(productsNotifierProvider);
+    ref.invalidate(posProductsProvider);
+  }
+
   @override
   Widget build(BuildContext context) {
     final async = ref.watch(invoiceDetailProvider(widget.invoiceId));
@@ -157,7 +176,7 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
       child: Dialog(
         insetPadding: const EdgeInsets.symmetric(horizontal: 48, vertical: 32),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 960, maxHeight: 720),
+          constraints: const BoxConstraints(maxWidth: 960, maxHeight: 820),
           child: async.when(
             loading: () => const Padding(
               padding: EdgeInsets.all(48),
@@ -186,6 +205,7 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
                   onClose: () => Navigator.of(context).pop(),
                   onReprint: () => _reprint(context, data),
                   onFullReturn: () => _confirmFullReturn(context),
+                  onPartialReturnDone: _onPartialReturnDone,
                 ),
                 if (_returning)
                   Positioned.fill(
@@ -217,6 +237,10 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Main body
+// ---------------------------------------------------------------------------
+
 class _InvoiceDetailBody extends StatelessWidget {
   const _InvoiceDetailBody({
     required this.data,
@@ -225,6 +249,7 @@ class _InvoiceDetailBody extends StatelessWidget {
     required this.onClose,
     required this.onReprint,
     required this.onFullReturn,
+    required this.onPartialReturnDone,
   });
 
   final InvoiceDetailData data;
@@ -233,6 +258,7 @@ class _InvoiceDetailBody extends StatelessWidget {
   final VoidCallback onClose;
   final VoidCallback onReprint;
   final VoidCallback onFullReturn;
+  final VoidCallback onPartialReturnDone;
 
   @override
   Widget build(BuildContext context) {
@@ -240,14 +266,18 @@ class _InvoiceDetailBody extends StatelessWidget {
           fontWeight: FontWeight.w700,
           color: AppColors.textPrimary,
         );
-    final bodyStyle = Theme.of(context).textTheme.bodyMedium;
     final h = data.header;
     final statusAr = invoiceLifecycleLabelAr(h.invoiceStatus);
-    final canReturn = canFullRefund && !data.isReturned && !returning;
+    final hasAnyReturn = invoiceHasAnyReturn(h.invoiceStatus);
+    // Full return is blocked once any partial return exists.
+    final canReturn = canFullRefund && !hasAnyReturn && !returning;
+    final canPartialReturn =
+        canFullRefund && invoiceCanBeReturned(h.invoiceStatus) && !returning;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        // ── Header bar ───────────────────────────────────────────────────
         Padding(
           padding: const EdgeInsets.fromLTRB(24, 20, 24, 12),
           child: Row(
@@ -267,11 +297,22 @@ class _InvoiceDetailBody extends StatelessWidget {
                     ),
                     if (data.isReturned)
                       const Chip(
-                        label: Text('مرتجعة'),
+                        label: Text('مرتجعة بالكامل'),
                         backgroundColor: AppColors.warningLight,
                         side: BorderSide(color: AppColors.warning),
                         labelStyle: TextStyle(
                           color: AppColors.warning,
+                          fontWeight: FontWeight.w700,
+                        ),
+                        visualDensity: VisualDensity.compact,
+                      )
+                    else if (hasAnyReturn)
+                      const Chip(
+                        label: Text('مرتجع جزئياً'),
+                        backgroundColor: AppColors.infoLight,
+                        side: BorderSide(color: AppColors.info),
+                        labelStyle: TextStyle(
+                          color: AppColors.info,
                           fontWeight: FontWeight.w700,
                         ),
                         visualDensity: VisualDensity.compact,
@@ -288,6 +329,8 @@ class _InvoiceDetailBody extends StatelessWidget {
           ),
         ),
         const Divider(height: 1),
+
+        // ── Scrollable content ────────────────────────────────────────────
         Expanded(
           child: Scrollbar(
             thumbVisibility: true,
@@ -311,43 +354,28 @@ class _InvoiceDetailBody extends StatelessWidget {
                       columnSpacing: 20,
                       horizontalMargin: 16,
                       columns: [
-                        DataColumn(
-                          label: Text('الصنف', style: titleStyle),
-                        ),
-                        DataColumn(
-                          label: Text('الكمية', style: titleStyle),
-                        ),
-                        DataColumn(
-                          label: Text('سعر الوحدة', style: titleStyle),
-                        ),
-                        DataColumn(
-                          label: Text('الخصم', style: titleStyle),
-                        ),
-                        DataColumn(
-                          label: Text('الإجمالي', style: titleStyle),
-                        ),
+                        DataColumn(label: Text('الصنف', style: titleStyle)),
+                        DataColumn(label: Text('الكمية', style: titleStyle)),
+                        DataColumn(label: Text('سعر الوحدة', style: titleStyle)),
+                        DataColumn(label: Text('الخصم', style: titleStyle)),
+                        DataColumn(label: Text('الإجمالي', style: titleStyle)),
                       ],
                       rows: [
                         for (final l in data.lines)
                           DataRow(
                             cells: [
-                              DataCell(Text(l.productName, style: bodyStyle)),
+                              DataCell(Text(l.productName)),
                               DataCell(Text(
-                                InvoiceDetailsDialog._money
-                                    .format(l.quantity),
-                                style: bodyStyle,
+                                InvoiceDetailsDialog._money.format(l.quantity),
                               )),
                               DataCell(Text(
                                 '${InvoiceDetailsDialog._money.format(l.unitPrice)} د.ع',
-                                style: bodyStyle,
                               )),
                               DataCell(Text(
                                 '${InvoiceDetailsDialog._money.format(l.discount)} د.ع',
-                                style: bodyStyle,
                               )),
                               DataCell(Text(
                                 '${InvoiceDetailsDialog._money.format(l.lineTotal)} د.ع',
-                                style: bodyStyle,
                               )),
                             ],
                           ),
@@ -358,17 +386,36 @@ class _InvoiceDetailBody extends StatelessWidget {
                   _SectionTitle(text: 'الإجماليات', style: titleStyle),
                   const SizedBox(height: 8),
                   _TotalsCard(data: data),
+
+                  // ── Full-return metadata ─────────────────────────────
                   if (data.isReturned) ...[
                     const SizedBox(height: 24),
                     _SectionTitle(text: 'بيانات الإرجاع', style: titleStyle),
                     const SizedBox(height: 8),
                     _ReturnMetadataCard(data: data),
                   ],
+
+                  // ── Partial return section ───────────────────────────
+                  if (invoiceCanBeReturned(h.invoiceStatus)) ...[
+                    const SizedBox(height: 24),
+                    _SectionTitle(text: 'الإرجاع الجزئي', style: titleStyle),
+                    const SizedBox(height: 8),
+                    _PartialReturnSection(
+                      invoiceId: h.id,
+                      lines: data.lines,
+                      canPartialReturn: canPartialReturn,
+                      onDone: onPartialReturnDone,
+                    ),
+                  ],
+
+                  const SizedBox(height: 16),
                 ],
               ),
             ),
           ),
         ),
+
+        // ── Footer buttons ────────────────────────────────────────────────
         const Divider(height: 1),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
@@ -385,8 +432,10 @@ class _InvoiceDetailBody extends StatelessWidget {
               if (canFullRefund)
                 Tooltip(
                   message: data.isReturned
-                      ? 'هذه الفاتورة مرتجعة مسبقاً'
-                      : 'إرجاع كامل مع استعادة المخزون',
+                      ? 'هذه الفاتورة مرتجعة بالكامل'
+                      : hasAnyReturn
+                          ? 'لا يمكن الإرجاع الكامل بعد تسجيل إرجاع جزئي'
+                          : 'إرجاع كامل مع استعادة المخزون',
                   child: FilledButton.icon(
                     onPressed: canReturn ? onFullReturn : null,
                     style: FilledButton.styleFrom(
@@ -411,6 +460,423 @@ class _InvoiceDetailBody extends StatelessWidget {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Partial return section
+// ---------------------------------------------------------------------------
+
+class _PartialReturnSection extends ConsumerStatefulWidget {
+  const _PartialReturnSection({
+    required this.invoiceId,
+    required this.lines,
+    required this.canPartialReturn,
+    required this.onDone,
+  });
+
+  final int invoiceId;
+  final List<InvoiceDetailLine> lines;
+  final bool canPartialReturn;
+  final VoidCallback onDone;
+
+  @override
+  ConsumerState<_PartialReturnSection> createState() =>
+      _PartialReturnSectionState();
+}
+
+class _PartialReturnSectionState extends ConsumerState<_PartialReturnSection> {
+  final Map<int, TextEditingController> _controllers = {};
+  bool _submitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    for (final line in widget.lines) {
+      _controllers[line.id] = TextEditingController();
+    }
+  }
+
+  @override
+  void dispose() {
+    for (final c in _controllers.values) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final qtysAsync = ref.watch(_partialReturnQtysProvider(widget.invoiceId));
+
+    return qtysAsync.when(
+      loading: () => const Padding(
+        padding: EdgeInsets.symmetric(vertical: 12),
+        child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+      ),
+      error: (e, _) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Text(
+          'تعذر تحميل بيانات الإرجاع: $e',
+          style: const TextStyle(color: AppColors.error),
+        ),
+      ),
+      data: (alreadyReturned) =>
+          _buildBody(context, alreadyReturned),
+    );
+  }
+
+  Widget _buildBody(
+    BuildContext context,
+    Map<int, double> alreadyReturned,
+  ) {
+    final labelStyle = Theme.of(context).textTheme.labelSmall?.copyWith(
+          fontWeight: FontWeight.w700,
+          color: AppColors.textSecondary,
+          letterSpacing: 0.4,
+        );
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.surfaceVariant.withValues(alpha: 0.45),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Column header row
+            Row(
+              children: [
+                Expanded(
+                  flex: 3,
+                  child: Text('الصنف', style: labelStyle),
+                ),
+                _colHeader('المباع', labelStyle),
+                _colHeader('المرتجع', labelStyle),
+                _colHeader('المتاح', labelStyle),
+                const SizedBox(width: 8),
+                SizedBox(
+                  width: 108,
+                  child: Text(
+                    'كمية الإرجاع',
+                    style: labelStyle,
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ],
+            ),
+            const Divider(height: 14),
+
+            // Item rows
+            for (final line in widget.lines)
+              _LineRow(
+                line: line,
+                alreadyReturned: alreadyReturned[line.id] ?? 0.0,
+                controller: _controllers[line.id]!,
+                canInput: widget.canPartialReturn && !_submitting,
+              ),
+
+            const SizedBox(height: 16),
+
+            if (widget.canPartialReturn)
+              Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: FilledButton.icon(
+                  onPressed: _submitting
+                      ? null
+                      : () => _submit(context, alreadyReturned),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.info,
+                    foregroundColor: Colors.white,
+                  ),
+                  icon: _submitting
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(Icons.assignment_return_rounded, size: 18),
+                  label: const Text('تنفيذ الإرجاع الجزئي'),
+                ),
+              )
+            else
+              Text(
+                'ليس لديك صلاحية تنفيذ الإرجاع الجزئي.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppColors.textSecondary,
+                      fontStyle: FontStyle.italic,
+                    ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _colHeader(String text, TextStyle? style) {
+    return SizedBox(
+      width: 72,
+      child: Text(text, style: style, textAlign: TextAlign.end),
+    );
+  }
+
+  Future<void> _submit(
+    BuildContext context,
+    Map<int, double> alreadyReturned,
+  ) async {
+    final m = NumberFormat('#,##0.##');
+    final lines = <PartialReturnLine>[];
+
+    for (final line in widget.lines) {
+      final text = _controllers[line.id]?.text.trim() ?? '';
+      if (text.isEmpty || text == '0') continue;
+
+      final qty = double.tryParse(text);
+      if (qty == null || qty <= 0) {
+        _showError(context, 'كمية غير صحيحة للصنف: ${line.productName}');
+        return;
+      }
+
+      final available =
+          (line.quantity - (alreadyReturned[line.id] ?? 0.0))
+              .clamp(0.0, double.infinity);
+
+      if (qty > available + 0.0001) {
+        _showError(
+          context,
+          'كمية الإرجاع (${m.format(qty)}) تتجاوز المتاح (${m.format(available)}) للصنف: ${line.productName}',
+        );
+        return;
+      }
+
+      lines.add(PartialReturnLine(
+        saleItemId: line.id,
+        productId: line.productId,
+        quantity: qty,
+        unitPrice: line.unitPrice,
+        unitCost: line.unitCost,
+      ));
+    }
+
+    if (lines.isEmpty) {
+      _showError(context, 'أدخل كمية إرجاع لصنف واحد على الأقل.');
+      return;
+    }
+
+    // Show note dialog
+    final note = await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => _PartialReturnNoteDialog(),
+    );
+    if (note == null) return;
+    if (!context.mounted) return;
+
+    final userId = ref.read(authProvider).valueOrNull?.user?.id;
+    if (userId == null) {
+      if (!context.mounted) return;
+      _showError(context, 'تعذر التحقق من هوية المستخدم. الرجاء تسجيل الدخول مجدداً.');
+      return;
+    }
+
+    setState(() => _submitting = true);
+    try {
+      await ref.read(partialReturnServiceProvider).processPartialReturn(
+            saleInvoiceId: widget.invoiceId,
+            lines: lines,
+            returnedByUserId: userId,
+            note: note,
+          );
+
+      // Clear all inputs
+      for (final c in _controllers.values) {
+        c.clear();
+      }
+
+      if (!context.mounted) return;
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        const SnackBar(
+          content: Text('تم تنفيذ الإرجاع الجزئي بنجاح واستعادة المخزون.'),
+          backgroundColor: AppColors.success,
+        ),
+      );
+
+      // Tell parent dialog to invalidate & reload
+      widget.onDone();
+    } on StateError catch (e) {
+      if (!context.mounted) return;
+      _showError(context, e.message);
+    } catch (e) {
+      if (!context.mounted) return;
+      _showError(context, 'تعذر تنفيذ الإرجاع الجزئي: $e');
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  void _showError(BuildContext context, String message) {
+    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: AppColors.error),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Single item row inside the partial-return section
+// ---------------------------------------------------------------------------
+
+class _LineRow extends StatelessWidget {
+  const _LineRow({
+    required this.line,
+    required this.alreadyReturned,
+    required this.controller,
+    required this.canInput,
+  });
+
+  final InvoiceDetailLine line;
+  final double alreadyReturned;
+  final TextEditingController controller;
+  final bool canInput;
+
+  @override
+  Widget build(BuildContext context) {
+    final m = NumberFormat('#,##0.##');
+    final available =
+        (line.quantity - alreadyReturned).clamp(0.0, double.infinity);
+    final isFullyReturned = available <= 0.0001;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 5),
+      child: Row(
+        children: [
+          // Product name + badge
+          Expanded(
+            flex: 3,
+            child: Row(
+              children: [
+                Flexible(
+                  child: Text(
+                    line.productName,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: isFullyReturned
+                          ? AppColors.textSecondary
+                          : AppColors.textPrimary,
+                      decoration: isFullyReturned
+                          ? TextDecoration.lineThrough
+                          : null,
+                    ),
+                  ),
+                ),
+                if (isFullyReturned) ...[
+                  const SizedBox(width: 6),
+                  _badge('مرتجع', AppColors.warning, AppColors.warningLight),
+                ],
+              ],
+            ),
+          ),
+
+          // Sold qty
+          SizedBox(
+            width: 72,
+            child: Text(
+              m.format(line.quantity),
+              textAlign: TextAlign.end,
+              style: const TextStyle(color: AppColors.textSecondary),
+            ),
+          ),
+
+          // Already returned
+          SizedBox(
+            width: 72,
+            child: Text(
+              alreadyReturned > 0 ? m.format(alreadyReturned) : '—',
+              textAlign: TextAlign.end,
+              style: alreadyReturned > 0
+                  ? const TextStyle(
+                      color: AppColors.warning, fontWeight: FontWeight.w600)
+                  : const TextStyle(color: AppColors.textSecondary),
+            ),
+          ),
+
+          // Available qty
+          SizedBox(
+            width: 72,
+            child: Text(
+              isFullyReturned ? '—' : m.format(available),
+              textAlign: TextAlign.end,
+              style: TextStyle(
+                color: isFullyReturned
+                    ? AppColors.textSecondary
+                    : AppColors.success,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+
+          const SizedBox(width: 8),
+
+          // Return qty input
+          SizedBox(
+            width: 108,
+            child: isFullyReturned
+                ? const SizedBox.shrink()
+                : canInput
+                    ? TextField(
+                        controller: controller,
+                        textAlign: TextAlign.center,
+                        keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true),
+                        inputFormatters: [
+                          FilteringTextInputFormatter.allow(
+                              RegExp(r'^\d*\.?\d*')),
+                        ],
+                        decoration: InputDecoration(
+                          hintText: '0',
+                          isDense: true,
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 7),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          filled: true,
+                          fillColor: AppColors.surface,
+                        ),
+                      )
+                    : const SizedBox.shrink(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _badge(String text, Color fg, Color bg) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: fg.withValues(alpha: 0.6)),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: 10,
+          color: fg,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Shared helpers
+// ---------------------------------------------------------------------------
+
 class _SectionTitle extends StatelessWidget {
   const _SectionTitle({required this.text, required this.style});
 
@@ -418,9 +884,7 @@ class _SectionTitle extends StatelessWidget {
   final TextStyle? style;
 
   @override
-  Widget build(BuildContext context) {
-    return Text(text, style: style);
-  }
+  Widget build(BuildContext context) => Text(text, style: style);
 }
 
 class _HeaderGrid extends StatelessWidget {
@@ -442,17 +906,14 @@ class _HeaderGrid extends StatelessWidget {
         child: LayoutBuilder(
           builder: (context, c) {
             final wide = c.maxWidth > 640;
-            final child = wide
+            return wide
                 ? Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(child: _HeaderCol1(data: data)),
                       const SizedBox(width: 24),
                       Expanded(
-                        child: _HeaderCol2(
-                          data: data,
-                          statusAr: statusAr,
-                        ),
+                        child: _HeaderCol2(data: data, statusAr: statusAr),
                       ),
                     ],
                   )
@@ -464,7 +925,6 @@ class _HeaderGrid extends StatelessWidget {
                       _HeaderCol2(data: data, statusAr: statusAr),
                     ],
                   );
-            return child;
           },
         ),
       ),
@@ -501,6 +961,11 @@ class _HeaderCol2 extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final h = data.header;
+    final Color? statusColor = data.isReturned
+        ? AppColors.warning
+        : invoiceHasAnyReturn(h.invoiceStatus)
+            ? AppColors.info
+            : null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -508,11 +973,8 @@ class _HeaderCol2 extends StatelessWidget {
         _kv(
           'الحالة',
           statusAr,
-          valueStyle: data.isReturned
-              ? const TextStyle(
-                  color: AppColors.warning,
-                  fontWeight: FontWeight.w800,
-                )
+          valueStyle: statusColor != null
+              ? TextStyle(color: statusColor, fontWeight: FontWeight.w800)
               : null,
         ),
       ],
@@ -540,9 +1002,7 @@ Widget _kv(String k, String val, {TextStyle? valueStyle}) {
           child: Text(
             val,
             style: valueStyle ??
-                const TextStyle(
-                  color: AppColors.textPrimary,
-                ),
+                const TextStyle(color: AppColors.textPrimary),
           ),
         ),
       ],
@@ -614,7 +1074,9 @@ class _TotalsCard extends StatelessWidget {
   }
 }
 
-// ── Return Metadata Card ───────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
+// Full-return metadata card
+// ---------------------------------------------------------------------------
 
 class _ReturnMetadataCard extends StatelessWidget {
   const _ReturnMetadataCard({required this.data});
@@ -640,14 +1102,11 @@ class _ReturnMetadataCard extends StatelessWidget {
           children: [
             const Row(
               children: [
-                Icon(
-                  Icons.assignment_return_rounded,
-                  size: 18,
-                  color: AppColors.warning,
-                ),
+                Icon(Icons.assignment_return_rounded,
+                    size: 18, color: AppColors.warning),
                 SizedBox(width: 8),
                 Text(
-                  'هذه الفاتورة مرتجعة',
+                  'هذه الفاتورة مرتجعة بالكامل',
                   style: TextStyle(
                     color: AppColors.warning,
                     fontWeight: FontWeight.w800,
@@ -662,8 +1121,7 @@ class _ReturnMetadataCard extends StatelessWidget {
             if (meta?.returnedByName != null &&
                 meta!.returnedByName!.trim().isNotEmpty)
               _metaRow('تم بواسطة', meta.returnedByName!),
-            if (meta?.returnNote != null &&
-                meta!.returnNote!.trim().isNotEmpty)
+            if (meta?.returnNote != null && meta!.returnNote!.trim().isNotEmpty)
               _metaRow('سبب الإرجاع', meta.returnNote!),
             if (meta == null || !meta.hasData)
               const Text(
@@ -696,10 +1154,7 @@ class _ReturnMetadataCard extends StatelessWidget {
           Expanded(
             child: Text(
               value,
-              style: const TextStyle(
-                color: AppColors.textPrimary,
-                fontSize: 13,
-              ),
+              style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
             ),
           ),
         ],
@@ -708,7 +1163,9 @@ class _ReturnMetadataCard extends StatelessWidget {
   }
 }
 
-// ── Return Confirmation Dialog (with required note) ────────────────────────
+// ---------------------------------------------------------------------------
+// Full-return confirmation dialog (unchanged)
+// ---------------------------------------------------------------------------
 
 class _ReturnConfirmDialog extends StatefulWidget {
   @override
@@ -738,9 +1195,7 @@ class _ReturnConfirmDialogState extends State<_ReturnConfirmDialog> {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text(
-                  'سيتم تنفيذ الإرجاع الكامل لهذه الفاتورة وفق التالي:',
-                ),
+                const Text('سيتم تنفيذ الإرجاع الكامل لهذه الفاتورة وفق التالي:'),
                 const SizedBox(height: 12),
                 const Text('• إعادة جميع الكميات المباعة إلى المخزون.'),
                 const SizedBox(height: 6),
@@ -773,9 +1228,7 @@ class _ReturnConfirmDialogState extends State<_ReturnConfirmDialog> {
                     fillColor: AppColors.inputFill,
                   ),
                   validator: (v) {
-                    if (v == null || v.trim().isEmpty) {
-                      return 'هذا الحقل مطلوب';
-                    }
+                    if (v == null || v.trim().isEmpty) return 'هذا الحقل مطلوب';
                     return null;
                   },
                 ),
@@ -799,6 +1252,81 @@ class _ReturnConfirmDialogState extends State<_ReturnConfirmDialog> {
               foregroundColor: AppColors.textPrimary,
             ),
             child: const Text('تأكيد الإرجاع'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Partial-return note dialog
+// ---------------------------------------------------------------------------
+
+class _PartialReturnNoteDialog extends StatefulWidget {
+  @override
+  State<_PartialReturnNoteDialog> createState() =>
+      _PartialReturnNoteDialogState();
+}
+
+class _PartialReturnNoteDialogState extends State<_PartialReturnNoteDialog> {
+  final _controller = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.assignment_return_rounded,
+                size: 20, color: AppColors.info),
+            SizedBox(width: 8),
+            Text('سبب الإرجاع الجزئي'),
+          ],
+        ),
+        content: Form(
+          key: _formKey,
+          child: TextFormField(
+            controller: _controller,
+            textDirection: TextDirection.rtl,
+            maxLines: 3,
+            autofocus: true,
+            decoration: InputDecoration(
+              hintText: 'أدخل سبب الإرجاع...',
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              filled: true,
+              fillColor: AppColors.inputFill,
+            ),
+            validator: (v) =>
+                (v == null || v.trim().isEmpty) ? 'هذا الحقل مطلوب' : null,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(null),
+            child: const Text('إلغاء'),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (_formKey.currentState!.validate()) {
+                Navigator.of(context).pop(_controller.text.trim());
+              }
+            },
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.info,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('تأكيد'),
           ),
         ],
       ),

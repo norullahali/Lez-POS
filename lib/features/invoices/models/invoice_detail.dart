@@ -62,16 +62,25 @@ class InvoiceDetailHeader {
 
 @immutable
 class InvoiceDetailLine {
+  /// sale_items.id — required for partial return lookups.
+  final int id;
+  /// sale_items.product_id — required for stock restoration.
+  final int productId;
   final String productName;
   final double quantity;
   final double unitPrice;
+  /// Snapshot cost at time of sale — used for ledger valuation on return.
+  final double unitCost;
   final double discount;
   final double lineTotal;
 
   const InvoiceDetailLine({
+    required this.id,
+    required this.productId,
     required this.productName,
     required this.quantity,
     required this.unitPrice,
+    this.unitCost = 0.0,
     required this.discount,
     required this.lineTotal,
   });

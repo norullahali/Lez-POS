@@ -276,11 +276,14 @@ WHERE si.id = ?
     final lineRows = await _db.customSelect(
       '''
 SELECT
-  p.name AS product_name,
-  s.quantity AS quantity,
-  s.unit_price AS unit_price,
+  s.id            AS sale_item_id,
+  s.product_id    AS product_id,
+  p.name          AS product_name,
+  s.quantity      AS quantity,
+  s.unit_price    AS unit_price,
+  COALESCE(s.unit_cost, 0.0) AS unit_cost,
   s.discount_amount AS discount_amount,
-  s.total AS line_total
+  s.total         AS line_total
 FROM sale_items s
 JOIN products p ON p.id = s.product_id
 WHERE s.invoice_id = ?
@@ -296,9 +299,12 @@ ORDER BY s.id ASC
     final lines = lineRows.map((r) {
       final m = r.data;
       return InvoiceDetailLine(
+        id: (m['sale_item_id'] as num).toInt(),
+        productId: (m['product_id'] as num).toInt(),
         productName: m['product_name'] as String,
         quantity: (m['quantity'] as num).toDouble(),
         unitPrice: (m['unit_price'] as num).toDouble(),
+        unitCost: (m['unit_cost'] as num?)?.toDouble() ?? 0.0,
         discount: (m['discount_amount'] as num).toDouble(),
         lineTotal: (m['line_total'] as num).toDouble(),
       );

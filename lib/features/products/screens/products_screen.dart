@@ -7,6 +7,7 @@ import '../../categories/providers/categories_provider.dart';
 import '../models/product_model.dart';
 import '../providers/products_provider.dart';
 import 'widgets/product_form_dialog.dart';
+import 'widgets/product_profile_dialog.dart';
 
 class ProductsScreen extends ConsumerWidget {
   const ProductsScreen({super.key});
@@ -156,6 +157,12 @@ class ProductsScreen extends ConsumerWidget {
       DataCell(Row(
         mainAxisSize: MainAxisSize.min,
         children: [
+          IconButton(
+            icon: const Icon(Icons.analytics_outlined, size: 20),
+            color: AppColors.info,
+            tooltip: 'عرض الملف الكامل',
+            onPressed: () => showProductProfileDialog(context, p),
+          ),
           IconButton(icon: const Icon(Icons.edit_rounded, color: AppColors.primary, size: 20), onPressed: () => _showForm(context, ref, p), tooltip: 'تعديل'),
         ],
       )),

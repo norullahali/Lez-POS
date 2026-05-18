@@ -1,5 +1,39 @@
 // lib/core/constants/movement_types.dart
 
+/// Business-level kinds used in the [stock_movements] table.
+///
+/// These are intentionally distinct from the low-level [StockMovementType]
+/// codes used in [stock_ledger] — one is accounting-grain, the other is
+/// business-operation-grain.
+class StockMovementKind {
+  StockMovementKind._();
+
+  static const String sale             = 'sale';
+  static const String purchase         = 'purchase';
+  static const String fullReturn       = 'full_return';
+  static const String openingStock     = 'opening_stock';
+  static const String manualAdjustment = 'manual_adjustment';
+
+  static const List<String> all = [
+    sale,
+    purchase,
+    fullReturn,
+    openingStock,
+    manualAdjustment,
+  ];
+
+  static String labelAr(String kind) {
+    return switch (kind) {
+      sale             => 'بيع',
+      purchase         => 'شراء',
+      fullReturn       => 'إرجاع كامل',
+      openingStock     => 'رصيد افتتاحي',
+      manualAdjustment => 'تسوية يدوية',
+      _                => kind,
+    };
+  }
+}
+
 enum StockMovementType {
   opening('OPENING', 'رصيد افتتاحي'),
   purchase('PURCHASE', 'شراء'),

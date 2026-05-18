@@ -33,6 +33,8 @@ import 'tables/logs_table.dart';
 import 'tables/pricing_rules_table.dart';
 import 'tables/app_settings_table.dart';
 import 'tables/notifications_table.dart';
+import 'tables/stock_movements_table.dart';
+import 'daos/stock_movements_dao.dart';
 import 'daos/users_dao.dart';
 import 'daos/categories_dao.dart';
 import 'daos/suppliers_dao.dart';
@@ -81,6 +83,7 @@ part 'app_database.g.dart';
     PricingRuleActions,
     AppSettings,
     NotificationsTable,
+    StockMovements,
   ],
   daos: [
     UsersDao,
@@ -96,6 +99,7 @@ part 'app_database.g.dart';
     ReturnsDao,
     LogsDao,
     AppSettingsDao,
+    StockMovementsDao,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -112,7 +116,7 @@ class AppDatabase extends _$AppDatabase {
   late final pricingDao = PricingDao(this);
 
   @override
-  int get schemaVersion => 21;
+  int get schemaVersion => 22;
 
   @override
   MigrationStrategy get migration {
@@ -564,6 +568,16 @@ class AppDatabase extends _$AppDatabase {
             } catch (e) {
               debugPrint('[Migration v21] skip: $e');
             }
+          }
+        }
+
+        if (from < 22) {
+          debugPrint('[Migration] v22: creating stock_movements table...');
+          try {
+            await m.createTable(stockMovements);
+            debugPrint('[Migration v22] stock_movements table created');
+          } catch (e) {
+            debugPrint('[Migration v22] stock_movements skip: $e');
           }
         }
       },

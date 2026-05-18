@@ -1,7 +1,7 @@
 // lib/features/opening_stock/repositories/opening_stock_repository.dart
-import '../../../core/database/app_database.dart';
-import '../../../core/constants/movement_types.dart';
 import 'package:drift/drift.dart';
+import '../../../core/constants/movement_types.dart';
+import '../../../core/database/app_database.dart';
 
 class OpeningStockRepository {
   final AppDatabase _db;
@@ -17,15 +17,16 @@ class OpeningStockRepository {
     return ((result?.data['cnt'] as int?) ?? 0) > 0;
   }
 
-  /// Save opening stock — sets current_stock directly and records an OPENING ledger entry.
+  /// Save opening stock — sets current_stock directly and records an OPENING ledger entry,
+  /// plus a high-level [StockMovements] record.
   Future<void> saveOpeningStock(int productId, double quantity, double unitCost) async {
-    // Remove existing opening ledger entry if any (keeps audit trail clean)
+    // Remove existing opening ledger entry if any (keeps audit trail clean).
     await _db.customStatement(
       "DELETE FROM stock_ledger WHERE product_id = ? AND movement_type = 'OPENING'",
       [productId],
     );
 
-    // Insert fresh opening ledger entry (audit trail only)
+    // Insert fresh opening ledger entry (low-level audit trail).
     await _db.stockDao.addMovement(
       StockLedgerCompanion(
         productId: Value(productId),
@@ -37,11 +38,25 @@ class OpeningStockRepository {
       ),
     );
 
-    // Set current_stock directly — this is the authoritative write for opening stock
+    // Read current stock BEFORE the authoritative write.
+    final stockBefore = await _db.stockDao.getStock(productId);
+
+    // Set current_stock directly — authoritative write for opening stock.
     await _db.customUpdate(
       'UPDATE products SET current_stock = ? WHERE id = ?',
       variables: [Variable.withReal(quantity), Variable.withInt(productId)],
       updates: {_db.products},
+    );
+
+    // Record high-level movement (signed delta = new qty − old qty).
+    await _db.stockMovementsDao.recordMovement(
+      productId: productId,
+      movementType: StockMovementKind.openingStock,
+      quantityChange: quantity - stockBefore,
+      stockBefore: stockBefore,
+      stockAfter: quantity,
+      referenceType: 'opening_stock',
+      note: 'رصيد افتتاحي',
     );
   }
 

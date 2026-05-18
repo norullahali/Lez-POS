@@ -97,6 +97,10 @@ class ReturnsDao extends DatabaseAccessor<AppDatabase> with _$ReturnsDaoMixin {
       if (inv.invoiceStatus == InvoiceLifecycleStatus.returned) {
         throw StateError('الفاتورة مرتجعة مسبقاً');
       }
+      if (inv.invoiceStatus == InvoiceLifecycleStatus.partiallyReturned) {
+        throw StateError(
+            'الفاتورة مرتجعة جزئياً - استخدم نظام الإرجاع الجزئي لإرجاع الكميات المتبقية');
+      }
 
       final dup = await (select(customerReturns)
             ..where((r) => r.originalInvoiceId.equals(invoiceId)))

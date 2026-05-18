@@ -34,7 +34,9 @@ import 'tables/pricing_rules_table.dart';
 import 'tables/app_settings_table.dart';
 import 'tables/notifications_table.dart';
 import 'tables/stock_movements_table.dart';
+import 'tables/sale_item_returns_table.dart';
 import 'daos/stock_movements_dao.dart';
+import 'daos/sale_item_returns_dao.dart';
 import 'daos/users_dao.dart';
 import 'daos/categories_dao.dart';
 import 'daos/suppliers_dao.dart';
@@ -84,6 +86,7 @@ part 'app_database.g.dart';
     AppSettings,
     NotificationsTable,
     StockMovements,
+    SaleItemReturns,
   ],
   daos: [
     UsersDao,
@@ -100,6 +103,7 @@ part 'app_database.g.dart';
     LogsDao,
     AppSettingsDao,
     StockMovementsDao,
+    SaleItemReturnsDao,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -116,7 +120,7 @@ class AppDatabase extends _$AppDatabase {
   late final pricingDao = PricingDao(this);
 
   @override
-  int get schemaVersion => 22;
+  int get schemaVersion => 23;
 
   @override
   MigrationStrategy get migration {
@@ -579,6 +583,18 @@ class AppDatabase extends _$AppDatabase {
           } catch (e) {
             debugPrint('[Migration v22] stock_movements skip: $e');
           }
+        }
+
+        if (from < 23) {
+          debugPrint('[Migration] v23: creating sale_item_returns table...');
+          try {
+            await m.createTable(saleItemReturns);
+            debugPrint('[Migration v23] sale_item_returns table created');
+          } catch (e) {
+            debugPrint('[Migration v23] sale_item_returns skip: $e');
+          }
+          // Update invoice_status CHECK constraint is not enforced in SQLite
+          // so 'partially_returned' works without DDL changes to sales_invoices.
         }
       },
       beforeOpen: (details) async {

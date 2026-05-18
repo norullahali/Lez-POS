@@ -11,6 +11,7 @@ class StockMovementKind {
   static const String sale             = 'sale';
   static const String purchase         = 'purchase';
   static const String fullReturn       = 'full_return';
+  static const String partialReturn    = 'partial_return';
   static const String openingStock     = 'opening_stock';
   static const String manualAdjustment = 'manual_adjustment';
 
@@ -18,6 +19,7 @@ class StockMovementKind {
     sale,
     purchase,
     fullReturn,
+    partialReturn,
     openingStock,
     manualAdjustment,
   ];
@@ -27,6 +29,7 @@ class StockMovementKind {
       sale             => 'بيع',
       purchase         => 'شراء',
       fullReturn       => 'إرجاع كامل',
+      partialReturn    => 'إرجاع جزئي',
       openingStock     => 'رصيد افتتاحي',
       manualAdjustment => 'تسوية يدوية',
       _                => kind,

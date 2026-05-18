@@ -8,6 +8,7 @@ import '../../../core/services/pos_sale_service.dart';
 import '../../../core/widgets/manager_approval_dialog.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../products/providers/products_provider.dart';
+import 'widgets/smart_return_lookup_dialog.dart';
 
 final customerReturnsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
   final db = AppDatabase.instance;
@@ -44,6 +45,17 @@ class _CustomerReturnsScreenState extends ConsumerState<CustomerReturnsScreen> {
             Row(children: [
               const Text('مرتجعات العملاء', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppColors.primary)),
               const Spacer(),
+              // Smart lookup — finds and links to a real historical sale
+              FilledButton.icon(
+                icon: const Icon(Icons.manage_search_rounded, size: 18),
+                label: const Text('البحث الذكي للإرجاع'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                ),
+                onPressed: () => showSmartReturnLookupDialog(context),
+              ),
+              const SizedBox(width: 12),
               ElevatedButton.icon(
                 icon: const Icon(Icons.flash_on_rounded, size: 18), 
                 style: ElevatedButton.styleFrom(backgroundColor: AppColors.warning, foregroundColor: Colors.white),

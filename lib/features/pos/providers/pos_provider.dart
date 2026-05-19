@@ -37,14 +37,41 @@ class PosSessionNotifier extends AsyncNotifier<PosSession?> {
     ref.invalidateSelf();
   }
 
-  Future<Map<String, dynamic>> closeSession(double closingCash) async {
+  /// Closes the active session.
+  ///
+  /// [closingCash]  — actual cash counted by cashier.
+  /// [notes]        — optional close note.
+  /// Returns the session summary map for the caller to display.
+  Future<Map<String, dynamic>> closeSession({
+    required double closingCash,
+    String? notes,
+  }) async {
     final session = state.valueOrNull;
     if (session == null) return {};
+    final userId = ref.read(authProvider).valueOrNull?.user?.id;
     final summary =
         await ref.read(posRepositoryProvider).getSessionSummary(session.id);
-    await ref.read(posRepositoryProvider).closeSession(session.id, closingCash);
+
+    final cashSales = (summary['cash'] as num?)?.toDouble() ?? 0.0;
+    final expectedCash = session.openingCash + cashSales;
+    final difference = closingCash - expectedCash;
+
+    await ref.read(posRepositoryProvider).closeSession(
+          sessionId: session.id,
+          closingCash: closingCash,
+          expectedCashAmount: expectedCash,
+          cashDifference: difference,
+          closedByUserId: userId,
+          notes: notes,
+        );
     ref.invalidateSelf();
-    return summary;
+    return {
+      ...summary,
+      'expectedCash': expectedCash,
+      'closingCash': closingCash,
+      'difference': difference,
+      'openingCash': session.openingCash,
+    };
   }
 }
 
@@ -117,7 +144,7 @@ class CartNotifier extends Notifier<CartState> {
 
     return defaultState;
   }
-  // ── Persistence ───────────────────────────────────────────────────────
+  // -- Persistence -------------------------------------------------------
 
   Future<void> _saveCartsToStorage() async {
     try {
@@ -159,7 +186,7 @@ class CartNotifier extends Notifier<CartState> {
     }
   }
 
-  // ── Multi-Cart Management ──────────────────────────────────────────────────────
+  // -- Multi-Cart Management ------------------------------------------------------
 
   void switchCart(int cartId) {
     if (state.carts.containsKey(cartId)) {
@@ -212,7 +239,7 @@ class CartNotifier extends Notifier<CartState> {
     _saveCartsToStorage();
   }
 
-  // ── Helper to update active cart ───────────────────────────────────────────
+  // -- Helper to update active cart -------------------------------------------
   void _updateActiveCart(CartSession updated) {
     final userId = ref.read(authProvider).valueOrNull?.user?.id;
     final finalUpdated = updated.copyWith(lastModifiedByUserId: userId);
@@ -222,7 +249,7 @@ class CartNotifier extends Notifier<CartState> {
     state = state.copyWith(carts: newCarts);
   }
 
-  // ── Apply pricing engine to a product + qty ──────────────────────────────
+  // -- Apply pricing engine to a product + qty ------------------------------
   CartItem _applyPricing(ProductModel product, double qty) {
     final ap = _engine.applyToItem(product, qty);
     return CartItem(
@@ -236,7 +263,7 @@ class CartNotifier extends Notifier<CartState> {
     );
   }
 
-  // ── Re-evaluate all items (call when rules reload) ───────────────────────
+  // -- Re-evaluate all items (call when rules reload) -----------------------
   void applyPricingRules() {
     final items = state.items.map((item) {
       if (item.isFreeItem) return item; // preserve free items
@@ -245,7 +272,7 @@ class CartNotifier extends Notifier<CartState> {
     _syncFreeItems(items);
   }
 
-  // ── BUY_X_GET_Y free item sync ────────────────────────────────────────────
+  // -- BUY_X_GET_Y free item sync --------------------------------------------
   void _syncFreeItems(List<CartItem> paidItems) {
     final lines = paidItems
         .where((i) => !i.isFreeItem)
@@ -287,7 +314,7 @@ class CartNotifier extends Notifier<CartState> {
     ));
   }
 
-  // ── Public Cart API ───────────────────────────────────────────────────────
+  // -- Public Cart API -------------------------------------------------------
 
   void addProduct(ProductModel product, {double qty = 1}) {
     final active = state.activeCart;
@@ -432,7 +459,7 @@ class CartNotifier extends Notifier<CartState> {
     _saveCartsToStorage();
   }
 
-  // ── Checkout ─────────────────────────────────────────────────────────────
+  // -- Checkout -------------------------------------------------------------
   Future<void> checkout({
     required int? sessionId,
     required String invoiceNumber,

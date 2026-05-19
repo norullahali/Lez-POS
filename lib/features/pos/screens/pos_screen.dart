@@ -29,7 +29,7 @@ import 'package:lez_pos/core/services/receipt_service.dart';
 
 import '../models/invoice_models.dart';
 
-// ─── Last invoice snapshot used by Ctrl+P re-print ────────────────────────
+// --- Last invoice snapshot used by Ctrl+P re-print ------------------------
 class _LastInvoiceData {
   final String invoiceNumber;
   final List<InvoiceItem> items;
@@ -43,7 +43,7 @@ class _LastInvoiceData {
   });
 }
 
-// ─── Keyboard shortcut intents ─────────────────────────────────────────────
+// --- Keyboard shortcut intents ---------------------------------------------
 class _FocusSearchIntent extends Intent { const _FocusSearchIntent(); }
 class _OpenPaymentIntent extends Intent { const _OpenPaymentIntent(); }
 class _ClearCartIntent extends Intent { const _ClearCartIntent(); }
@@ -58,8 +58,13 @@ final posNfProvider = Provider<NumberFormat>((ref) => NumberFormat('#,##0.##'));
 class _PosTopBar extends ConsumerWidget {
   const _PosTopBar();
 
+  static final _df = DateFormat('HH:mm');
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final sessionAsync = ref.watch(posSessionProvider);
+    final session = sessionAsync.valueOrNull;
+
     return Container(
       height: 50,
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -77,11 +82,51 @@ class _PosTopBar extends ConsumerWidget {
               }),
           const Text(
             'Lez POS',
-            style: TextStyle(color: Colors.white),
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
           ),
+          const SizedBox(width: 16),
+          // Session info chip
+          if (session != null)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppColors.success.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppColors.success.withValues(alpha: 0.4)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.circle, color: AppColors.success, size: 8),
+                  const SizedBox(width: 6),
+                  Text(
+                    '${session.cashierName}  |  فتحت ${_df.format(session.openedAt)}',
+                    style: const TextStyle(
+                        color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w500),
+                  ),
+                ],
+              ),
+            ),
           const Spacer(),
+          // Close session button
+          if (session != null)
+            TextButton.icon(
+              onPressed: () => _showCloseDialog(context, ref, session),
+              icon: const Icon(Icons.lock_outline_rounded, size: 16, color: Colors.white54),
+              label: const Text('إغلاق الوردية',
+                  style: TextStyle(color: Colors.white54, fontSize: 12)),
+            ),
         ],
       ),
+    );
+  }
+
+  Future<void> _showCloseDialog(
+      BuildContext context, WidgetRef ref, PosSession session) async {
+    await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => SessionCloseDialog(session: session),
     );
   }
 }
@@ -119,7 +164,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     super.dispose();
   }
 
-  // ── Shortcut action handlers ───────────────────────────────────────────────
+  // -- Shortcut action handlers -----------------------------------------------
 
   void _triggerCheckout() => _checkoutTrigger.value++;
 
@@ -664,7 +709,7 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
       return;
     }
 
-    // ── Snapshot the active cart NOW, before any async gap ──────────────────
+    // -- Snapshot the active cart NOW, before any async gap ------------------
     final cartState = ref.read(cartProvider);
     final activeCartSnapshot = cartState.activeCart;
     final completedCartId = cartState.activeCartId;
@@ -682,7 +727,7 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
 
     if (!mounted) return;
 
-    // ── Evaluate Return Limits & Permissions ────
+    // -- Evaluate Return Limits & Permissions ----
     int? approvedByUserId;
     if (activeCartSnapshot.items.any((i) => i.isReturn)) {
       final user = ref.read(authProvider).valueOrNull?.user;
@@ -863,7 +908,7 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
 
     return Column(
       children: [
-        // ─── Multi-cart tabs ─────────────────────────────────────────────
+        // --- Multi-cart tabs ---------------------------------------------
         const _CartTabsBar(),
         // Cart header
         Container(
@@ -1465,9 +1510,9 @@ class _SummaryRow extends StatelessWidget {
   }
 }
 
-// ══════════════════════════════════════════════════════════════════════════
+// ==========================================================================
 // Multi-Cart Tabs Bar
-// ══════════════════════════════════════════════════════════════════════════
+// ==========================================================================
 class _CartTabsBar extends ConsumerWidget {
   const _CartTabsBar();
 
@@ -1626,9 +1671,9 @@ class _QtyBtn extends StatelessWidget {
   }
 }
 
-// ══════════════════════════════════════════════════════════════════════════
+// ==========================================================================
 // Shortcut Hint Bar  –  shown at the very bottom of the POS screen
-// ══════════════════════════════════════════════════════════════════════════
+// ==========================================================================
 
 class _PosShortcutHintBar extends StatelessWidget {
   const _PosShortcutHintBar();

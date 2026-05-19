@@ -120,7 +120,7 @@ class AppDatabase extends _$AppDatabase {
   late final pricingDao = PricingDao(this);
 
   @override
-  int get schemaVersion => 23;
+  int get schemaVersion => 24;
 
   @override
   MigrationStrategy get migration {
@@ -595,6 +595,34 @@ class AppDatabase extends _$AppDatabase {
           }
           // Update invoice_status CHECK constraint is not enforced in SQLite
           // so 'partially_returned' works without DDL changes to sales_invoices.
+        }
+
+        if (from < 24) {
+          debugPrint('[Migration] v24: adding session close columns to pos_sessions...');
+          for (final ddl in [
+            'ALTER TABLE pos_sessions ADD COLUMN closed_by_user_id INTEGER',
+            'ALTER TABLE pos_sessions ADD COLUMN expected_cash_amount REAL',
+            'ALTER TABLE pos_sessions ADD COLUMN cash_difference REAL',
+            'ALTER TABLE pos_sessions ADD COLUMN notes TEXT',
+          ]) {
+            try {
+              await customStatement(ddl);
+              debugPrint('[Migration v24] executed: $ddl');
+            } catch (e) {
+              debugPrint('[Migration v24] skip ($ddl): $e');
+            }
+          }
+          // Backfill index for status lookups
+          try {
+            await customStatement(
+              'CREATE INDEX IF NOT EXISTS ps_status_idx ON pos_sessions (is_closed)',
+            );
+            await customStatement(
+              'CREATE INDEX IF NOT EXISTS ps_user_idx ON pos_sessions (created_by_user_id)',
+            );
+          } catch (e) {
+            debugPrint('[Migration v24] index skip: $e');
+          }
         }
       },
       beforeOpen: (details) async {

@@ -25,12 +25,23 @@ class SalesDao extends DatabaseAccessor<AppDatabase> with _$SalesDaoMixin {
   Future<int> openSession(PosSessionsCompanion session) =>
       into(posSessions).insert(session);
 
-  Future<int> closeSession(int sessionId, double closingCash) =>
+  Future<int> closeSession({
+    required int sessionId,
+    required double closingCash,
+    double? expectedCashAmount,
+    double? cashDifference,
+    int? closedByUserId,
+    String? notes,
+  }) =>
       (update(posSessions)..where((s) => s.id.equals(sessionId))).write(
         PosSessionsCompanion(
           isClosed: const Value(true),
           closedAt: Value(DateTime.now()),
           closingCash: Value(closingCash),
+          closedByUserId: Value(closedByUserId),
+          expectedCashAmount: Value(expectedCashAmount),
+          cashDifference: Value(cashDifference),
+          notes: Value(notes),
         ),
       );
 

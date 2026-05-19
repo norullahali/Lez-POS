@@ -18,8 +18,22 @@ class PosRepository {
         ),
       );
 
-  Future<void> closeSession(int sessionId, double closingCash) =>
-      _db.salesDao.closeSession(sessionId, closingCash);
+  Future<void> closeSession({
+    required int sessionId,
+    required double closingCash,
+    double? expectedCashAmount,
+    double? cashDifference,
+    int? closedByUserId,
+    String? notes,
+  }) =>
+      _db.salesDao.closeSession(
+        sessionId: sessionId,
+        closingCash: closingCash,
+        expectedCashAmount: expectedCashAmount,
+        cashDifference: cashDifference,
+        closedByUserId: closedByUserId,
+        notes: notes,
+      );
 
   Future<Map<String, dynamic>> getSessionSummary(int sessionId) =>
       _db.salesDao.getSessionSummary(sessionId);

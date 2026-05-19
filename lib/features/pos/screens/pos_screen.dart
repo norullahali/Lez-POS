@@ -55,13 +55,39 @@ class _DismissIntent extends Intent { const _DismissIntent(); }
 
 final posNfProvider = Provider<NumberFormat>((ref) => NumberFormat('#,##0.##'));
 
-class _PosTopBar extends ConsumerWidget {
+class _PosTopBar extends ConsumerStatefulWidget {
   const _PosTopBar();
 
-  static final _df = DateFormat('HH:mm');
+  @override
+  ConsumerState<_PosTopBar> createState() => _PosTopBarState();
+}
+
+class _PosTopBarState extends ConsumerState<_PosTopBar> {
+  Timer? _timer;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(minutes: 1), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  String _formatElapsed(DateTime openedAt) {
+    final elapsed = DateTime.now().difference(openedAt);
+    final h = elapsed.inHours.toString().padLeft(2, '0');
+    final m = (elapsed.inMinutes % 60).toString().padLeft(2, '0');
+    return '$h:$m';
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final sessionAsync = ref.watch(posSessionProvider);
     final session = sessionAsync.valueOrNull;
 
@@ -85,14 +111,15 @@ class _PosTopBar extends ConsumerWidget {
             style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
           ),
           const SizedBox(width: 16),
-          // Session info chip
+          // Session info chip — updates every minute
           if (session != null)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
                 color: AppColors.success.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppColors.success.withValues(alpha: 0.4)),
+                border: Border.all(
+                    color: AppColors.success.withValues(alpha: 0.4)),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -100,9 +127,11 @@ class _PosTopBar extends ConsumerWidget {
                   const Icon(Icons.circle, color: AppColors.success, size: 8),
                   const SizedBox(width: 6),
                   Text(
-                    '${session.cashierName}  |  فتحت ${_df.format(session.openedAt)}',
+                    'جلسة نشطة  •  منذ ${_formatElapsed(session.openedAt)}',
                     style: const TextStyle(
-                        color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w500),
+                        color: Colors.white70,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500),
                   ),
                 ],
               ),
@@ -111,8 +140,9 @@ class _PosTopBar extends ConsumerWidget {
           // Close session button
           if (session != null)
             TextButton.icon(
-              onPressed: () => _showCloseDialog(context, ref, session),
-              icon: const Icon(Icons.lock_outline_rounded, size: 16, color: Colors.white54),
+              onPressed: () => _showCloseDialog(session),
+              icon: const Icon(Icons.lock_outline_rounded,
+                  size: 16, color: Colors.white54),
               label: const Text('إغلاق الوردية',
                   style: TextStyle(color: Colors.white54, fontSize: 12)),
             ),
@@ -121,8 +151,7 @@ class _PosTopBar extends ConsumerWidget {
     );
   }
 
-  Future<void> _showCloseDialog(
-      BuildContext context, WidgetRef ref, PosSession session) async {
+  Future<void> _showCloseDialog(PosSession session) async {
     await showDialog<bool>(
       context: context,
       barrierDismissible: false,

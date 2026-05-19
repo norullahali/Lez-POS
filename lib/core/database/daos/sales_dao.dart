@@ -146,13 +146,18 @@ class SalesDao extends DatabaseAccessor<AppDatabase> with _$SalesDaoMixin {
   /// Daily session summary
   Future<Map<String, dynamic>> getSessionSummary(int sessionId) async {
     final result = await customSelect(
-      '''SELECT COUNT(*) as count, COALESCE(SUM(total), 0) as total,
-         COALESCE(SUM(cash_paid), 0) as cash, COALESCE(SUM(card_paid), 0) as card
-         FROM sales_invoices WHERE session_id = ? AND IFNULL(invoice_status, 'completed') != 'returned' ''',
+      '''SELECT
+           COUNT(CASE WHEN IFNULL(invoice_status, 'completed') NOT IN ('returned') THEN 1 END) as count,
+           COALESCE(SUM(CASE WHEN IFNULL(invoice_status, 'completed') NOT IN ('returned') THEN total END), 0) as total,
+           COALESCE(SUM(CASE WHEN IFNULL(invoice_status, 'completed') NOT IN ('returned') THEN cash_paid END), 0) as cash,
+           COALESCE(SUM(CASE WHEN IFNULL(invoice_status, 'completed') NOT IN ('returned') THEN card_paid END), 0) as card,
+           COALESCE(SUM(CASE WHEN invoice_status = 'returned' THEN cash_paid END), 0) as cash_returns
+         FROM sales_invoices WHERE session_id = ?''',
       variables: [Variable.withInt(sessionId)],
       readsFrom: {salesInvoices},
     ).getSingleOrNull();
-    return result?.data ?? {'count': 0, 'total': 0.0, 'cash': 0.0, 'card': 0.0};
+    return result?.data ??
+        {'count': 0, 'total': 0.0, 'cash': 0.0, 'card': 0.0, 'cash_returns': 0.0};
   }
 
   /// Save complete sale invoice with items and stock ledger entries

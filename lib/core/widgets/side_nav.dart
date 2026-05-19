@@ -66,11 +66,6 @@ const kNavItems = [
       label: 'المخزن',
       permissionKey: 'products.view'),
   NavItem(
-      route: '/customer-returns',
-      icon: Icons.assignment_return_rounded,
-      label: 'مرتجعات العملاء',
-      permissionKey: 'pos.refund'),
-  NavItem(
       route: '/supplier-returns',
       icon: Icons.local_shipping_rounded,
       label: 'مرتجعات الموردين',

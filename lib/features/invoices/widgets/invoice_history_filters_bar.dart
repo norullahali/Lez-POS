@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 
 import '../../../core/theme/app_colors.dart';
+import '../../../features/returns/screens/widgets/smart_return_lookup_dialog.dart';
 import '../data/invoice_history_query.dart';
 import '../providers/invoice_history_provider.dart';
 
@@ -186,11 +187,23 @@ class _InvoiceHistoryFiltersBarState
                 },
               ),
             ),
+            const SizedBox(width: 12),
+            FilledButton.icon(
+              onPressed: () => showSmartReturnLookupDialog(context),
+              icon: const Icon(Icons.manage_search_rounded, size: 18),
+              label: const Text('البحث الذكي للإرجاع'),
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 16, vertical: 12),
+              ),
+            ),
             const SizedBox(width: 8),
             IconButton.filledTonal(
               tooltip: 'تطبيق البحث فوراً',
               onPressed: _flushSearchNow,
-              icon: const Icon(Icons.manage_search_rounded),
+              icon: const Icon(Icons.search_rounded),
             ),
             IconButton(
               tooltip: 'إعادة ضبط الفلاتر',

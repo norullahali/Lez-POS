@@ -15,6 +15,9 @@ class PosRepository {
           cashierName: Value(cashierName),
           openingCash: Value(openingCash),
           createdByUserId: Value(userId),
+          // Explicit Dart DateTime.now() — avoids SQLite's CURRENT_TIMESTAMP
+          // text default which Drift mis-reads when using integer datetime mode.
+          openedAt: Value(DateTime.now()),
         ),
       );
 

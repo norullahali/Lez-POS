@@ -81,9 +81,9 @@ class _PosTopBarState extends ConsumerState<_PosTopBar> {
 
   String _formatElapsed(DateTime openedAt) {
     final elapsed = DateTime.now().difference(openedAt);
-    final h = elapsed.inHours.toString().padLeft(2, '0');
-    final m = (elapsed.inMinutes % 60).toString().padLeft(2, '0');
-    return '$h:$m';
+    final hours = elapsed.inHours;
+    final minutes = elapsed.inMinutes.remainder(60);
+    return '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}';
   }
 
   @override

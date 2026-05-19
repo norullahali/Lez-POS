@@ -16,11 +16,20 @@ class SalesDao extends DatabaseAccessor<AppDatabase> with _$SalesDaoMixin {
   SalesDao(super.db);
 
   // --- Sessions ---
-  Future<PosSession?> getOpenSession() =>
-      (select(posSessions)..where((s) => s.isClosed.equals(false))
-        ..orderBy([(s) => OrderingTerm.desc(s.openedAt)])
-        ..limit(1))
-          .getSingleOrNull();
+  /// Returns the active (unclosed) session opened today.
+  /// Sessions from previous days are intentionally excluded — they are stale
+  /// and a new session must be opened each working day.
+  Future<PosSession?> getOpenSession() {
+    final now = DateTime.now();
+    final startOfToday = DateTime(now.year, now.month, now.day);
+    return (select(posSessions)
+          ..where((s) =>
+              s.isClosed.equals(false) &
+              s.openedAt.isBiggerOrEqualValue(startOfToday))
+          ..orderBy([(s) => OrderingTerm.desc(s.openedAt)])
+          ..limit(1))
+        .getSingleOrNull();
+  }
 
   Future<int> openSession(PosSessionsCompanion session) =>
       into(posSessions).insert(session);

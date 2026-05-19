@@ -4,7 +4,7 @@ import '../../../core/database/app_database.dart';
 import '../models/pricing_rule_model.dart';
 import '../services/pricing_engine.dart';
 
-// ── Singleton engine ──────────────────────────────────────────────────────────
+// -- Singleton engine ----------------------------------------------------------
 final _engine = PricingEngine();
 
 /// Async notifier that loads all pricing rules from DB and keeps them in memory.
@@ -41,7 +41,7 @@ final pricingEngineProvider = Provider<PricingEngine>((ref) {
   return _engine;
 });
 
-// ── Admin helpers ─────────────────────────────────────────────────────────────
+// -- Admin helpers -------------------------------------------------------------
 
 /// All rules (active + inactive) for the admin list screen.
 final allPricingRulesProvider = FutureProvider<List<PricingRuleModel>>((ref) async {

@@ -12,9 +12,9 @@ class CustomerAccountsDao extends DatabaseAccessor<AppDatabase>
     with _$CustomerAccountsDaoMixin {
   CustomerAccountsDao(super.db);
 
-  // ─────────────────────────────────────────────────────
+  // -----------------------------------------------------
   // Balance queries
-  // ─────────────────────────────────────────────────────
+  // -----------------------------------------------------
 
   /// Stream of current balance for a specific customer.
   Stream<double> watchBalance(int customerId) {
@@ -42,9 +42,9 @@ class CustomerAccountsDao extends DatabaseAccessor<AppDatabase>
     return row.read(sumExp) ?? 0.0;
   }
 
-  // ─────────────────────────────────────────────────────
+  // -----------------------------------------------------
   // Transaction writing (all balance-altering ops)
-  // ─────────────────────────────────────────────────────
+  // -----------------------------------------------------
 
   /// Core method — always call inside a Drift transaction.
   /// Signs: SALE = +amount (balance grows), PAYMENT = -amount (balance shrinks),
@@ -150,9 +150,9 @@ class CustomerAccountsDao extends DatabaseAccessor<AppDatabase>
         note: note,
       );
 
-  // ─────────────────────────────────────────────────────
+  // -----------------------------------------------------
   // History queries
-  // ─────────────────────────────────────────────────────
+  // -----------------------------------------------------
 
   /// Stream of full transaction history for one customer, newest first.
   Stream<List<CustomerTransaction>> watchHistory(int customerId, {int limit = 50}) {
@@ -171,9 +171,9 @@ class CustomerAccountsDao extends DatabaseAccessor<AppDatabase>
         .get();
   }
 
-  // ─────────────────────────────────────────────────────
+  // -----------------------------------------------------
   // Reports
-  // ─────────────────────────────────────────────────────
+  // -----------------------------------------------------
 
   /// Stream of all customers with non-zero balances, ordered by balance desc.
   Stream<List<CustomerAccount>> watchAllDebtors() {
@@ -230,9 +230,9 @@ class CustomerAccountsDao extends DatabaseAccessor<AppDatabase>
     return {'0_7': bucket1, '8_30': bucket2, '30_plus': bucket3};
   }
 
-  // ─────────────────────────────────────────────────────
+  // -----------------------------------------------------
   // Credit limit check (utility)
-  // ─────────────────────────────────────────────────────
+  // -----------------------------------------------------
 
   /// Returns true if adding [extraAmount] to this customer's balance would
   /// exceed their credit_limit (0 = no limit, always returns false).

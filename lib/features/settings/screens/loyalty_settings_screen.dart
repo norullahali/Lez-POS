@@ -23,7 +23,7 @@ class LoyaltySettingsScreen extends ConsumerStatefulWidget {
 
 class _LoyaltySettingsScreenState
     extends ConsumerState<LoyaltySettingsScreen> {
-  // ── State ────────────────────────────────────────────────────────────────
+  // -- State ----------------------------------------------------------------
   bool _enabled = true;
   final _ppcCtrl   = TextEditingController(); // points_per_currency
   final _rvCtrl    = TextEditingController(); // redemption_value
@@ -45,7 +45,7 @@ class _LoyaltySettingsScreenState
     super.dispose();
   }
 
-  // ── Load current settings ─────────────────────────────────────────────────
+  // -- Load current settings -------------------------------------------------
   Future<void> _load() async {
     final svc = ref.read(settingsServiceProvider);
     final cfg = await svc.loadLoyaltySettings();
@@ -58,7 +58,7 @@ class _LoyaltySettingsScreenState
     });
   }
 
-  // ── Save ──────────────────────────────────────────────────────────────────
+  // -- Save ------------------------------------------------------------------
   Future<void> _save() async {
     final ppc = double.tryParse(_ppcCtrl.text.trim());
     final rv  = double.tryParse(_rvCtrl.text.trim());
@@ -103,7 +103,7 @@ class _LoyaltySettingsScreenState
     });
   }
 
-  // ── Build ─────────────────────────────────────────────────────────────────
+  // -- Build -----------------------------------------------------------------
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -147,7 +147,7 @@ class _LoyaltySettingsScreenState
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // ── Feedback banner ───────────────────────────────────────
+                  // -- Feedback banner ---------------------------------------
                   if (_feedback != null)
                     AnimatedContainer(
                       duration: const Duration(milliseconds: 300),
@@ -187,7 +187,7 @@ class _LoyaltySettingsScreenState
                       ]),
                     ),
 
-                  // ── Cards ─────────────────────────────────────────────────
+                  // -- Cards -------------------------------------------------
                   Expanded(
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -227,9 +227,9 @@ class _LoyaltySettingsScreenState
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // Settings Card
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 class _SettingsCard extends StatelessWidget {
   final bool enabled;
@@ -383,9 +383,9 @@ class _SettingsCard extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // Live Preview Card
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 class _PreviewCard extends StatelessWidget {
   final bool enabled;
@@ -536,9 +536,9 @@ class _PreviewCard extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // Reusable setting row layout
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 class _SettingRow extends StatelessWidget {
   final IconData icon;

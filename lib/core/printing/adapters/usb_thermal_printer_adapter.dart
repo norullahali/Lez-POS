@@ -1,4 +1,4 @@
-﻿// lib/core/printing/adapters/usb_thermal_printer_adapter.dart
+// lib/core/printing/adapters/usb_thermal_printer_adapter.dart
 //
 // ESC/POS printing over a Windows USB (RAW) printer port.
 //
@@ -8,9 +8,9 @@
 //
 // Call flow:
 //   PrintManager.print(invoiceData)
-//     └── UsbThermalPrinterAdapter.print(data)          [sealed in ThermalPrinterAdapter]
-//           ├── buildBytes(data)  → EscPosBuilder.fromInvoice(data, capabilities)
-//           └── sendBytes(bytes)  → RawWindowsPrinter.send(bytes, printerName)
+//     --- UsbThermalPrinterAdapter.print(data)          [sealed in ThermalPrinterAdapter]
+//           --- buildBytes(data)  → EscPosBuilder.fromInvoice(data, capabilities)
+//           --- sendBytes(bytes)  → RawWindowsPrinter.send(bytes, printerName)
 //                                       OpenPrinter → StartDocPrinter → StartPagePrinter
 //                                       → WritePrinter → EndPagePrinter
 //                                       → EndDocPrinter → ClosePrinter
@@ -45,7 +45,7 @@ import '../windows/raw_windows_printer.dart';
 class UsbThermalPrinterAdapter extends ThermalPrinterAdapter {
   const UsbThermalPrinterAdapter(super.config);
 
-  // ── Capabilities ─────────────────────────────────────────────────────────
+  // -- Capabilities ---------------------------------------------------------
 
   @override
   PrinterCapabilities get capabilities {
@@ -55,7 +55,7 @@ class UsbThermalPrinterAdapter extends ThermalPrinterAdapter {
     return PrinterCapabilities.thermal80Usb;
   }
 
-  // ── Transport: sendBytes ──────────────────────────────────────────────────
+  // -- Transport: sendBytes --------------------------------------------------
 
   @override
   Future<void> sendBytes(Uint8List bytes) async {
@@ -64,7 +64,7 @@ class UsbThermalPrinterAdapter extends ThermalPrinterAdapter {
         ? '(OS default)'
         : printerName;
 
-    debugPrint('[UsbThermalPrinterAdapter] ── sendBytes ──────────────────');
+    debugPrint('[UsbThermalPrinterAdapter] -- sendBytes ------------------');
     debugPrint('[UsbThermalPrinterAdapter]   Printer    : $display');
     debugPrint('[UsbThermalPrinterAdapter]   Paper size : ${config.paperSize.name}');
     debugPrint('[UsbThermalPrinterAdapter]   Byte count : ${bytes.length}');
@@ -92,7 +92,7 @@ class UsbThermalPrinterAdapter extends ThermalPrinterAdapter {
         'to "$display" in ${result.elapsedMs} ms.');
   }
 
-  // ── Availability check ────────────────────────────────────────────────────
+  // -- Availability check ----------------------------------------------------
 
   @override
   Future<bool> isAvailable() async {
@@ -109,7 +109,7 @@ class UsbThermalPrinterAdapter extends ThermalPrinterAdapter {
     return available;
   }
 
-  // ── Private helpers ───────────────────────────────────────────────────────
+  // -- Private helpers -------------------------------------------------------
 
   /// Maps a failed [RawPrintResult] to a descriptive exception.
   Never _throwFromResult(RawPrintResult result, String displayName) {

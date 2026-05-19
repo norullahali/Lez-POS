@@ -18,7 +18,7 @@ class StockMovementsDao extends DatabaseAccessor<AppDatabase>
     with _$StockMovementsDaoMixin {
   StockMovementsDao(super.db);
 
-  // ── Core write ─────────────────────────────────────────────────────────────
+  // -- Core write -------------------------------------------------------------
 
   /// Inserts a single stock movement record.
   ///
@@ -60,7 +60,7 @@ class StockMovementsDao extends DatabaseAccessor<AppDatabase>
     );
   }
 
-  // ── Reads (for future reports / screens) ──────────────────────────────────
+  // -- Reads (for future reports / screens) ----------------------------------
 
   /// All movements for a single product, newest first.
   Future<List<StockMovement>> getMovementsForProduct(int productId) =>

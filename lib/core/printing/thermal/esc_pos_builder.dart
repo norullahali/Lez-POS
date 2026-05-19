@@ -1,4 +1,4 @@
-﻿// lib/core/printing/thermal/esc_pos_builder.dart
+// lib/core/printing/thermal/esc_pos_builder.dart
 //
 // Pure-Dart ESC/POS command byte builder.
 //
@@ -41,17 +41,17 @@ import '../printer_capabilities.dart';
 class EscPosBuilder {
   final List<int> _buf = [];
 
-  // ── Raw ESC/POS control bytes ─────────────────────────────────────────────
+  // -- Raw ESC/POS control bytes ---------------------------------------------
   static const int _ESC = 0x1B;
   static const int _GS  = 0x1D;
   static const int _LF  = 0x0A;
 
-  // ── Initialisation ────────────────────────────────────────────────────────
+  // -- Initialisation --------------------------------------------------------
 
   /// `ESC @` — reset the printer to default state. Always call first.
   EscPosBuilder init() => _add([_ESC, 0x40]);
 
-  // ── Code page ─────────────────────────────────────────────────────────────
+  // -- Code page -------------------------------------------------------------
 
   /// `ESC t n` — select character code table.
   ///
@@ -63,7 +63,7 @@ class EscPosBuilder {
   EscPosBuilder selectCodePage(int page) =>
       _add([_ESC, 0x74, page & 0xFF]);
 
-  // ── Alignment ─────────────────────────────────────────────────────────────
+  // -- Alignment -------------------------------------------------------------
 
   /// `ESC a 0` — left justify (default).
   EscPosBuilder alignLeft() => _add([_ESC, 0x61, 0x00]);
@@ -74,7 +74,7 @@ class EscPosBuilder {
   /// `ESC a 2` — right justify.
   EscPosBuilder alignRight() => _add([_ESC, 0x61, 0x02]);
 
-  // ── Text style ────────────────────────────────────────────────────────────
+  // -- Text style ------------------------------------------------------------
 
   /// `ESC E 1` — bold on.
   EscPosBuilder boldOn() => _add([_ESC, 0x45, 0x01]);
@@ -100,7 +100,7 @@ class EscPosBuilder {
   /// `ESC ! 0x00` — reset character size to normal.
   EscPosBuilder normalSize() => _add([_ESC, 0x21, 0x00]);
 
-  // ── Line spacing ──────────────────────────────────────────────────────────
+  // -- Line spacing ----------------------------------------------------------
 
   /// `ESC 2` — restore default line spacing (~3.75 mm).
   EscPosBuilder defaultLineSpacing() => _add([_ESC, 0x32]);
@@ -108,7 +108,7 @@ class EscPosBuilder {
   /// `ESC 3 n` — set line spacing to n × 0.125 mm.
   EscPosBuilder lineSpacing(int n) => _add([_ESC, 0x33, n.clamp(0, 255)]);
 
-  // ── Text output ───────────────────────────────────────────────────────────
+  // -- Text output -----------------------------------------------------------
 
   /// Append raw text bytes (caller is responsible for encoding).
   EscPosBuilder text(String t) {
@@ -142,7 +142,7 @@ class EscPosBuilder {
     return this;
   }
 
-  // ── Layout helpers ────────────────────────────────────────────────────────
+  // -- Layout helpers --------------------------------------------------------
 
   /// Print a full-width separator of [char] repeated [width] times.
   EscPosBuilder separator({int width = 48, String char = '-'}) {
@@ -193,7 +193,7 @@ class EscPosBuilder {
     return this;
   }
 
-  // ── Hardware control ──────────────────────────────────────────────────────
+  // -- Hardware control ------------------------------------------------------
 
   /// `GS V 0` = full cut / `GS V 1` = partial cut.
   EscPosBuilder cut({bool full = false}) =>
@@ -206,7 +206,7 @@ class EscPosBuilder {
     return _add([_ESC, 0x70, 0x00, t1, t2]);
   }
 
-  // ── Build ─────────────────────────────────────────────────────────────────
+  // -- Build -----------------------------------------------------------------
 
   /// Returns the accumulated bytes as an immutable [Uint8List].
   Uint8List build() => Uint8List.fromList(_buf);
@@ -217,14 +217,14 @@ class EscPosBuilder {
   /// Number of bytes accumulated so far.
   int get byteCount => _buf.length;
 
-  // ── Private helpers ───────────────────────────────────────────────────────
+  // -- Private helpers -------------------------------------------------------
 
   EscPosBuilder _add(List<int> bytes) {
     _buf.addAll(bytes);
     return this;
   }
 
-  // ── High-level invoice builder ────────────────────────────────────────────
+  // -- High-level invoice builder --------------------------------------------
 
   /// Builds a complete receipt [Uint8List] from [InvoiceData] + [PrinterCapabilities].
   ///
@@ -248,7 +248,7 @@ class EscPosBuilder {
     b.init();
     if (caps.codePageId != null) b.selectCodePage(caps.codePageId!);
 
-    // ── Header ───────────────────────────────────────────────────────────
+    // -- Header -----------------------------------------------------------
     b
         .alignCenter()
         .boldOn()
@@ -266,9 +266,9 @@ class EscPosBuilder {
 
     b.separator(width: w);
 
-    // ── Invoice metadata (RTL order: value LEFT, label: RIGHT) ───────────
+    // -- Invoice metadata (RTL order: value LEFT, label: RIGHT) -----------
     // Matches the preview's _meta widget layout.
-    // ── Invoice metadata ─────────────────────────────────────────────────
+    // -- Invoice metadata -------------------------------------------------
     // الكاشير and العميل are ALWAYS shown; null values fall back to defaults
     // so the receipt always has a complete header regardless of login state.
     b.alignLeft();
@@ -283,7 +283,7 @@ class EscPosBuilder {
 
     b.separator(width: w);
 
-    // ── Items table: [المادة] [العدد] [السعر] [المجموع] (left → right) ─────
+    // -- Items table: [المادة] [العدد] [السعر] [المجموع] (left → right) -----
     b.boldOn().line(_rtlTableHeader(w)).boldOff();
     b.separator(width: w, char: '.');
 
@@ -294,7 +294,7 @@ class EscPosBuilder {
 
     b.separator(width: w);
 
-    // ── Totals ───────────────────────────────────────────────────────────
+    // -- Totals -----------------------------------------------------------
     // Use rtlInfoRow for ALL totals: value on LEFT, label: on RIGHT.
     // Arabic accounting: الإجمالي: (RIGHT)          2500 د.ع (LEFT)
     final subtotal = data.items.fold(0.0, (s, i) => s + i.lineTotal);
@@ -323,7 +323,7 @@ class EscPosBuilder {
 
     b.separator(width: w);
 
-    // ── Return metadata ───────────────────────────────────────────────────
+    // -- Return metadata ---------------------------------------------------
     if (data.isReturned) {
       b.alignCenter().boldOn().line('** فاتورة مرتجعة **').boldOff();
       b.alignLeft();
@@ -339,7 +339,7 @@ class EscPosBuilder {
       b.separator(width: w);
     }
 
-    // ── Footer ───────────────────────────────────────────────────────────
+    // -- Footer -----------------------------------------------------------
     b.alignCenter();
     if (data.footer != null && data.footer!.isNotEmpty) {
       b.line(data.footer!);
@@ -349,13 +349,13 @@ class EscPosBuilder {
     }
     b.feed(1).line('Lez POS by Birtij Software').feed(3);
 
-    // ── Hardware finalisation ────────────────────────────────────────────
+    // -- Hardware finalisation --------------------------------------------
     if (caps.supportsCut) b.cut();
 
     return b.build();
   }
 
-  // ── Private static helpers ────────────────────────────────────────────────
+  // -- Private static helpers ------------------------------------------------
 
   static String _fmt(num v) => v.toStringAsFixed(0);
 
@@ -363,7 +363,7 @@ class EscPosBuilder {
       '${d.year}/${d.month.toString().padLeft(2, "0")}/${d.day.toString().padLeft(2, "0")} '
       '${d.hour.toString().padLeft(2, "0")}:${d.minute.toString().padLeft(2, "0")}';
 
-  // ── Arabic accounting table helpers ──────────────────────────────────────
+  // -- Arabic accounting table helpers --------------------------------------
   //
   // Thermal printers print left-to-right, byte by byte.
   // Arabic is read right-to-left.  To match Arabic reading order the columns

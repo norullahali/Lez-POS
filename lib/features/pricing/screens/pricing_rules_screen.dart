@@ -20,7 +20,7 @@ class PricingRulesScreen extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ── Header ──
+          // -- Header --
           Row(
             children: [
               const Expanded(
@@ -38,7 +38,7 @@ class PricingRulesScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 20),
 
-          // ── List ──
+          // -- List --
           Expanded(
             child: allRules.when(
               loading: () => const Center(child: CircularProgressIndicator()),
@@ -173,7 +173,7 @@ class PricingRulesScreen extends ConsumerWidget {
   }
 }
 
-// ── Active Toggle ──────────────────────────────────────────────────────────────
+// -- Active Toggle --------------------------------------------------------------
 
 class _ActiveToggle extends StatelessWidget {
   final PricingRuleModel rule;
@@ -193,7 +193,7 @@ class _ActiveToggle extends StatelessWidget {
   }
 }
 
-// ── Type Chip ─────────────────────────────────────────────────────────────────
+// -- Type Chip -----------------------------------------------------------------
 
 class _TypeChip extends StatelessWidget {
   final RuleType type;

@@ -3,7 +3,7 @@ import 'package:drift/drift.dart';
 import 'products_table.dart';
 import 'categories_table.dart';
 
-// ─── Rule Type Enum stored as TEXT ───────────────────────────────────────────
+// --- Rule Type Enum stored as TEXT -------------------------------------------
 // DISCOUNT_PERCENTAGE | DISCOUNT_FIXED | BUY_X_GET_Y | WHOLESALE_PRICE | SPECIAL_PRICE
 
 /// Main pricing rule record.

@@ -64,7 +64,7 @@ class CartSession {
     );
   }
 
-  // ── Serialization ────────────────────────────────────────────────────────
+  // -- Serialization --------------------------------------------------------
 
   Map<String, dynamic> toJson() => {
         'id': id,

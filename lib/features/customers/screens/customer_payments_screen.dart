@@ -322,7 +322,7 @@ class _CustomerPaymentsScreenState
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 class _TransactionHistoryList extends ConsumerWidget {
   final int customerId;
   const _TransactionHistoryList({required this.customerId});

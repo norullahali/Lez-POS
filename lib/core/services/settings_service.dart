@@ -7,7 +7,7 @@ import '../database/app_database.dart';
 import '../printing/printer_config.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-// ── Setting key constants ─────────────────────────────────────────────────────
+// -- Setting key constants -----------------------------------------------------
 
 abstract class SettingsKeys {
   static const String loyaltyEnabled = 'loyalty_enabled';
@@ -24,13 +24,13 @@ abstract class SettingsKeys {
   static const String showQr  = 'show_qr';
 }
 
-// ── Service ───────────────────────────────────────────────────────────────────
+// -- Service -------------------------------------------------------------------
 
 class SettingsService {
   final AppDatabase _db;
   SettingsService(this._db);
 
-  // ── Printer configuration ──────────────────────────────────────────────────
+  // -- Printer configuration --------------------------------------------------
 
   /// Loads the full printer configuration from app_settings.
   ///
@@ -103,7 +103,7 @@ class SettingsService {
     return prefs.getString('printer_type') ?? 'pdf';
   }
 
-  // ── Invoice display ────────────────────────────────────────────────────────
+  // -- Invoice display --------------------------------------------------------
 
   Future<String?> getInvoiceFooter() => _getRaw(SettingsKeys.invoiceFooter);
 
@@ -143,7 +143,7 @@ class SettingsService {
 
   Future<void> setShowQr(bool v) => _setRaw(SettingsKeys.showQr, v ? '1' : '0');
 
-  // ── Low-level helpers ─────────────────────────────────────────────────────
+  // -- Low-level helpers -----------------------------------------------------
 
   Future<String?> _getRaw(String key) async {
     try {
@@ -185,7 +185,7 @@ class SettingsService {
     return (v == null) ? fallback : (double.tryParse(v) ?? fallback);
   }
 
-  // ── Public API ─────────────────────────────────────────────────────────────
+  // -- Public API -------------------------------------------------------------
 
   Future<bool> isLoyaltyEnabled() =>
       _getBool(SettingsKeys.loyaltyEnabled, fallback: true);
@@ -209,7 +209,7 @@ class SettingsService {
   Future<void> setRedemptionValue(double v) =>
       _setRaw(SettingsKeys.redemptionValue, v.toString());
 
-  // ── Store Info ─────────────────────────────────────────────────────────────
+  // -- Store Info -------------------------------------------------------------
 
   Future<String> getStoreName() async =>
       await _getRaw(SettingsKeys.storeName) ?? 'Lez POS';
@@ -256,7 +256,7 @@ class SettingsService {
     }
   }
 
-  // ── Snapshot ─────────────────────────────────────────────────────────────
+  // -- Snapshot -------------------------------------------------------------
   Future<LoyaltySettings> loadLoyaltySettings() async {
     final results = await Future.wait([
       isLoyaltyEnabled(),
@@ -272,7 +272,7 @@ class SettingsService {
   }
 }
 
-// ── Value object ─────────────────────────────────────────────────────────────
+// -- Value object -------------------------------------------------------------
 class LoyaltySettings {
   final bool enabled;
   final double pointsPerCurrency;

@@ -24,7 +24,7 @@ class PricingDao {
     LEFT JOIN pricing_rule_actions    a ON a.rule_id = r.id
   ''';
 
-  // ── Reads ─────────────────────────────────────────────────────────────────
+  // -- Reads -----------------------------------------------------------------
 
   Future<List<Map<String, dynamic>>> getAllRulesRaw() async {
     final rows = await db.customSelect(
@@ -49,7 +49,7 @@ class PricingDao {
     return rows.map((r) => r.data).toList();
   }
 
-  // ── Mutations ─────────────────────────────────────────────────────────────
+  // -- Mutations -------------------------------------------------------------
 
   Future<int> saveRule({
     required String name,
@@ -159,7 +159,7 @@ class PricingDao {
     );
   }
 
-  // ── Helpers ───────────────────────────────────────────────────────────────
+  // -- Helpers ---------------------------------------------------------------
 
   String _esc(String s) => s.replaceAll("'", "''");
 

@@ -27,7 +27,7 @@ class LoyaltyConfig {
   /// Minimum points that must be used in a single redemption.
   static const double minRedeemPoints = 10;
 
-  // ── Derived helpers ──────────────────────────────────────────────────────
+  // -- Derived helpers ------------------------------------------------------
 
   /// How many points a customer earns for [amount] currency spent.
   static double earnedPoints(double amount) =>

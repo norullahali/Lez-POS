@@ -1,4 +1,4 @@
-﻿import 'dart:io';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
@@ -22,7 +22,7 @@ class InvoiceSettingsScreen extends StatefulWidget {
 }
 
 class _InvoiceSettingsScreenState extends State<InvoiceSettingsScreen> {
-  // ── Invoice fields ─────────────────────────────────────────────────────────
+  // -- Invoice fields ---------------------------------------------------------
   final _storeNameCtrl = TextEditingController();
   final _phoneCtrl     = TextEditingController();
   final _addressCtrl   = TextEditingController();
@@ -33,7 +33,7 @@ class _InvoiceSettingsScreenState extends State<InvoiceSettingsScreen> {
   bool    showQr   = false;
   String? logoPath;
 
-  // ── Printer fields ─────────────────────────────────────────────────────────
+  // -- Printer fields ---------------------------------------------------------
   PrinterType      _printerType = PrinterType.pdf;
   ReceiptPaperSize _paperSize   = ReceiptPaperSize.thermal80;
 
@@ -44,7 +44,7 @@ class _InvoiceSettingsScreenState extends State<InvoiceSettingsScreen> {
 
   bool _isTesting = false;
 
-  // ── Lifecycle ──────────────────────────────────────────────────────────────
+  // -- Lifecycle --------------------------------------------------------------
 
   @override
   void initState() {
@@ -81,12 +81,12 @@ class _InvoiceSettingsScreenState extends State<InvoiceSettingsScreen> {
 
   void _onFieldChanged() => setState(() {});
 
-  // ── Persistence ────────────────────────────────────────────────────────────
+  // -- Persistence ------------------------------------------------------------
 
   Future<void> _loadSettings() async {
     final svc = SettingsService(AppDatabase.instance);
 
-    // ── Load from DB (primary source) ─────────────────────────────────────
+    // -- Load from DB (primary source) -------------------------------------
     final dbPhone = await svc.getPhone();
 
     if (dbPhone == null) {
@@ -114,7 +114,7 @@ class _InvoiceSettingsScreenState extends State<InvoiceSettingsScreen> {
       await svc.setShowQr(legacyQr);
     }
 
-    // ── Read final values from DB ──────────────────────────────────────────
+    // -- Read final values from DB ------------------------------------------
     logoPath              = await svc.getStoreLogoPath();
     _storeNameCtrl.text   = await svc.getStoreName();
     _phoneCtrl.text       = await svc.getPhone()            ?? '';
@@ -124,7 +124,7 @@ class _InvoiceSettingsScreenState extends State<InvoiceSettingsScreen> {
     showTax               = await svc.getShowTax();
     showQr                = await svc.getShowQr();
 
-    // ── Printer config (always DB-backed) ──────────────────────────────────
+    // -- Printer config (always DB-backed) ----------------------------------
     final config = await svc.getPrinterConfig();
     _printerType          = config.type;
     _paperSize            = config.paperSize;
@@ -139,7 +139,7 @@ class _InvoiceSettingsScreenState extends State<InvoiceSettingsScreen> {
   Future<void> _saveSettings() async {
     final svc = SettingsService(AppDatabase.instance);
 
-    // ── Invoice settings → DB (single source of truth for printing) ────────
+    // -- Invoice settings → DB (single source of truth for printing) --------
     await svc.setStoreName(_storeNameCtrl.text.trim());
     await svc.setPhone(_phoneCtrl.text.trim().isEmpty        ? null : _phoneCtrl.text.trim());
     await svc.setAddress(_addressCtrl.text.trim().isEmpty    ? null : _addressCtrl.text.trim());
@@ -149,7 +149,7 @@ class _InvoiceSettingsScreenState extends State<InvoiceSettingsScreen> {
     await svc.setShowTax(showTax);
     await svc.setShowQr(showQr);
 
-    // ── Printer config → DB ────────────────────────────────────────────────
+    // -- Printer config → DB ------------------------------------------------
     await svc.savePrinterConfig(PrinterConfig(
       type:              _printerType,
       paperSize:         _paperSize,
@@ -172,7 +172,7 @@ class _InvoiceSettingsScreenState extends State<InvoiceSettingsScreen> {
     }
   }
 
-  // ── Test print ─────────────────────────────────────────────────────────────
+  // -- Test print -------------------------------------------------------------
 
   Future<void> _testPrint() async {
     setState(() => _isTesting = true);
@@ -235,7 +235,7 @@ class _InvoiceSettingsScreenState extends State<InvoiceSettingsScreen> {
     }
   }
 
-  // ── Build ──────────────────────────────────────────────────────────────────
+  // -- Build ------------------------------------------------------------------
 
   @override
   Widget build(BuildContext context) {
@@ -296,9 +296,9 @@ class _InvoiceSettingsScreenState extends State<InvoiceSettingsScreen> {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // Settings form
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 class _SettingsForm extends StatelessWidget {
   // Invoice params
@@ -362,7 +362,7 @@ class _SettingsForm extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── Invoice settings title ──────────────────────────────────────
+            // -- Invoice settings title --------------------------------------
             _sectionHeader(
               context,
               icon:  Icons.settings_rounded,
@@ -457,7 +457,7 @@ class _SettingsForm extends StatelessWidget {
 
             const SizedBox(height: 20),
 
-            // ── Printer settings section ────────────────────────────────────
+            // -- Printer settings section ------------------------------------
             const Divider(),
             const SizedBox(height: 12),
 
@@ -611,7 +611,7 @@ class _SettingsForm extends StatelessWidget {
 
             const SizedBox(height: 20),
 
-            // ── Logo picker ─────────────────────────────────────────────────
+            // -- Logo picker -------------------------------------------------
             const Divider(),
             const SizedBox(height: 12),
 
@@ -653,7 +653,7 @@ class _SettingsForm extends StatelessWidget {
 
             const SizedBox(height: 24),
 
-            // ── Save button ─────────────────────────────────────────────────
+            // -- Save button -------------------------------------------------
             SizedBox(
               width:  double.infinity,
               height: 46,
@@ -672,7 +672,7 @@ class _SettingsForm extends StatelessWidget {
     );
   }
 
-  // ── Helpers ────────────────────────────────────────────────────────────────
+  // -- Helpers ----------------------------------------------------------------
 
   Widget _sectionHeader(
     BuildContext context, {

@@ -14,7 +14,7 @@ class AppSettingsDao extends DatabaseAccessor<AppDatabase>
     with _$AppSettingsDaoMixin {
   AppSettingsDao(super.db);
 
-  // ── Raw access ────────────────────────────────────────────────────────────
+  // -- Raw access ------------------------------------------------------------
 
   /// Returns the raw string value for [key], or null if the key doesn't exist.
   Future<String?> getRaw(String key) async {
@@ -53,7 +53,7 @@ class AppSettingsDao extends DatabaseAccessor<AppDatabase>
   Future<List<AppSetting>> getAll() =>
       (select(appSettings)..orderBy([(s) => OrderingTerm.asc(s.key)])).get();
 
-  // ── Typed helpers ─────────────────────────────────────────────────────────
+  // -- Typed helpers ---------------------------------------------------------
 
   Future<bool?> getBool(String key) async {
     final v = await getRaw(key);
@@ -74,7 +74,7 @@ class AppSettingsDao extends DatabaseAccessor<AppDatabase>
       {String? description}) =>
       setRaw(key, value.toString(), description: description);
 
-  // ── Deletion (rarely needed) ──────────────────────────────────────────────
+  // -- Deletion (rarely needed) ----------------------------------------------
 
   Future<void> deleteSetting(String key) async {
     await (delete(appSettings)..where((s) => s.key.equals(key))).go();

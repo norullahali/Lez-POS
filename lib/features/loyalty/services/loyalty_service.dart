@@ -26,12 +26,12 @@ class LoyaltyService {
 
   LoyaltyService(this._db, this._settings);
 
-  // ── Settings snapshot ─────────────────────────────────────────────────────
+  // -- Settings snapshot -----------------------------------------------------
 
   /// Load live settings.  Cached per-call-site via Riverpod [loyaltySettingsProvider].
   Future<LoyaltySettings> _cfg() => _settings.loadLoyaltySettings();
 
-  // ── Computation (uses live settings) ──────────────────────────────────────
+  // -- Computation (uses live settings) --------------------------------------
 
   /// Points earned for spending [totalAmount] currency.
   /// Returns 0 if loyalty is disabled.
@@ -55,7 +55,7 @@ class LoyaltyService {
   /// Whether the loyalty system is currently enabled.
   Future<bool> isEnabled() => _settings.isLoyaltyEnabled();
 
-  // ── Validation ────────────────────────────────────────────────────────────
+  // -- Validation ------------------------------------------------------------
 
   /// Validates that [pointsToUse] ≤ [available] and ≤ max allowed by [total].
   /// Returns an Arabic error string, or null when the input is valid.
@@ -75,7 +75,7 @@ class LoyaltyService {
     return null;
   }
 
-  // ── Persistence (raw SQL) ─────────────────────────────────────────────────
+  // -- Persistence (raw SQL) -------------------------------------------------
 
   /// Fetch the current loyalty-point balance of [customerId].
   Future<double> getPoints(int customerId) async {

@@ -54,7 +54,7 @@ class CartItem {
     );
   }
 
-  // ── Serialization ────────────────────────────────────────────────────────
+  // -- Serialization --------------------------------------------------------
 
   Map<String, dynamic> toJson() => {
         'product': {

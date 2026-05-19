@@ -18,9 +18,9 @@ class PricingEngine {
   // String? _activeCoupon;
   // int? _customerGroupId;
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Lifecycle
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   /// Load (or reload) rules from the DB result. Already sorted by priority.
   void loadRules(List<PricingRuleModel> rules) {
@@ -36,9 +36,9 @@ class PricingEngine {
 
   int get ruleCount => _rules.length;
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Item-level pricing
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   /// Returns the best [AppliedPrice] for a single [product] at [quantity].
   /// Will skip BUY_X_GET_Y rules (those are cart-level, handled separately).
@@ -65,9 +65,9 @@ class PricingEngine {
   AppliedPrice reapply(ProductModel product, double quantity) =>
       applyToItem(product, quantity);
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Cart-level: BUY_X_GET_Y
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   /// Returns a list of (productId → freeQuantity) for BUY_X_GET_Y rules.
   /// The caller (CartNotifier) inserts zero-price items into the cart.
@@ -101,9 +101,9 @@ class PricingEngine {
     return freeMap;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Private helpers
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   bool _isDateValid(PricingRuleModel rule, DateTime now) {
     if (rule.startDate != null && now.isBefore(rule.startDate!)) return false;

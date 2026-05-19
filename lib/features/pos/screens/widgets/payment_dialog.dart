@@ -66,7 +66,7 @@ class _PaymentDialogState extends ConsumerState<PaymentDialog> {
     super.dispose();
   }
 
-  // ─── helpers ────────────────────────────────────────
+  // --- helpers ----------------------------------------
   static String _normalizeNumber(String input) {
     const eastern = '٠١٢٣٤٥٦٧٨٩';
     const arabic = '۰۱۲۳۴۵۶۷۸۹';
@@ -143,7 +143,7 @@ class _PaymentDialogState extends ConsumerState<PaymentDialog> {
     });
   }
 
-  // ─── build ──────────────────────────────────────────
+  // --- build ------------------------------------------
   @override
   Widget build(BuildContext context) {
     return Dialog(
@@ -171,7 +171,7 @@ class _PaymentDialogState extends ConsumerState<PaymentDialog> {
                     fontWeight: FontWeight.w700),
               ),
 
-              // ── Loyalty points section ──────────────────────────────
+              // -- Loyalty points section ------------------------------
               if (_loyaltyLoaded && _hasLoyaltyCustomer) ...[
                 const SizedBox(height: 12),
                 _LoyaltySection(
@@ -486,9 +486,9 @@ class _PaymentDialogState extends ConsumerState<PaymentDialog> {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // Loyalty points section widget (extracted for clarity)
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 class _LoyaltySection extends StatelessWidget {
   final double availablePoints;
@@ -629,7 +629,7 @@ class _LoyaltySection extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 class _MethodButton extends StatelessWidget {
   final String label;
   final IconData icon;

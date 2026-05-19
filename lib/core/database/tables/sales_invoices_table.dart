@@ -24,7 +24,7 @@ class SalesInvoices extends Table {
   TextColumn get invoiceStatus =>
       text().withDefault(const Constant('completed'))();
 
-  // ── Return metadata (nullable — only set when invoiceStatus = 'returned') ──
+  // -- Return metadata (nullable — only set when invoiceStatus = 'returned') --
   DateTimeColumn get returnDate => dateTime().nullable()();
   TextColumn get returnNote => text().nullable()();
   IntColumn get returnedByUserId =>

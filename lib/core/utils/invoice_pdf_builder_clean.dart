@@ -1,4 +1,4 @@
-﻿// lib/core/utils/invoice_pdf_builder_clean.dart
+// lib/core/utils/invoice_pdf_builder_clean.dart
 
 import 'dart:typed_data';
 
@@ -177,7 +177,7 @@ class InvoicePdfBuilderClean {
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.stretch,
       children: [
-        // ── Header row ──────────────────────────────────────────────────
+        // -- Header row --------------------------------------------------
         // pw.Row inherits RTL from the parent pw.Directionality(rtl).
         // First child → RIGHT, last child → LEFT.
         // Children order [المادة, العدد, السعر, المجموع]:
@@ -192,7 +192,7 @@ class InvoicePdfBuilderClean {
           ],
         ),
         pw.Divider(thickness: 0.8),
-        // ── Data rows ───────────────────────────────────────────────────
+        // -- Data rows ---------------------------------------------------
         ...items.map(
           (item) => pw.Padding(
             padding: const pw.EdgeInsets.symmetric(vertical: 1),
@@ -314,7 +314,7 @@ class InvoicePdfBuilderClean {
     );
   }
 
-  // ── Row helpers ──────────────────────────────────────────────────────────
+  // -- Row helpers ----------------------------------------------------------
   //
   // We set textDirection: rtl EXPLICITLY on every Row so we do NOT rely on
   // the ambient pw.Directionality — some pdf widget types ignore it.
@@ -353,7 +353,7 @@ class InvoicePdfBuilderClean {
         '${date.minute.toString().padLeft(2, "0")}';
   }
 
-  // ── Return metadata ───────────────────────────────────────────────────────
+  // -- Return metadata -------------------------------------------------------
 
   /// A prominent "RETURNED" banner shown at the top of the receipt.
   pw.Widget _buildReturnBadge(InvoiceData data) {

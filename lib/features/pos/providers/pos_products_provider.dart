@@ -51,7 +51,7 @@ class PosProductsNotifier extends AsyncNotifier<PosProductsState> {
     final initialBatch = await repo.getLimit(100);
     _integrateBatch(initialBatch);
 
-    // ── Reactive DB sync ────────────────────────────────────────────────────
+    // -- Reactive DB sync ----------------------------------------------------
     // Keep the in-memory cache live whenever products.current_stock (or any
     // product field) changes — covers ALL write paths:
     //   • POS sale      (StockGuard.deductStock → customUpdate → products)
@@ -235,7 +235,7 @@ class PosProductsNotifier extends AsyncNotifier<PosProductsState> {
     return _searchEngine.search(query, maxResults: maxResults);
   }
 
-  // ── Internal helpers ────────────────────────────────────────────────────
+  // -- Internal helpers ----------------------------------------------------
 
   void _rebuildIndex() {
     _searchEngine.buildIndex(_internalMap);
@@ -245,16 +245,16 @@ class PosProductsNotifier extends AsyncNotifier<PosProductsState> {
 final posProductsProvider =
     AsyncNotifierProvider<PosProductsNotifier, PosProductsState>(PosProductsNotifier.new);
 
-// ── Search Query State ─────────────────────────────────────────────────────
+// -- Search Query State -----------------------------------------------------
 
 /// Raw user-typed query string (debounced by the UI layer).
 final posSearchQueryProvider = StateProvider<String>((ref) => '');
 
-// ── Category Filter State ──────────────────────────────────────────────────
+// -- Category Filter State --------------------------------------------------
 
 final posCategoryFilterProvider = StateProvider<int?>((ref) => null);
 
-// ── Smart Search Results Provider ─────────────────────────────────────────
+// -- Smart Search Results Provider -----------------------------------------
 
 /// Returns a ranked [List<SearchResult>] from the in-memory engine.
 /// Watches [posSearchQueryProvider] and recomputes only when the query changes.
@@ -267,7 +267,7 @@ final smartSearchResultsProvider = Provider<List<SearchResult>>((ref) {
   return notifier.searchProducts(query);
 });
 
-// ── Filtered Products Provider (unchanged – used for grid / category mode) ─
+// -- Filtered Products Provider (unchanged – used for grid / category mode) -
 
 /// Returns all products matching the active category filter (no query search).
 /// Used by the grid when the search overlay is NOT active.

@@ -24,7 +24,7 @@ class _PricingRuleFormState extends ConsumerState<PricingRuleForm> {
   bool _saving = false;
   bool _isLoadingData = true;
 
-  // ── Form state ─────────────────────────────────────────────────────────────
+  // -- Form state -------------------------------------------------------------
   late final _nameCtrl            = TextEditingController();
   late final _priorityCtrl        = TextEditingController(text: '0');
   late final _discPctCtrl         = TextEditingController(text: '0');
@@ -108,7 +108,7 @@ class _PricingRuleFormState extends ConsumerState<PricingRuleForm> {
     super.dispose();
   }
 
-  // ── Save ──────────────────────────────────────────────────────────────────
+  // -- Save ------------------------------------------------------------------
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _saving = true);
@@ -159,7 +159,7 @@ class _PricingRuleFormState extends ConsumerState<PricingRuleForm> {
     }
   }
 
-  // ── UI ────────────────────────────────────────────────────────────────────
+  // -- UI --------------------------------------------------------------------
   @override
   Widget build(BuildContext context) {
     final isEdit = widget.editRule != null;
@@ -169,7 +169,7 @@ class _PricingRuleFormState extends ConsumerState<PricingRuleForm> {
       child: SizedBox(
         width: 560,
         child: Column(mainAxisSize: MainAxisSize.min, children: [
-          // ── Title bar ──
+          // -- Title bar --
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
             decoration: const BoxDecoration(
@@ -190,7 +190,7 @@ class _PricingRuleFormState extends ConsumerState<PricingRuleForm> {
             ]),
           ),
 
-          // ── Scrollable body or loading spinner ──
+          // -- Scrollable body or loading spinner --
           if (_isLoadingData)
             const SizedBox(height: 300, child: Center(child: CircularProgressIndicator()))
           else
@@ -269,7 +269,7 @@ class _PricingRuleFormState extends ConsumerState<PricingRuleForm> {
                     ),
                   ),
 
-                  // ── Actions ──
+                  // -- Actions --
                   const Divider(height: 1),
                   Padding(
                     padding: const EdgeInsets.all(16),
@@ -296,7 +296,7 @@ class _PricingRuleFormState extends ConsumerState<PricingRuleForm> {
     );
   }
 
-  // ── Action fields by rule type ────────────────────────────────────────────
+  // -- Action fields by rule type --------------------------------------------
   Widget _actionFields() {
     switch (_ruleType) {
       case RuleType.discountPercentage:
@@ -333,7 +333,7 @@ class _PricingRuleFormState extends ConsumerState<PricingRuleForm> {
     }
   }
 
-  // ── Helpers ───────────────────────────────────────────────────────────────
+  // -- Helpers ---------------------------------------------------------------
   Widget _row(List<Widget> children) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,

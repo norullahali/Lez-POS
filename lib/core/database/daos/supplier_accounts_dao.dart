@@ -12,9 +12,9 @@ class SupplierAccountsDao extends DatabaseAccessor<AppDatabase>
     with _$SupplierAccountsDaoMixin {
   SupplierAccountsDao(super.db);
 
-  // ─────────────────────────────────────────────────────
+  // -----------------------------------------------------
   // Balance queries
-  // ─────────────────────────────────────────────────────
+  // -----------------------------------------------------
 
   Stream<double> watchBalance(int supplierId) {
     return (select(supplierAccounts)
@@ -39,9 +39,9 @@ class SupplierAccountsDao extends DatabaseAccessor<AppDatabase>
     return row.read(sumExp) ?? 0.0;
   }
 
-  // ─────────────────────────────────────────────────────
+  // -----------------------------------------------------
   // Transaction writing
-  // ─────────────────────────────────────────────────────
+  // -----------------------------------------------------
 
   Future<void> addTransaction({
     required int supplierId,
@@ -91,9 +91,9 @@ class SupplierAccountsDao extends DatabaseAccessor<AppDatabase>
     });
   }
 
-  // ─────────────────────────────────────────────────────
+  // -----------------------------------------------------
   // History queries
-  // ─────────────────────────────────────────────────────
+  // -----------------------------------------------------
 
   Stream<List<SupplierTransaction>> watchHistory(int supplierId, {int limit = 50}) {
     return (select(supplierTransactions)
@@ -111,9 +111,9 @@ class SupplierAccountsDao extends DatabaseAccessor<AppDatabase>
         .get();
   }
 
-  // ─────────────────────────────────────────────────────
+  // -----------------------------------------------------
   // Reports
-  // ─────────────────────────────────────────────────────
+  // -----------------------------------------------------
 
   Future<double> getTotalOutstanding() async {
     final sumExp = supplierAccounts.currentBalance.sum();

@@ -23,16 +23,16 @@ import '../../models/search_result.dart';
 import '../../providers/pos_products_provider.dart';
 import '../../providers/cart_stock_provider.dart';
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // Providers for overlay state (kept outside the widget so siblings can read)
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 /// Index of the keyboard-selected row in the search dropdown. -1 = none.
 final _searchFocusedIndexProvider = StateProvider<int>((ref) => -1);
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // SmartSearchBar – public widget consumed by PosScreen
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 /// Drop-in replacement for the old `_SearchPanel`.
 ///
@@ -66,7 +66,7 @@ class _SmartSearchBarState extends ConsumerState<SmartSearchBar> {
   OverlayEntry? _overlayEntry;
   Timer? _debounce;
 
-  // ── Lifecycle ──────────────────────────────────────────────────────────────
+  // -- Lifecycle --------------------------------------------------------------
 
   @override
   void initState() {
@@ -91,7 +91,7 @@ class _SmartSearchBarState extends ConsumerState<SmartSearchBar> {
     super.dispose();
   }
 
-  // ── Focus handling ─────────────────────────────────────────────────────────
+  // -- Focus handling ---------------------------------------------------------
 
   void _onFocusChange() {
     if (!_fieldFocusNode.hasFocus) {
@@ -103,7 +103,7 @@ class _SmartSearchBarState extends ConsumerState<SmartSearchBar> {
     }
   }
 
-  // ── Text input ────────────────────────────────────────────────────────────
+  // -- Text input ------------------------------------------------------------
 
   void _onChanged(String value) {
     _debounce?.cancel();
@@ -133,7 +133,7 @@ class _SmartSearchBarState extends ConsumerState<SmartSearchBar> {
     }
   }
 
-  // ── Keyboard navigation ───────────────────────────────────────────────────
+  // -- Keyboard navigation ---------------------------------------------------
 
   KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent) return KeyEventResult.ignored;
@@ -170,7 +170,7 @@ class _SmartSearchBarState extends ConsumerState<SmartSearchBar> {
     return KeyEventResult.ignored;
   }
 
-  // ── Overlay management ────────────────────────────────────────────────────
+  // -- Overlay management ----------------------------------------------------
 
   void _maybeShowOverlay() {
     final query = ref.read(posSearchQueryProvider);
@@ -206,7 +206,7 @@ class _SmartSearchBarState extends ConsumerState<SmartSearchBar> {
     _overlayEntry = null;
   }
 
-  // ── Clear ─────────────────────────────────────────────────────────────────
+  // -- Clear -----------------------------------------------------------------
 
   void _clearSearch() {
     _ctrl.clear();
@@ -216,12 +216,12 @@ class _SmartSearchBarState extends ConsumerState<SmartSearchBar> {
     _fieldFocusNode.requestFocus();
   }
 
-  // ── Public API ────────────────────────────────────────────────────────────
+  // -- Public API ------------------------------------------------------------
 
   /// Request focus from outside (F2 shortcut).
   void requestFocus() => _fieldFocusNode.requestFocus();
 
-  // ── Build ─────────────────────────────────────────────────────────────────
+  // -- Build -----------------------------------------------------------------
 
   @override
   Widget build(BuildContext context) {
@@ -266,9 +266,9 @@ class _SmartSearchBarState extends ConsumerState<SmartSearchBar> {
 }
 
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // _SearchOverlay – the floating dropdown beneath the search field
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 class _SearchOverlay extends ConsumerWidget {
   final LayerLink layerLink;
@@ -387,9 +387,9 @@ class _SearchOverlay extends ConsumerWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // _SearchResultRow – a single row in the dropdown
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 class _SearchResultRow extends ConsumerWidget {
   final SearchResult result;
@@ -480,9 +480,9 @@ class _SearchResultRow extends ConsumerWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // Small helper widgets
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 class _RankBadge extends StatelessWidget {
   final SearchRank rank;

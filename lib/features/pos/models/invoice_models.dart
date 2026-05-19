@@ -36,7 +36,7 @@ class InvoiceData {
   /// Whether to print a QR code at the end of the receipt.
   final bool showQr;
 
-  // ── Return metadata (null for non-returned invoices) ──────────────────────
+  // -- Return metadata (null for non-returned invoices) ----------------------
   final bool isReturned;
   final DateTime? returnDate;
   final String? returnNote;

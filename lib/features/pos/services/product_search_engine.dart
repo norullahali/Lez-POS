@@ -17,9 +17,9 @@ import '../../../core/utils/number_parser.dart';
 import '../../products/models/product_model.dart';
 import '../models/search_result.dart';
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // Arabic normalisation helpers
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 /// Strips Arabic diacritics (tashkeel / harakat) and normalises alef variants.
 /// Input → fully lowercase, diacritic-free, alef-normalised string.
@@ -48,9 +48,9 @@ String normalizeArabic(String input) {
   return s;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // Levenshtein distance (optimised with two-row DP)
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 /// Returns the Levenshtein edit distance between [a] and [b].
 /// Uses two-row rolling DP → O(min(|a|,|b|)) space.
@@ -103,9 +103,9 @@ int _levenshtein(String a, String b, {int maxDistance = 3}) {
   return prev[bLen];
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // Pre-built index entry (lightweight – stores ints/strings, no product copy)
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 class _IndexEntry {
   final int productId;          // key into the products map
@@ -121,9 +121,9 @@ class _IndexEntry {
   });
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // Text highlighting helper
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 const TextStyle _normalStyle = TextStyle(
   color: Colors.white,
@@ -162,12 +162,12 @@ List<TextSpan> _buildHighlightSpans(String text, String normText, String normQue
   return spans;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // ProductSearchEngine
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 class ProductSearchEngine {
-  // ── Index ─────────────────────────────────────────────────────────────────
+  // -- Index -----------------------------------------------------------------
 
   /// Flat list of index entries – built once, rebuilt when cache refreshes.
   List<_IndexEntry> _index = [];
@@ -175,13 +175,13 @@ class ProductSearchEngine {
   /// Pointer to the authoritative product map (passed in from PosProductsState).
   Map<int, ProductModel> _productsMap = {};
 
-  // ── Synonyms (extensible hook) ────────────────────────────────────────────
+  // -- Synonyms (extensible hook) --------------------------------------------
 
   /// Map from a normalised synonym → list of normalised expansions.
   /// e.g. {'كولا': ['كوكا كولا', 'pepsi']}
   Map<String, List<String>> synonyms = {};
 
-  // ── Incremental search cache ───────────────────────────────────────────────
+  // -- Incremental search cache -----------------------------------------------
 
   /// The query used in the last search call.
   String _lastQuery = '';
@@ -189,9 +189,9 @@ class ProductSearchEngine {
   /// The index entries that survived the last search (reused for incremental).
   List<_IndexEntry> _lastCandidates = [];
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Public API
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   /// Rebuilds the search index from [productsMap].
   /// MUST be called whenever the in-memory cache changes.
@@ -241,10 +241,10 @@ class ProductSearchEngine {
       return [];
     }
 
-    // ── Synonym expansion ─────────────────────────────────────────────────
+    // -- Synonym expansion -------------------------------------------------
     final expandedQueries = _expandSynonyms(normQuery);
 
-    // ── Incremental candidate selection ──────────────────────────────────
+    // -- Incremental candidate selection ----------------------------------
     final List<_IndexEntry> candidates;
     if (_lastQuery.isNotEmpty && normQuery.startsWith(_lastQuery) && _lastCandidates.isNotEmpty) {
       // The query grew – previous candidates are a safe superset
@@ -253,10 +253,10 @@ class ProductSearchEngine {
       candidates = _index;
     }
 
-    // ── Fuzzy threshold: allow 1 typo for queries ≥ 4 chars, 2 for ≥ 6 ──
+    // -- Fuzzy threshold: allow 1 typo for queries ≥ 4 chars, 2 for ≥ 6 --
     final int fuzzyMax = normQuery.length >= 6 ? 2 : (normQuery.length >= 4 ? 1 : 0);
 
-    // ── Score every candidate ─────────────────────────────────────────────
+    // -- Score every candidate ---------------------------------------------
     final scored = <({_IndexEntry entry, SearchRank rank, String field})>[];
 
     for (final entry in candidates) {
@@ -321,10 +321,10 @@ class ProductSearchEngine {
       }
     }
 
-    // ── Sort by rank ──────────────────────────────────────────────────────
+    // -- Sort by rank ------------------------------------------------------
     scored.sort((a, b) => a.rank.index.compareTo(b.rank.index));
 
-    // ── Build SearchResult objects (top N only) ───────────────────────────
+    // -- Build SearchResult objects (top N only) ---------------------------
     final results = <SearchResult>[];
     final limit = scored.length < maxResults ? scored.length : maxResults;
 
@@ -341,7 +341,7 @@ class ProductSearchEngine {
       ));
     }
 
-    // ── Update incremental cache ──────────────────────────────────────────
+    // -- Update incremental cache ------------------------------------------
     _lastQuery = normQuery;
     // Store only surviving entries for next incremental pass
     _lastCandidates = scored.map((s) => s.entry).toList();
@@ -349,9 +349,9 @@ class ProductSearchEngine {
     return results;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Private helpers
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   /// Expands [normQuery] with any registered synonyms, returning a set of
   /// normalised query strings to test.

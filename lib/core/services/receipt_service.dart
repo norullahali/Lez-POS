@@ -1,4 +1,4 @@
-﻿// lib/core/services/receipt_service.dart
+// lib/core/services/receipt_service.dart
 //
 // Public print entry points for Lez POS.
 //
@@ -32,7 +32,7 @@ Future<void> printSale({
   double? loyaltyPoints,
   String? customerName,
   String? cashierName,
-  // ── Return metadata ─────────────────────────────────────────────────────
+  // -- Return metadata -----------------------------------------------------
   bool isReturned = false,
   DateTime? returnDate,
   String? returnNote,
@@ -42,7 +42,7 @@ Future<void> printSale({
 
   final settings = SettingsService(AppDatabase.instance);
 
-  // ── Load store & invoice settings (all from DB via SettingsService) ───────
+  // -- Load store & invoice settings (all from DB via SettingsService) -------
   final storeName = await settings.getStoreName();
   final phone     = await settings.getPhone();
   final address   = await settings.getAddress();
@@ -52,17 +52,17 @@ Future<void> printSale({
   final showTax   = await settings.getShowTax();
   final showQr    = await settings.getShowQr();
 
-  // ── Load logo bytes if a logo file is configured ───────────────────────────
+  // -- Load logo bytes if a logo file is configured ---------------------------
   Uint8List? logoBytes;
   if (logoPath != null) {
     final file = File(logoPath);
     if (await file.exists()) logoBytes = await file.readAsBytes();
   }
 
-  // ── Calculate total ────────────────────────────────────────────────────────
+  // -- Calculate total --------------------------------------------------------
   final total = items.fold(0.0, (sum, e) => sum + e.lineTotal);
 
-  // ── Build invoice data ─────────────────────────────────────────────────────
+  // -- Build invoice data -----------------------------------------------------
   final invoiceData = InvoiceData(
     invoiceNumber: invoiceNumber,
     items: items,
@@ -86,7 +86,7 @@ Future<void> printSale({
     returnedByName: returnedByName,
   );
 
-  // ── Route to the correct printer via PrintManager ──────────────────────────
+  // -- Route to the correct printer via PrintManager --------------------------
   final config  = await settings.getPrinterConfig();
   final manager = PrintManager(config);
 

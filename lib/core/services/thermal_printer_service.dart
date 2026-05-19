@@ -9,7 +9,7 @@ class ThermalPrinterService {
   Future<void> printInvoice(InvoiceData data) async {
     final List<int> bytes = <int>[];
 
-    // ── Header ─────────────────────────
+    // -- Header -------------------------
     bytes.addAll(_textCenter(data.storeName ?? '', bold: true, size: 2));
 
     if (data.phone != null) {
@@ -22,7 +22,7 @@ class ThermalPrinterService {
 
     bytes.addAll(_divider());
 
-    // ── Items ─────────────────────────
+    // -- Items -------------------------
     for (final item in data.items) {
       bytes.addAll(_textLeft('${item.name}'));
       bytes.addAll(_textLeft(
@@ -31,7 +31,7 @@ class ThermalPrinterService {
 
     bytes.addAll(_divider());
 
-    // ── Total ─────────────────────────
+    // -- Total -------------------------
     bytes.addAll(_textRight(
       'الإجمالي: ${data.total.toStringAsFixed(0)} د.ع',
       bold: true,
@@ -47,7 +47,7 @@ class ThermalPrinterService {
 
     bytes.addAll(_divider());
 
-    // ── Footer ─────────────────────────
+    // -- Footer -------------------------
     if (data.footer != null && data.footer!.isNotEmpty) {
       bytes.addAll(_textCenter(data.footer!));
     }
@@ -58,7 +58,7 @@ class ThermalPrinterService {
     await printRaw(Uint8List.fromList(bytes));
   }
 
-  // ───────────────── Helpers ─────────────────
+  // ----------------- Helpers -----------------
 
   List<int> _textCenter(String text, {bool bold = false, int size = 0}) {
     return [

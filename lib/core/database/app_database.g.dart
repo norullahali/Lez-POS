@@ -13993,6 +13993,1047 @@ class SaleItemReturnsCompanion extends UpdateCompanion<SaleItemReturn> {
   }
 }
 
+class $ReturnAuditLogsTable extends ReturnAuditLogs
+    with TableInfo<$ReturnAuditLogsTable, ReturnAuditLog> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ReturnAuditLogsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+      'id', aliasedName, false,
+      hasAutoIncrement: true,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('PRIMARY KEY AUTOINCREMENT'));
+  static const VerificationMeta _createdAtMeta =
+      const VerificationMeta('createdAt');
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+      'created_at', aliasedName, false,
+      type: DriftSqlType.dateTime, requiredDuringInsert: true);
+  static const VerificationMeta _returnTypeMeta =
+      const VerificationMeta('returnType');
+  @override
+  late final GeneratedColumn<String> returnType = GeneratedColumn<String>(
+      'return_type', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _invoiceIdMeta =
+      const VerificationMeta('invoiceId');
+  @override
+  late final GeneratedColumn<int> invoiceId = GeneratedColumn<int>(
+      'invoice_id', aliasedName, true,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      $customConstraints: 'NULL REFERENCES sales_invoices(id)');
+  static const VerificationMeta _saleItemIdMeta =
+      const VerificationMeta('saleItemId');
+  @override
+  late final GeneratedColumn<int> saleItemId = GeneratedColumn<int>(
+      'sale_item_id', aliasedName, true,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      $customConstraints: 'NULL REFERENCES sale_items(id)');
+  static const VerificationMeta _productIdMeta =
+      const VerificationMeta('productId');
+  @override
+  late final GeneratedColumn<int> productId = GeneratedColumn<int>(
+      'product_id', aliasedName, true,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      $customConstraints: 'NULL REFERENCES products(id)');
+  static const VerificationMeta _returnedQuantityMeta =
+      const VerificationMeta('returnedQuantity');
+  @override
+  late final GeneratedColumn<double> returnedQuantity = GeneratedColumn<double>(
+      'returned_quantity', aliasedName, false,
+      type: DriftSqlType.double,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0.0));
+  static const VerificationMeta _returnedAmountMeta =
+      const VerificationMeta('returnedAmount');
+  @override
+  late final GeneratedColumn<double> returnedAmount = GeneratedColumn<double>(
+      'returned_amount', aliasedName, false,
+      type: DriftSqlType.double,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0.0));
+  static const VerificationMeta _cashierUserIdMeta =
+      const VerificationMeta('cashierUserId');
+  @override
+  late final GeneratedColumn<int> cashierUserId = GeneratedColumn<int>(
+      'cashier_user_id', aliasedName, true,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      $customConstraints: 'NULL REFERENCES users(id)');
+  static const VerificationMeta _cashierNameSnapshotMeta =
+      const VerificationMeta('cashierNameSnapshot');
+  @override
+  late final GeneratedColumn<String> cashierNameSnapshot =
+      GeneratedColumn<String>('cashier_name_snapshot', aliasedName, true,
+          type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _sessionIdMeta =
+      const VerificationMeta('sessionId');
+  @override
+  late final GeneratedColumn<int> sessionId = GeneratedColumn<int>(
+      'session_id', aliasedName, true,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      $customConstraints: 'NULL REFERENCES pos_sessions(id)');
+  static const VerificationMeta _customerIdMeta =
+      const VerificationMeta('customerId');
+  @override
+  late final GeneratedColumn<int> customerId = GeneratedColumn<int>(
+      'customer_id', aliasedName, true,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      $customConstraints: 'NULL REFERENCES customers(id)');
+  static const VerificationMeta _customerNameSnapshotMeta =
+      const VerificationMeta('customerNameSnapshot');
+  @override
+  late final GeneratedColumn<String> customerNameSnapshot =
+      GeneratedColumn<String>('customer_name_snapshot', aliasedName, true,
+          type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _returnReasonMeta =
+      const VerificationMeta('returnReason');
+  @override
+  late final GeneratedColumn<String> returnReason = GeneratedColumn<String>(
+      'return_reason', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _returnNoteMeta =
+      const VerificationMeta('returnNote');
+  @override
+  late final GeneratedColumn<String> returnNote = GeneratedColumn<String>(
+      'return_note', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _stockBeforeMeta =
+      const VerificationMeta('stockBefore');
+  @override
+  late final GeneratedColumn<double> stockBefore = GeneratedColumn<double>(
+      'stock_before', aliasedName, true,
+      type: DriftSqlType.double, requiredDuringInsert: false);
+  static const VerificationMeta _stockAfterMeta =
+      const VerificationMeta('stockAfter');
+  @override
+  late final GeneratedColumn<double> stockAfter = GeneratedColumn<double>(
+      'stock_after', aliasedName, true,
+      type: DriftSqlType.double, requiredDuringInsert: false);
+  static const VerificationMeta _referenceTypeMeta =
+      const VerificationMeta('referenceType');
+  @override
+  late final GeneratedColumn<String> referenceType = GeneratedColumn<String>(
+      'reference_type', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _referenceIdMeta =
+      const VerificationMeta('referenceId');
+  @override
+  late final GeneratedColumn<int> referenceId = GeneratedColumn<int>(
+      'reference_id', aliasedName, true,
+      type: DriftSqlType.int, requiredDuringInsert: false);
+  static const VerificationMeta _deviceInfoMeta =
+      const VerificationMeta('deviceInfo');
+  @override
+  late final GeneratedColumn<String> deviceInfo = GeneratedColumn<String>(
+      'device_info', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _metadataJsonMeta =
+      const VerificationMeta('metadataJson');
+  @override
+  late final GeneratedColumn<String> metadataJson = GeneratedColumn<String>(
+      'metadata_json', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  @override
+  List<GeneratedColumn> get $columns => [
+        id,
+        createdAt,
+        returnType,
+        invoiceId,
+        saleItemId,
+        productId,
+        returnedQuantity,
+        returnedAmount,
+        cashierUserId,
+        cashierNameSnapshot,
+        sessionId,
+        customerId,
+        customerNameSnapshot,
+        returnReason,
+        returnNote,
+        stockBefore,
+        stockAfter,
+        referenceType,
+        referenceId,
+        deviceInfo,
+        metadataJson
+      ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'return_audit_logs';
+  @override
+  VerificationContext validateIntegrity(Insertable<ReturnAuditLog> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(_createdAtMeta,
+          createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('return_type')) {
+      context.handle(
+          _returnTypeMeta,
+          returnType.isAcceptableOrUnknown(
+              data['return_type']!, _returnTypeMeta));
+    } else if (isInserting) {
+      context.missing(_returnTypeMeta);
+    }
+    if (data.containsKey('invoice_id')) {
+      context.handle(_invoiceIdMeta,
+          invoiceId.isAcceptableOrUnknown(data['invoice_id']!, _invoiceIdMeta));
+    }
+    if (data.containsKey('sale_item_id')) {
+      context.handle(
+          _saleItemIdMeta,
+          saleItemId.isAcceptableOrUnknown(
+              data['sale_item_id']!, _saleItemIdMeta));
+    }
+    if (data.containsKey('product_id')) {
+      context.handle(_productIdMeta,
+          productId.isAcceptableOrUnknown(data['product_id']!, _productIdMeta));
+    }
+    if (data.containsKey('returned_quantity')) {
+      context.handle(
+          _returnedQuantityMeta,
+          returnedQuantity.isAcceptableOrUnknown(
+              data['returned_quantity']!, _returnedQuantityMeta));
+    }
+    if (data.containsKey('returned_amount')) {
+      context.handle(
+          _returnedAmountMeta,
+          returnedAmount.isAcceptableOrUnknown(
+              data['returned_amount']!, _returnedAmountMeta));
+    }
+    if (data.containsKey('cashier_user_id')) {
+      context.handle(
+          _cashierUserIdMeta,
+          cashierUserId.isAcceptableOrUnknown(
+              data['cashier_user_id']!, _cashierUserIdMeta));
+    }
+    if (data.containsKey('cashier_name_snapshot')) {
+      context.handle(
+          _cashierNameSnapshotMeta,
+          cashierNameSnapshot.isAcceptableOrUnknown(
+              data['cashier_name_snapshot']!, _cashierNameSnapshotMeta));
+    }
+    if (data.containsKey('session_id')) {
+      context.handle(_sessionIdMeta,
+          sessionId.isAcceptableOrUnknown(data['session_id']!, _sessionIdMeta));
+    }
+    if (data.containsKey('customer_id')) {
+      context.handle(
+          _customerIdMeta,
+          customerId.isAcceptableOrUnknown(
+              data['customer_id']!, _customerIdMeta));
+    }
+    if (data.containsKey('customer_name_snapshot')) {
+      context.handle(
+          _customerNameSnapshotMeta,
+          customerNameSnapshot.isAcceptableOrUnknown(
+              data['customer_name_snapshot']!, _customerNameSnapshotMeta));
+    }
+    if (data.containsKey('return_reason')) {
+      context.handle(
+          _returnReasonMeta,
+          returnReason.isAcceptableOrUnknown(
+              data['return_reason']!, _returnReasonMeta));
+    }
+    if (data.containsKey('return_note')) {
+      context.handle(
+          _returnNoteMeta,
+          returnNote.isAcceptableOrUnknown(
+              data['return_note']!, _returnNoteMeta));
+    }
+    if (data.containsKey('stock_before')) {
+      context.handle(
+          _stockBeforeMeta,
+          stockBefore.isAcceptableOrUnknown(
+              data['stock_before']!, _stockBeforeMeta));
+    }
+    if (data.containsKey('stock_after')) {
+      context.handle(
+          _stockAfterMeta,
+          stockAfter.isAcceptableOrUnknown(
+              data['stock_after']!, _stockAfterMeta));
+    }
+    if (data.containsKey('reference_type')) {
+      context.handle(
+          _referenceTypeMeta,
+          referenceType.isAcceptableOrUnknown(
+              data['reference_type']!, _referenceTypeMeta));
+    }
+    if (data.containsKey('reference_id')) {
+      context.handle(
+          _referenceIdMeta,
+          referenceId.isAcceptableOrUnknown(
+              data['reference_id']!, _referenceIdMeta));
+    }
+    if (data.containsKey('device_info')) {
+      context.handle(
+          _deviceInfoMeta,
+          deviceInfo.isAcceptableOrUnknown(
+              data['device_info']!, _deviceInfoMeta));
+    }
+    if (data.containsKey('metadata_json')) {
+      context.handle(
+          _metadataJsonMeta,
+          metadataJson.isAcceptableOrUnknown(
+              data['metadata_json']!, _metadataJsonMeta));
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  ReturnAuditLog map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ReturnAuditLog(
+      id: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}id'])!,
+      createdAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
+      returnType: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}return_type'])!,
+      invoiceId: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}invoice_id']),
+      saleItemId: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}sale_item_id']),
+      productId: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}product_id']),
+      returnedQuantity: attachedDatabase.typeMapping.read(
+          DriftSqlType.double, data['${effectivePrefix}returned_quantity'])!,
+      returnedAmount: attachedDatabase.typeMapping.read(
+          DriftSqlType.double, data['${effectivePrefix}returned_amount'])!,
+      cashierUserId: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}cashier_user_id']),
+      cashierNameSnapshot: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}cashier_name_snapshot']),
+      sessionId: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}session_id']),
+      customerId: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}customer_id']),
+      customerNameSnapshot: attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}customer_name_snapshot']),
+      returnReason: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}return_reason']),
+      returnNote: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}return_note']),
+      stockBefore: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}stock_before']),
+      stockAfter: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}stock_after']),
+      referenceType: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}reference_type']),
+      referenceId: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}reference_id']),
+      deviceInfo: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}device_info']),
+      metadataJson: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}metadata_json']),
+    );
+  }
+
+  @override
+  $ReturnAuditLogsTable createAlias(String alias) {
+    return $ReturnAuditLogsTable(attachedDatabase, alias);
+  }
+}
+
+class ReturnAuditLog extends DataClass implements Insertable<ReturnAuditLog> {
+  final int id;
+
+  /// Always set explicitly from Dart (avoids SQLite TEXT timestamp default).
+  final DateTime createdAt;
+
+  /// Discriminator: 'full' | 'partial' | 'smart_lookup' | 'manual_future'
+  final String returnType;
+  final int? invoiceId;
+
+  /// Null for full returns (the whole invoice is returned, not a single line).
+  final int? saleItemId;
+  final int? productId;
+  final double returnedQuantity;
+  final double returnedAmount;
+  final int? cashierUserId;
+
+  /// Denormalized — survives user record rename/deletion.
+  final String? cashierNameSnapshot;
+  final int? sessionId;
+  final int? customerId;
+
+  /// Denormalized — survives customer record rename/deletion.
+  final String? customerNameSnapshot;
+  final String? returnReason;
+  final String? returnNote;
+  final double? stockBefore;
+  final double? stockAfter;
+  final String? referenceType;
+  final int? referenceId;
+  final String? deviceInfo;
+  final String? metadataJson;
+  const ReturnAuditLog(
+      {required this.id,
+      required this.createdAt,
+      required this.returnType,
+      this.invoiceId,
+      this.saleItemId,
+      this.productId,
+      required this.returnedQuantity,
+      required this.returnedAmount,
+      this.cashierUserId,
+      this.cashierNameSnapshot,
+      this.sessionId,
+      this.customerId,
+      this.customerNameSnapshot,
+      this.returnReason,
+      this.returnNote,
+      this.stockBefore,
+      this.stockAfter,
+      this.referenceType,
+      this.referenceId,
+      this.deviceInfo,
+      this.metadataJson});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['return_type'] = Variable<String>(returnType);
+    if (!nullToAbsent || invoiceId != null) {
+      map['invoice_id'] = Variable<int>(invoiceId);
+    }
+    if (!nullToAbsent || saleItemId != null) {
+      map['sale_item_id'] = Variable<int>(saleItemId);
+    }
+    if (!nullToAbsent || productId != null) {
+      map['product_id'] = Variable<int>(productId);
+    }
+    map['returned_quantity'] = Variable<double>(returnedQuantity);
+    map['returned_amount'] = Variable<double>(returnedAmount);
+    if (!nullToAbsent || cashierUserId != null) {
+      map['cashier_user_id'] = Variable<int>(cashierUserId);
+    }
+    if (!nullToAbsent || cashierNameSnapshot != null) {
+      map['cashier_name_snapshot'] = Variable<String>(cashierNameSnapshot);
+    }
+    if (!nullToAbsent || sessionId != null) {
+      map['session_id'] = Variable<int>(sessionId);
+    }
+    if (!nullToAbsent || customerId != null) {
+      map['customer_id'] = Variable<int>(customerId);
+    }
+    if (!nullToAbsent || customerNameSnapshot != null) {
+      map['customer_name_snapshot'] = Variable<String>(customerNameSnapshot);
+    }
+    if (!nullToAbsent || returnReason != null) {
+      map['return_reason'] = Variable<String>(returnReason);
+    }
+    if (!nullToAbsent || returnNote != null) {
+      map['return_note'] = Variable<String>(returnNote);
+    }
+    if (!nullToAbsent || stockBefore != null) {
+      map['stock_before'] = Variable<double>(stockBefore);
+    }
+    if (!nullToAbsent || stockAfter != null) {
+      map['stock_after'] = Variable<double>(stockAfter);
+    }
+    if (!nullToAbsent || referenceType != null) {
+      map['reference_type'] = Variable<String>(referenceType);
+    }
+    if (!nullToAbsent || referenceId != null) {
+      map['reference_id'] = Variable<int>(referenceId);
+    }
+    if (!nullToAbsent || deviceInfo != null) {
+      map['device_info'] = Variable<String>(deviceInfo);
+    }
+    if (!nullToAbsent || metadataJson != null) {
+      map['metadata_json'] = Variable<String>(metadataJson);
+    }
+    return map;
+  }
+
+  ReturnAuditLogsCompanion toCompanion(bool nullToAbsent) {
+    return ReturnAuditLogsCompanion(
+      id: Value(id),
+      createdAt: Value(createdAt),
+      returnType: Value(returnType),
+      invoiceId: invoiceId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(invoiceId),
+      saleItemId: saleItemId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(saleItemId),
+      productId: productId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(productId),
+      returnedQuantity: Value(returnedQuantity),
+      returnedAmount: Value(returnedAmount),
+      cashierUserId: cashierUserId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(cashierUserId),
+      cashierNameSnapshot: cashierNameSnapshot == null && nullToAbsent
+          ? const Value.absent()
+          : Value(cashierNameSnapshot),
+      sessionId: sessionId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(sessionId),
+      customerId: customerId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(customerId),
+      customerNameSnapshot: customerNameSnapshot == null && nullToAbsent
+          ? const Value.absent()
+          : Value(customerNameSnapshot),
+      returnReason: returnReason == null && nullToAbsent
+          ? const Value.absent()
+          : Value(returnReason),
+      returnNote: returnNote == null && nullToAbsent
+          ? const Value.absent()
+          : Value(returnNote),
+      stockBefore: stockBefore == null && nullToAbsent
+          ? const Value.absent()
+          : Value(stockBefore),
+      stockAfter: stockAfter == null && nullToAbsent
+          ? const Value.absent()
+          : Value(stockAfter),
+      referenceType: referenceType == null && nullToAbsent
+          ? const Value.absent()
+          : Value(referenceType),
+      referenceId: referenceId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(referenceId),
+      deviceInfo: deviceInfo == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deviceInfo),
+      metadataJson: metadataJson == null && nullToAbsent
+          ? const Value.absent()
+          : Value(metadataJson),
+    );
+  }
+
+  factory ReturnAuditLog.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ReturnAuditLog(
+      id: serializer.fromJson<int>(json['id']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      returnType: serializer.fromJson<String>(json['returnType']),
+      invoiceId: serializer.fromJson<int?>(json['invoiceId']),
+      saleItemId: serializer.fromJson<int?>(json['saleItemId']),
+      productId: serializer.fromJson<int?>(json['productId']),
+      returnedQuantity: serializer.fromJson<double>(json['returnedQuantity']),
+      returnedAmount: serializer.fromJson<double>(json['returnedAmount']),
+      cashierUserId: serializer.fromJson<int?>(json['cashierUserId']),
+      cashierNameSnapshot:
+          serializer.fromJson<String?>(json['cashierNameSnapshot']),
+      sessionId: serializer.fromJson<int?>(json['sessionId']),
+      customerId: serializer.fromJson<int?>(json['customerId']),
+      customerNameSnapshot:
+          serializer.fromJson<String?>(json['customerNameSnapshot']),
+      returnReason: serializer.fromJson<String?>(json['returnReason']),
+      returnNote: serializer.fromJson<String?>(json['returnNote']),
+      stockBefore: serializer.fromJson<double?>(json['stockBefore']),
+      stockAfter: serializer.fromJson<double?>(json['stockAfter']),
+      referenceType: serializer.fromJson<String?>(json['referenceType']),
+      referenceId: serializer.fromJson<int?>(json['referenceId']),
+      deviceInfo: serializer.fromJson<String?>(json['deviceInfo']),
+      metadataJson: serializer.fromJson<String?>(json['metadataJson']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'returnType': serializer.toJson<String>(returnType),
+      'invoiceId': serializer.toJson<int?>(invoiceId),
+      'saleItemId': serializer.toJson<int?>(saleItemId),
+      'productId': serializer.toJson<int?>(productId),
+      'returnedQuantity': serializer.toJson<double>(returnedQuantity),
+      'returnedAmount': serializer.toJson<double>(returnedAmount),
+      'cashierUserId': serializer.toJson<int?>(cashierUserId),
+      'cashierNameSnapshot': serializer.toJson<String?>(cashierNameSnapshot),
+      'sessionId': serializer.toJson<int?>(sessionId),
+      'customerId': serializer.toJson<int?>(customerId),
+      'customerNameSnapshot': serializer.toJson<String?>(customerNameSnapshot),
+      'returnReason': serializer.toJson<String?>(returnReason),
+      'returnNote': serializer.toJson<String?>(returnNote),
+      'stockBefore': serializer.toJson<double?>(stockBefore),
+      'stockAfter': serializer.toJson<double?>(stockAfter),
+      'referenceType': serializer.toJson<String?>(referenceType),
+      'referenceId': serializer.toJson<int?>(referenceId),
+      'deviceInfo': serializer.toJson<String?>(deviceInfo),
+      'metadataJson': serializer.toJson<String?>(metadataJson),
+    };
+  }
+
+  ReturnAuditLog copyWith(
+          {int? id,
+          DateTime? createdAt,
+          String? returnType,
+          Value<int?> invoiceId = const Value.absent(),
+          Value<int?> saleItemId = const Value.absent(),
+          Value<int?> productId = const Value.absent(),
+          double? returnedQuantity,
+          double? returnedAmount,
+          Value<int?> cashierUserId = const Value.absent(),
+          Value<String?> cashierNameSnapshot = const Value.absent(),
+          Value<int?> sessionId = const Value.absent(),
+          Value<int?> customerId = const Value.absent(),
+          Value<String?> customerNameSnapshot = const Value.absent(),
+          Value<String?> returnReason = const Value.absent(),
+          Value<String?> returnNote = const Value.absent(),
+          Value<double?> stockBefore = const Value.absent(),
+          Value<double?> stockAfter = const Value.absent(),
+          Value<String?> referenceType = const Value.absent(),
+          Value<int?> referenceId = const Value.absent(),
+          Value<String?> deviceInfo = const Value.absent(),
+          Value<String?> metadataJson = const Value.absent()}) =>
+      ReturnAuditLog(
+        id: id ?? this.id,
+        createdAt: createdAt ?? this.createdAt,
+        returnType: returnType ?? this.returnType,
+        invoiceId: invoiceId.present ? invoiceId.value : this.invoiceId,
+        saleItemId: saleItemId.present ? saleItemId.value : this.saleItemId,
+        productId: productId.present ? productId.value : this.productId,
+        returnedQuantity: returnedQuantity ?? this.returnedQuantity,
+        returnedAmount: returnedAmount ?? this.returnedAmount,
+        cashierUserId:
+            cashierUserId.present ? cashierUserId.value : this.cashierUserId,
+        cashierNameSnapshot: cashierNameSnapshot.present
+            ? cashierNameSnapshot.value
+            : this.cashierNameSnapshot,
+        sessionId: sessionId.present ? sessionId.value : this.sessionId,
+        customerId: customerId.present ? customerId.value : this.customerId,
+        customerNameSnapshot: customerNameSnapshot.present
+            ? customerNameSnapshot.value
+            : this.customerNameSnapshot,
+        returnReason:
+            returnReason.present ? returnReason.value : this.returnReason,
+        returnNote: returnNote.present ? returnNote.value : this.returnNote,
+        stockBefore: stockBefore.present ? stockBefore.value : this.stockBefore,
+        stockAfter: stockAfter.present ? stockAfter.value : this.stockAfter,
+        referenceType:
+            referenceType.present ? referenceType.value : this.referenceType,
+        referenceId: referenceId.present ? referenceId.value : this.referenceId,
+        deviceInfo: deviceInfo.present ? deviceInfo.value : this.deviceInfo,
+        metadataJson:
+            metadataJson.present ? metadataJson.value : this.metadataJson,
+      );
+  ReturnAuditLog copyWithCompanion(ReturnAuditLogsCompanion data) {
+    return ReturnAuditLog(
+      id: data.id.present ? data.id.value : this.id,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      returnType:
+          data.returnType.present ? data.returnType.value : this.returnType,
+      invoiceId: data.invoiceId.present ? data.invoiceId.value : this.invoiceId,
+      saleItemId:
+          data.saleItemId.present ? data.saleItemId.value : this.saleItemId,
+      productId: data.productId.present ? data.productId.value : this.productId,
+      returnedQuantity: data.returnedQuantity.present
+          ? data.returnedQuantity.value
+          : this.returnedQuantity,
+      returnedAmount: data.returnedAmount.present
+          ? data.returnedAmount.value
+          : this.returnedAmount,
+      cashierUserId: data.cashierUserId.present
+          ? data.cashierUserId.value
+          : this.cashierUserId,
+      cashierNameSnapshot: data.cashierNameSnapshot.present
+          ? data.cashierNameSnapshot.value
+          : this.cashierNameSnapshot,
+      sessionId: data.sessionId.present ? data.sessionId.value : this.sessionId,
+      customerId:
+          data.customerId.present ? data.customerId.value : this.customerId,
+      customerNameSnapshot: data.customerNameSnapshot.present
+          ? data.customerNameSnapshot.value
+          : this.customerNameSnapshot,
+      returnReason: data.returnReason.present
+          ? data.returnReason.value
+          : this.returnReason,
+      returnNote:
+          data.returnNote.present ? data.returnNote.value : this.returnNote,
+      stockBefore:
+          data.stockBefore.present ? data.stockBefore.value : this.stockBefore,
+      stockAfter:
+          data.stockAfter.present ? data.stockAfter.value : this.stockAfter,
+      referenceType: data.referenceType.present
+          ? data.referenceType.value
+          : this.referenceType,
+      referenceId:
+          data.referenceId.present ? data.referenceId.value : this.referenceId,
+      deviceInfo:
+          data.deviceInfo.present ? data.deviceInfo.value : this.deviceInfo,
+      metadataJson: data.metadataJson.present
+          ? data.metadataJson.value
+          : this.metadataJson,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ReturnAuditLog(')
+          ..write('id: $id, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('returnType: $returnType, ')
+          ..write('invoiceId: $invoiceId, ')
+          ..write('saleItemId: $saleItemId, ')
+          ..write('productId: $productId, ')
+          ..write('returnedQuantity: $returnedQuantity, ')
+          ..write('returnedAmount: $returnedAmount, ')
+          ..write('cashierUserId: $cashierUserId, ')
+          ..write('cashierNameSnapshot: $cashierNameSnapshot, ')
+          ..write('sessionId: $sessionId, ')
+          ..write('customerId: $customerId, ')
+          ..write('customerNameSnapshot: $customerNameSnapshot, ')
+          ..write('returnReason: $returnReason, ')
+          ..write('returnNote: $returnNote, ')
+          ..write('stockBefore: $stockBefore, ')
+          ..write('stockAfter: $stockAfter, ')
+          ..write('referenceType: $referenceType, ')
+          ..write('referenceId: $referenceId, ')
+          ..write('deviceInfo: $deviceInfo, ')
+          ..write('metadataJson: $metadataJson')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hashAll([
+        id,
+        createdAt,
+        returnType,
+        invoiceId,
+        saleItemId,
+        productId,
+        returnedQuantity,
+        returnedAmount,
+        cashierUserId,
+        cashierNameSnapshot,
+        sessionId,
+        customerId,
+        customerNameSnapshot,
+        returnReason,
+        returnNote,
+        stockBefore,
+        stockAfter,
+        referenceType,
+        referenceId,
+        deviceInfo,
+        metadataJson
+      ]);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ReturnAuditLog &&
+          other.id == this.id &&
+          other.createdAt == this.createdAt &&
+          other.returnType == this.returnType &&
+          other.invoiceId == this.invoiceId &&
+          other.saleItemId == this.saleItemId &&
+          other.productId == this.productId &&
+          other.returnedQuantity == this.returnedQuantity &&
+          other.returnedAmount == this.returnedAmount &&
+          other.cashierUserId == this.cashierUserId &&
+          other.cashierNameSnapshot == this.cashierNameSnapshot &&
+          other.sessionId == this.sessionId &&
+          other.customerId == this.customerId &&
+          other.customerNameSnapshot == this.customerNameSnapshot &&
+          other.returnReason == this.returnReason &&
+          other.returnNote == this.returnNote &&
+          other.stockBefore == this.stockBefore &&
+          other.stockAfter == this.stockAfter &&
+          other.referenceType == this.referenceType &&
+          other.referenceId == this.referenceId &&
+          other.deviceInfo == this.deviceInfo &&
+          other.metadataJson == this.metadataJson);
+}
+
+class ReturnAuditLogsCompanion extends UpdateCompanion<ReturnAuditLog> {
+  final Value<int> id;
+  final Value<DateTime> createdAt;
+  final Value<String> returnType;
+  final Value<int?> invoiceId;
+  final Value<int?> saleItemId;
+  final Value<int?> productId;
+  final Value<double> returnedQuantity;
+  final Value<double> returnedAmount;
+  final Value<int?> cashierUserId;
+  final Value<String?> cashierNameSnapshot;
+  final Value<int?> sessionId;
+  final Value<int?> customerId;
+  final Value<String?> customerNameSnapshot;
+  final Value<String?> returnReason;
+  final Value<String?> returnNote;
+  final Value<double?> stockBefore;
+  final Value<double?> stockAfter;
+  final Value<String?> referenceType;
+  final Value<int?> referenceId;
+  final Value<String?> deviceInfo;
+  final Value<String?> metadataJson;
+  const ReturnAuditLogsCompanion({
+    this.id = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.returnType = const Value.absent(),
+    this.invoiceId = const Value.absent(),
+    this.saleItemId = const Value.absent(),
+    this.productId = const Value.absent(),
+    this.returnedQuantity = const Value.absent(),
+    this.returnedAmount = const Value.absent(),
+    this.cashierUserId = const Value.absent(),
+    this.cashierNameSnapshot = const Value.absent(),
+    this.sessionId = const Value.absent(),
+    this.customerId = const Value.absent(),
+    this.customerNameSnapshot = const Value.absent(),
+    this.returnReason = const Value.absent(),
+    this.returnNote = const Value.absent(),
+    this.stockBefore = const Value.absent(),
+    this.stockAfter = const Value.absent(),
+    this.referenceType = const Value.absent(),
+    this.referenceId = const Value.absent(),
+    this.deviceInfo = const Value.absent(),
+    this.metadataJson = const Value.absent(),
+  });
+  ReturnAuditLogsCompanion.insert({
+    this.id = const Value.absent(),
+    required DateTime createdAt,
+    required String returnType,
+    this.invoiceId = const Value.absent(),
+    this.saleItemId = const Value.absent(),
+    this.productId = const Value.absent(),
+    this.returnedQuantity = const Value.absent(),
+    this.returnedAmount = const Value.absent(),
+    this.cashierUserId = const Value.absent(),
+    this.cashierNameSnapshot = const Value.absent(),
+    this.sessionId = const Value.absent(),
+    this.customerId = const Value.absent(),
+    this.customerNameSnapshot = const Value.absent(),
+    this.returnReason = const Value.absent(),
+    this.returnNote = const Value.absent(),
+    this.stockBefore = const Value.absent(),
+    this.stockAfter = const Value.absent(),
+    this.referenceType = const Value.absent(),
+    this.referenceId = const Value.absent(),
+    this.deviceInfo = const Value.absent(),
+    this.metadataJson = const Value.absent(),
+  })  : createdAt = Value(createdAt),
+        returnType = Value(returnType);
+  static Insertable<ReturnAuditLog> custom({
+    Expression<int>? id,
+    Expression<DateTime>? createdAt,
+    Expression<String>? returnType,
+    Expression<int>? invoiceId,
+    Expression<int>? saleItemId,
+    Expression<int>? productId,
+    Expression<double>? returnedQuantity,
+    Expression<double>? returnedAmount,
+    Expression<int>? cashierUserId,
+    Expression<String>? cashierNameSnapshot,
+    Expression<int>? sessionId,
+    Expression<int>? customerId,
+    Expression<String>? customerNameSnapshot,
+    Expression<String>? returnReason,
+    Expression<String>? returnNote,
+    Expression<double>? stockBefore,
+    Expression<double>? stockAfter,
+    Expression<String>? referenceType,
+    Expression<int>? referenceId,
+    Expression<String>? deviceInfo,
+    Expression<String>? metadataJson,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (createdAt != null) 'created_at': createdAt,
+      if (returnType != null) 'return_type': returnType,
+      if (invoiceId != null) 'invoice_id': invoiceId,
+      if (saleItemId != null) 'sale_item_id': saleItemId,
+      if (productId != null) 'product_id': productId,
+      if (returnedQuantity != null) 'returned_quantity': returnedQuantity,
+      if (returnedAmount != null) 'returned_amount': returnedAmount,
+      if (cashierUserId != null) 'cashier_user_id': cashierUserId,
+      if (cashierNameSnapshot != null)
+        'cashier_name_snapshot': cashierNameSnapshot,
+      if (sessionId != null) 'session_id': sessionId,
+      if (customerId != null) 'customer_id': customerId,
+      if (customerNameSnapshot != null)
+        'customer_name_snapshot': customerNameSnapshot,
+      if (returnReason != null) 'return_reason': returnReason,
+      if (returnNote != null) 'return_note': returnNote,
+      if (stockBefore != null) 'stock_before': stockBefore,
+      if (stockAfter != null) 'stock_after': stockAfter,
+      if (referenceType != null) 'reference_type': referenceType,
+      if (referenceId != null) 'reference_id': referenceId,
+      if (deviceInfo != null) 'device_info': deviceInfo,
+      if (metadataJson != null) 'metadata_json': metadataJson,
+    });
+  }
+
+  ReturnAuditLogsCompanion copyWith(
+      {Value<int>? id,
+      Value<DateTime>? createdAt,
+      Value<String>? returnType,
+      Value<int?>? invoiceId,
+      Value<int?>? saleItemId,
+      Value<int?>? productId,
+      Value<double>? returnedQuantity,
+      Value<double>? returnedAmount,
+      Value<int?>? cashierUserId,
+      Value<String?>? cashierNameSnapshot,
+      Value<int?>? sessionId,
+      Value<int?>? customerId,
+      Value<String?>? customerNameSnapshot,
+      Value<String?>? returnReason,
+      Value<String?>? returnNote,
+      Value<double?>? stockBefore,
+      Value<double?>? stockAfter,
+      Value<String?>? referenceType,
+      Value<int?>? referenceId,
+      Value<String?>? deviceInfo,
+      Value<String?>? metadataJson}) {
+    return ReturnAuditLogsCompanion(
+      id: id ?? this.id,
+      createdAt: createdAt ?? this.createdAt,
+      returnType: returnType ?? this.returnType,
+      invoiceId: invoiceId ?? this.invoiceId,
+      saleItemId: saleItemId ?? this.saleItemId,
+      productId: productId ?? this.productId,
+      returnedQuantity: returnedQuantity ?? this.returnedQuantity,
+      returnedAmount: returnedAmount ?? this.returnedAmount,
+      cashierUserId: cashierUserId ?? this.cashierUserId,
+      cashierNameSnapshot: cashierNameSnapshot ?? this.cashierNameSnapshot,
+      sessionId: sessionId ?? this.sessionId,
+      customerId: customerId ?? this.customerId,
+      customerNameSnapshot: customerNameSnapshot ?? this.customerNameSnapshot,
+      returnReason: returnReason ?? this.returnReason,
+      returnNote: returnNote ?? this.returnNote,
+      stockBefore: stockBefore ?? this.stockBefore,
+      stockAfter: stockAfter ?? this.stockAfter,
+      referenceType: referenceType ?? this.referenceType,
+      referenceId: referenceId ?? this.referenceId,
+      deviceInfo: deviceInfo ?? this.deviceInfo,
+      metadataJson: metadataJson ?? this.metadataJson,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (returnType.present) {
+      map['return_type'] = Variable<String>(returnType.value);
+    }
+    if (invoiceId.present) {
+      map['invoice_id'] = Variable<int>(invoiceId.value);
+    }
+    if (saleItemId.present) {
+      map['sale_item_id'] = Variable<int>(saleItemId.value);
+    }
+    if (productId.present) {
+      map['product_id'] = Variable<int>(productId.value);
+    }
+    if (returnedQuantity.present) {
+      map['returned_quantity'] = Variable<double>(returnedQuantity.value);
+    }
+    if (returnedAmount.present) {
+      map['returned_amount'] = Variable<double>(returnedAmount.value);
+    }
+    if (cashierUserId.present) {
+      map['cashier_user_id'] = Variable<int>(cashierUserId.value);
+    }
+    if (cashierNameSnapshot.present) {
+      map['cashier_name_snapshot'] =
+          Variable<String>(cashierNameSnapshot.value);
+    }
+    if (sessionId.present) {
+      map['session_id'] = Variable<int>(sessionId.value);
+    }
+    if (customerId.present) {
+      map['customer_id'] = Variable<int>(customerId.value);
+    }
+    if (customerNameSnapshot.present) {
+      map['customer_name_snapshot'] =
+          Variable<String>(customerNameSnapshot.value);
+    }
+    if (returnReason.present) {
+      map['return_reason'] = Variable<String>(returnReason.value);
+    }
+    if (returnNote.present) {
+      map['return_note'] = Variable<String>(returnNote.value);
+    }
+    if (stockBefore.present) {
+      map['stock_before'] = Variable<double>(stockBefore.value);
+    }
+    if (stockAfter.present) {
+      map['stock_after'] = Variable<double>(stockAfter.value);
+    }
+    if (referenceType.present) {
+      map['reference_type'] = Variable<String>(referenceType.value);
+    }
+    if (referenceId.present) {
+      map['reference_id'] = Variable<int>(referenceId.value);
+    }
+    if (deviceInfo.present) {
+      map['device_info'] = Variable<String>(deviceInfo.value);
+    }
+    if (metadataJson.present) {
+      map['metadata_json'] = Variable<String>(metadataJson.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ReturnAuditLogsCompanion(')
+          ..write('id: $id, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('returnType: $returnType, ')
+          ..write('invoiceId: $invoiceId, ')
+          ..write('saleItemId: $saleItemId, ')
+          ..write('productId: $productId, ')
+          ..write('returnedQuantity: $returnedQuantity, ')
+          ..write('returnedAmount: $returnedAmount, ')
+          ..write('cashierUserId: $cashierUserId, ')
+          ..write('cashierNameSnapshot: $cashierNameSnapshot, ')
+          ..write('sessionId: $sessionId, ')
+          ..write('customerId: $customerId, ')
+          ..write('customerNameSnapshot: $customerNameSnapshot, ')
+          ..write('returnReason: $returnReason, ')
+          ..write('returnNote: $returnNote, ')
+          ..write('stockBefore: $stockBefore, ')
+          ..write('stockAfter: $stockAfter, ')
+          ..write('referenceType: $referenceType, ')
+          ..write('referenceId: $referenceId, ')
+          ..write('deviceInfo: $deviceInfo, ')
+          ..write('metadataJson: $metadataJson')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -14043,6 +15084,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $StockMovementsTable stockMovements = $StockMovementsTable(this);
   late final $SaleItemReturnsTable saleItemReturns =
       $SaleItemReturnsTable(this);
+  late final $ReturnAuditLogsTable returnAuditLogs =
+      $ReturnAuditLogsTable(this);
   late final UsersDao usersDao = UsersDao(this as AppDatabase);
   late final CategoriesDao categoriesDao = CategoriesDao(this as AppDatabase);
   late final SuppliersDao suppliersDao = SuppliersDao(this as AppDatabase);
@@ -14063,6 +15106,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       StockMovementsDao(this as AppDatabase);
   late final SaleItemReturnsDao saleItemReturnsDao =
       SaleItemReturnsDao(this as AppDatabase);
+  late final ReturnAuditLogsDao returnAuditLogsDao =
+      ReturnAuditLogsDao(this as AppDatabase);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -14099,7 +15144,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         appSettings,
         notificationsTable,
         stockMovements,
-        saleItemReturns
+        saleItemReturns,
+        returnAuditLogs
       ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules(
@@ -26290,6 +27336,426 @@ typedef $$SaleItemReturnsTableProcessedTableManager = ProcessedTableManager<
     (SaleItemReturn, $$SaleItemReturnsTableReferences),
     SaleItemReturn,
     PrefetchHooks Function({bool saleItemId, bool productId})>;
+typedef $$ReturnAuditLogsTableCreateCompanionBuilder = ReturnAuditLogsCompanion
+    Function({
+  Value<int> id,
+  required DateTime createdAt,
+  required String returnType,
+  Value<int?> invoiceId,
+  Value<int?> saleItemId,
+  Value<int?> productId,
+  Value<double> returnedQuantity,
+  Value<double> returnedAmount,
+  Value<int?> cashierUserId,
+  Value<String?> cashierNameSnapshot,
+  Value<int?> sessionId,
+  Value<int?> customerId,
+  Value<String?> customerNameSnapshot,
+  Value<String?> returnReason,
+  Value<String?> returnNote,
+  Value<double?> stockBefore,
+  Value<double?> stockAfter,
+  Value<String?> referenceType,
+  Value<int?> referenceId,
+  Value<String?> deviceInfo,
+  Value<String?> metadataJson,
+});
+typedef $$ReturnAuditLogsTableUpdateCompanionBuilder = ReturnAuditLogsCompanion
+    Function({
+  Value<int> id,
+  Value<DateTime> createdAt,
+  Value<String> returnType,
+  Value<int?> invoiceId,
+  Value<int?> saleItemId,
+  Value<int?> productId,
+  Value<double> returnedQuantity,
+  Value<double> returnedAmount,
+  Value<int?> cashierUserId,
+  Value<String?> cashierNameSnapshot,
+  Value<int?> sessionId,
+  Value<int?> customerId,
+  Value<String?> customerNameSnapshot,
+  Value<String?> returnReason,
+  Value<String?> returnNote,
+  Value<double?> stockBefore,
+  Value<double?> stockAfter,
+  Value<String?> referenceType,
+  Value<int?> referenceId,
+  Value<String?> deviceInfo,
+  Value<String?> metadataJson,
+});
+
+class $$ReturnAuditLogsTableFilterComposer
+    extends Composer<_$AppDatabase, $ReturnAuditLogsTable> {
+  $$ReturnAuditLogsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get returnType => $composableBuilder(
+      column: $table.returnType, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get invoiceId => $composableBuilder(
+      column: $table.invoiceId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get saleItemId => $composableBuilder(
+      column: $table.saleItemId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get productId => $composableBuilder(
+      column: $table.productId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get returnedQuantity => $composableBuilder(
+      column: $table.returnedQuantity,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get returnedAmount => $composableBuilder(
+      column: $table.returnedAmount,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get cashierUserId => $composableBuilder(
+      column: $table.cashierUserId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get cashierNameSnapshot => $composableBuilder(
+      column: $table.cashierNameSnapshot,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get sessionId => $composableBuilder(
+      column: $table.sessionId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get customerId => $composableBuilder(
+      column: $table.customerId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get customerNameSnapshot => $composableBuilder(
+      column: $table.customerNameSnapshot,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get returnReason => $composableBuilder(
+      column: $table.returnReason, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get returnNote => $composableBuilder(
+      column: $table.returnNote, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get stockBefore => $composableBuilder(
+      column: $table.stockBefore, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get stockAfter => $composableBuilder(
+      column: $table.stockAfter, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get referenceType => $composableBuilder(
+      column: $table.referenceType, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get referenceId => $composableBuilder(
+      column: $table.referenceId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get deviceInfo => $composableBuilder(
+      column: $table.deviceInfo, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get metadataJson => $composableBuilder(
+      column: $table.metadataJson, builder: (column) => ColumnFilters(column));
+}
+
+class $$ReturnAuditLogsTableOrderingComposer
+    extends Composer<_$AppDatabase, $ReturnAuditLogsTable> {
+  $$ReturnAuditLogsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get returnType => $composableBuilder(
+      column: $table.returnType, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get invoiceId => $composableBuilder(
+      column: $table.invoiceId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get saleItemId => $composableBuilder(
+      column: $table.saleItemId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get productId => $composableBuilder(
+      column: $table.productId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get returnedQuantity => $composableBuilder(
+      column: $table.returnedQuantity,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get returnedAmount => $composableBuilder(
+      column: $table.returnedAmount,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get cashierUserId => $composableBuilder(
+      column: $table.cashierUserId,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get cashierNameSnapshot => $composableBuilder(
+      column: $table.cashierNameSnapshot,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get sessionId => $composableBuilder(
+      column: $table.sessionId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get customerId => $composableBuilder(
+      column: $table.customerId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get customerNameSnapshot => $composableBuilder(
+      column: $table.customerNameSnapshot,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get returnReason => $composableBuilder(
+      column: $table.returnReason,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get returnNote => $composableBuilder(
+      column: $table.returnNote, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get stockBefore => $composableBuilder(
+      column: $table.stockBefore, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get stockAfter => $composableBuilder(
+      column: $table.stockAfter, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get referenceType => $composableBuilder(
+      column: $table.referenceType,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get referenceId => $composableBuilder(
+      column: $table.referenceId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get deviceInfo => $composableBuilder(
+      column: $table.deviceInfo, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get metadataJson => $composableBuilder(
+      column: $table.metadataJson,
+      builder: (column) => ColumnOrderings(column));
+}
+
+class $$ReturnAuditLogsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $ReturnAuditLogsTable> {
+  $$ReturnAuditLogsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<String> get returnType => $composableBuilder(
+      column: $table.returnType, builder: (column) => column);
+
+  GeneratedColumn<int> get invoiceId =>
+      $composableBuilder(column: $table.invoiceId, builder: (column) => column);
+
+  GeneratedColumn<int> get saleItemId => $composableBuilder(
+      column: $table.saleItemId, builder: (column) => column);
+
+  GeneratedColumn<int> get productId =>
+      $composableBuilder(column: $table.productId, builder: (column) => column);
+
+  GeneratedColumn<double> get returnedQuantity => $composableBuilder(
+      column: $table.returnedQuantity, builder: (column) => column);
+
+  GeneratedColumn<double> get returnedAmount => $composableBuilder(
+      column: $table.returnedAmount, builder: (column) => column);
+
+  GeneratedColumn<int> get cashierUserId => $composableBuilder(
+      column: $table.cashierUserId, builder: (column) => column);
+
+  GeneratedColumn<String> get cashierNameSnapshot => $composableBuilder(
+      column: $table.cashierNameSnapshot, builder: (column) => column);
+
+  GeneratedColumn<int> get sessionId =>
+      $composableBuilder(column: $table.sessionId, builder: (column) => column);
+
+  GeneratedColumn<int> get customerId => $composableBuilder(
+      column: $table.customerId, builder: (column) => column);
+
+  GeneratedColumn<String> get customerNameSnapshot => $composableBuilder(
+      column: $table.customerNameSnapshot, builder: (column) => column);
+
+  GeneratedColumn<String> get returnReason => $composableBuilder(
+      column: $table.returnReason, builder: (column) => column);
+
+  GeneratedColumn<String> get returnNote => $composableBuilder(
+      column: $table.returnNote, builder: (column) => column);
+
+  GeneratedColumn<double> get stockBefore => $composableBuilder(
+      column: $table.stockBefore, builder: (column) => column);
+
+  GeneratedColumn<double> get stockAfter => $composableBuilder(
+      column: $table.stockAfter, builder: (column) => column);
+
+  GeneratedColumn<String> get referenceType => $composableBuilder(
+      column: $table.referenceType, builder: (column) => column);
+
+  GeneratedColumn<int> get referenceId => $composableBuilder(
+      column: $table.referenceId, builder: (column) => column);
+
+  GeneratedColumn<String> get deviceInfo => $composableBuilder(
+      column: $table.deviceInfo, builder: (column) => column);
+
+  GeneratedColumn<String> get metadataJson => $composableBuilder(
+      column: $table.metadataJson, builder: (column) => column);
+}
+
+class $$ReturnAuditLogsTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $ReturnAuditLogsTable,
+    ReturnAuditLog,
+    $$ReturnAuditLogsTableFilterComposer,
+    $$ReturnAuditLogsTableOrderingComposer,
+    $$ReturnAuditLogsTableAnnotationComposer,
+    $$ReturnAuditLogsTableCreateCompanionBuilder,
+    $$ReturnAuditLogsTableUpdateCompanionBuilder,
+    (
+      ReturnAuditLog,
+      BaseReferences<_$AppDatabase, $ReturnAuditLogsTable, ReturnAuditLog>
+    ),
+    ReturnAuditLog,
+    PrefetchHooks Function()> {
+  $$ReturnAuditLogsTableTableManager(
+      _$AppDatabase db, $ReturnAuditLogsTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$ReturnAuditLogsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$ReturnAuditLogsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$ReturnAuditLogsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<int> id = const Value.absent(),
+            Value<DateTime> createdAt = const Value.absent(),
+            Value<String> returnType = const Value.absent(),
+            Value<int?> invoiceId = const Value.absent(),
+            Value<int?> saleItemId = const Value.absent(),
+            Value<int?> productId = const Value.absent(),
+            Value<double> returnedQuantity = const Value.absent(),
+            Value<double> returnedAmount = const Value.absent(),
+            Value<int?> cashierUserId = const Value.absent(),
+            Value<String?> cashierNameSnapshot = const Value.absent(),
+            Value<int?> sessionId = const Value.absent(),
+            Value<int?> customerId = const Value.absent(),
+            Value<String?> customerNameSnapshot = const Value.absent(),
+            Value<String?> returnReason = const Value.absent(),
+            Value<String?> returnNote = const Value.absent(),
+            Value<double?> stockBefore = const Value.absent(),
+            Value<double?> stockAfter = const Value.absent(),
+            Value<String?> referenceType = const Value.absent(),
+            Value<int?> referenceId = const Value.absent(),
+            Value<String?> deviceInfo = const Value.absent(),
+            Value<String?> metadataJson = const Value.absent(),
+          }) =>
+              ReturnAuditLogsCompanion(
+            id: id,
+            createdAt: createdAt,
+            returnType: returnType,
+            invoiceId: invoiceId,
+            saleItemId: saleItemId,
+            productId: productId,
+            returnedQuantity: returnedQuantity,
+            returnedAmount: returnedAmount,
+            cashierUserId: cashierUserId,
+            cashierNameSnapshot: cashierNameSnapshot,
+            sessionId: sessionId,
+            customerId: customerId,
+            customerNameSnapshot: customerNameSnapshot,
+            returnReason: returnReason,
+            returnNote: returnNote,
+            stockBefore: stockBefore,
+            stockAfter: stockAfter,
+            referenceType: referenceType,
+            referenceId: referenceId,
+            deviceInfo: deviceInfo,
+            metadataJson: metadataJson,
+          ),
+          createCompanionCallback: ({
+            Value<int> id = const Value.absent(),
+            required DateTime createdAt,
+            required String returnType,
+            Value<int?> invoiceId = const Value.absent(),
+            Value<int?> saleItemId = const Value.absent(),
+            Value<int?> productId = const Value.absent(),
+            Value<double> returnedQuantity = const Value.absent(),
+            Value<double> returnedAmount = const Value.absent(),
+            Value<int?> cashierUserId = const Value.absent(),
+            Value<String?> cashierNameSnapshot = const Value.absent(),
+            Value<int?> sessionId = const Value.absent(),
+            Value<int?> customerId = const Value.absent(),
+            Value<String?> customerNameSnapshot = const Value.absent(),
+            Value<String?> returnReason = const Value.absent(),
+            Value<String?> returnNote = const Value.absent(),
+            Value<double?> stockBefore = const Value.absent(),
+            Value<double?> stockAfter = const Value.absent(),
+            Value<String?> referenceType = const Value.absent(),
+            Value<int?> referenceId = const Value.absent(),
+            Value<String?> deviceInfo = const Value.absent(),
+            Value<String?> metadataJson = const Value.absent(),
+          }) =>
+              ReturnAuditLogsCompanion.insert(
+            id: id,
+            createdAt: createdAt,
+            returnType: returnType,
+            invoiceId: invoiceId,
+            saleItemId: saleItemId,
+            productId: productId,
+            returnedQuantity: returnedQuantity,
+            returnedAmount: returnedAmount,
+            cashierUserId: cashierUserId,
+            cashierNameSnapshot: cashierNameSnapshot,
+            sessionId: sessionId,
+            customerId: customerId,
+            customerNameSnapshot: customerNameSnapshot,
+            returnReason: returnReason,
+            returnNote: returnNote,
+            stockBefore: stockBefore,
+            stockAfter: stockAfter,
+            referenceType: referenceType,
+            referenceId: referenceId,
+            deviceInfo: deviceInfo,
+            metadataJson: metadataJson,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$ReturnAuditLogsTableProcessedTableManager = ProcessedTableManager<
+    _$AppDatabase,
+    $ReturnAuditLogsTable,
+    ReturnAuditLog,
+    $$ReturnAuditLogsTableFilterComposer,
+    $$ReturnAuditLogsTableOrderingComposer,
+    $$ReturnAuditLogsTableAnnotationComposer,
+    $$ReturnAuditLogsTableCreateCompanionBuilder,
+    $$ReturnAuditLogsTableUpdateCompanionBuilder,
+    (
+      ReturnAuditLog,
+      BaseReferences<_$AppDatabase, $ReturnAuditLogsTable, ReturnAuditLog>
+    ),
+    ReturnAuditLog,
+    PrefetchHooks Function()>;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -26358,4 +27824,6 @@ class $AppDatabaseManager {
       $$StockMovementsTableTableManager(_db, _db.stockMovements);
   $$SaleItemReturnsTableTableManager get saleItemReturns =>
       $$SaleItemReturnsTableTableManager(_db, _db.saleItemReturns);
+  $$ReturnAuditLogsTableTableManager get returnAuditLogs =>
+      $$ReturnAuditLogsTableTableManager(_db, _db.returnAuditLogs);
 }

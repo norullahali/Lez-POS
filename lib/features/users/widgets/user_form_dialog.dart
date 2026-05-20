@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../auth/permissions/permission_keys.dart';
+import '../../auth/utils/permission_actions.dart';
 import '../providers/users_provider.dart';
 
 class UserFormDialog extends ConsumerStatefulWidget {
@@ -49,6 +51,9 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+    if (!PermissionActions.guard(ref, context, PermissionKeys.usersManage)) {
+      return;
+    }
     if (_selectedRoleId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('الرجاء اختيار الدور (الصلاحية)')),

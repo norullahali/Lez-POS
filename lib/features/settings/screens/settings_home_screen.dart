@@ -1,11 +1,29 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../auth/permissions/route_permissions.dart';
+import '../../auth/providers/permission_provider.dart';
 
-class SettingsHomeScreen extends StatelessWidget {
+class SettingsHomeScreen extends ConsumerWidget {
   const SettingsHomeScreen({super.key});
 
+  static const _items = [
+    ('إعدادات الفاتورة', '/settings/invoice'),
+    ('النسخ الاحتياطي', '/backup'),
+    ('المستخدمين', '/users'),
+    ('الصلاحيات', '/roles'),
+    ('نقاط الولاء', '/loyalty-settings'),
+  ];
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final permissions = ref.watch(permissionServiceProvider);
+    final visibleItems = _items.where((item) {
+      final required = permissionForRoute(item.$2);
+      if (required == null) return true;
+      return permissions.hasPermissionSync(required);
+    }).toList();
+
     return Padding(
       padding: const EdgeInsets.all(24),
       child: Column(
@@ -16,23 +34,29 @@ class SettingsHomeScreen extends StatelessWidget {
             style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 24),
-          Wrap(
-            spacing: 16,
-            runSpacing: 16,
-            children: [
-              _item(context, 'إعدادات الفاتورة', '/settings/invoice'),
-              _item(context, 'النسخ الاحتياطي', '/backup'),
-              _item(context, 'المستخدمين', '/users'),
-              _item(context, 'الصلاحيات', '/roles'),
-              _item(context, 'نقاط الولاء', '/loyalty-settings'),
-            ],
-          ),
+          if (visibleItems.isEmpty)
+            const Text('لا توجد إعدادات متاحة لصلاحياتك الحالية.')
+          else
+            Wrap(
+              spacing: 16,
+              runSpacing: 16,
+              children: visibleItems
+                  .map((item) => _SettingsTile(title: item.$1, route: item.$2))
+                  .toList(),
+            ),
         ],
       ),
     );
   }
+}
 
-  Widget _item(BuildContext context, String title, String route) {
+class _SettingsTile extends StatelessWidget {
+  const _SettingsTile({required this.title, required this.route});
+  final String title;
+  final String route;
+
+  @override
+  Widget build(BuildContext context) {
     return InkWell(
       onTap: () => context.go(route),
       child: Container(

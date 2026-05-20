@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/search_field.dart';
+import '../../auth/permissions/permission_keys.dart';
+import '../../auth/widgets/permission_gate.dart';
 import '../../categories/providers/categories_provider.dart';
 import '../models/product_model.dart';
 import '../providers/products_provider.dart';
@@ -47,10 +49,13 @@ class ProductsScreen extends ConsumerWidget {
                 error: (_, __) => const SizedBox.shrink(),
               ),
               const SizedBox(width: 12),
-              ElevatedButton.icon(
-                icon: const Icon(Icons.add_rounded, size: 18),
-                label: const Text('إضافة منتج'),
-                onPressed: () => _showForm(context, ref, null),
+              PermissionVisibility(
+                permission: PermissionKeys.productsEdit,
+                child: ElevatedButton.icon(
+                  icon: const Icon(Icons.add_rounded, size: 18),
+                  label: const Text('إضافة منتج'),
+                  onPressed: () => _showForm(context, ref, null),
+                ),
               ),
             ],
           ),
@@ -82,10 +87,13 @@ class ProductsScreen extends ConsumerWidget {
                         const SizedBox(height: 16),
                         Text('لا توجد منتجات', style: Theme.of(context).textTheme.titleMedium?.copyWith(color: AppColors.textHint)),
                         const SizedBox(height: 12),
-                        ElevatedButton.icon(
-                          icon: const Icon(Icons.add),
-                          label: const Text('إضافة أول منتج'),
-                          onPressed: () => _showForm(context, ref, null),
+                        PermissionVisibility(
+                          permission: PermissionKeys.productsEdit,
+                          child: ElevatedButton.icon(
+                            icon: const Icon(Icons.add),
+                            label: const Text('إضافة أول منتج'),
+                            onPressed: () => _showForm(context, ref, null),
+                          ),
                         ),
                       ],
                     ),
@@ -148,10 +156,13 @@ class ProductsScreen extends ConsumerWidget {
         ),
       ),
       DataCell(
-        Switch.adaptive(
-          value: p.isActive,
-          activeTrackColor: AppColors.success,
-          onChanged: (val) => ref.read(productsNotifierProvider.notifier).toggle(p.id!, val),
+        PermissionDisable(
+          permission: PermissionKeys.productsEdit,
+          child: Switch.adaptive(
+            value: p.isActive,
+            activeTrackColor: AppColors.success,
+            onChanged: (val) => ref.read(productsNotifierProvider.notifier).toggle(p.id!, val),
+          ),
         ),
       ),
       DataCell(Row(
@@ -163,7 +174,14 @@ class ProductsScreen extends ConsumerWidget {
             tooltip: 'عرض الملف الكامل',
             onPressed: () => showProductProfileDialog(context, p),
           ),
-          IconButton(icon: const Icon(Icons.edit_rounded, color: AppColors.primary, size: 20), onPressed: () => _showForm(context, ref, p), tooltip: 'تعديل'),
+          PermissionDisable(
+            permission: PermissionKeys.productsEdit,
+            child: IconButton(
+              icon: const Icon(Icons.edit_rounded, color: AppColors.primary, size: 20),
+              onPressed: () => _showForm(context, ref, p),
+              tooltip: 'تعديل',
+            ),
+          ),
         ],
       )),
     ]);

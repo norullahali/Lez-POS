@@ -7,6 +7,8 @@ import 'core/theme/app_theme.dart';
 import 'core/widgets/app_shell.dart';
 import 'features/auth/providers/auth_provider.dart';
 import 'features/auth/screens/login_screen.dart';
+import 'features/auth/screens/unauthorized_screen.dart';
+import 'features/auth/widgets/permission_route_guard.dart';
 import 'core/localization/generated/app_localizations.dart';
 
 // Screens — imported after each module is built
@@ -39,6 +41,10 @@ import 'package:lez_pos/features/settings/screens/invoice_settings_screen.dart';
 import 'package:lez_pos/features/invoices/screens/invoice_history_screen.dart';
 import 'package:lez_pos/features/returns/screens/return_analytics_dashboard_screen.dart';
 
+Widget _guardRoute(String route, Widget child) {
+  return PermissionRouteGuard.forRoute(route: route, child: child);
+}
+
 final routerProvider = Provider<GoRouter>((ref) {
   final authAsync = ref.watch(authProvider);
   final authState = authAsync.valueOrNull;
@@ -57,7 +63,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       return null;
     },
     routes: [
-      GoRoute(path: '/pos', builder: (_, __) => const PosScreen()),
+      GoRoute(path: '/pos', builder: (_, __) => _guardRoute('/pos', const PosScreen())),
       GoRoute(path: '/login', builder: (_, __) => const LoginScreen()),
       ShellRoute(
         builder: (context, state, child) => AppShell(
@@ -66,110 +72,174 @@ final routerProvider = Provider<GoRouter>((ref) {
         ),
         routes: [
           GoRoute(
+            path: '/unauthorized',
+            builder: (_, state) => UnauthorizedScreen(
+              attemptedRoute: state.uri.queryParameters['from'],
+            ),
+          ),
+          GoRoute(
             path: '/settings/invoice',
-            builder: (_, __) => const InvoiceSettingsScreen(),
+            builder: (_, __) =>
+                _guardRoute('/settings/invoice', const InvoiceSettingsScreen()),
           ),
           GoRoute(
             path: '/settings',
-            builder: (_, __) => const SettingsHomeScreen(),
+            builder: (_, __) =>
+                _guardRoute('/settings', const SettingsHomeScreen()),
           ),
           GoRoute(path: '/', redirect: (_, __) => '/dashboard'),
           GoRoute(
-              path: '/dashboard', builder: (_, __) => const DashboardScreen()),
+              path: '/dashboard',
+              builder: (_, __) => const DashboardScreen()),
           GoRoute(
-              path: '/products', builder: (_, __) => const ProductsScreen()),
+              path: '/products',
+              builder: (_, __) => _guardRoute('/products', const ProductsScreen())),
           GoRoute(
               path: '/categories',
-              builder: (_, __) => const CategoriesScreen()),
+              builder: (_, __) =>
+                  _guardRoute('/categories', const CategoriesScreen())),
           GoRoute(
               path: '/customers',
-              builder: (_, __) => const CustomersScreen(),
+              builder: (_, __) => _guardRoute('/customers', const CustomersScreen()),
               routes: [
                 GoRoute(
                   path: 'profile/:id',
-                  builder: (_, state) => CustomerProfileScreen(
-                    customerId: int.parse(state.pathParameters['id']!),
+                  builder: (_, state) => _guardRoute(
+                    '/customers',
+                    CustomerProfileScreen(
+                      customerId: int.parse(state.pathParameters['id']!),
+                    ),
                   ),
                 ),
                 GoRoute(
                   path: 'payments',
-                  builder: (_, __) => const CustomerPaymentsScreen(),
+                  builder: (_, __) => _guardRoute(
+                    '/customers',
+                    const CustomerPaymentsScreen(),
+                  ),
                 ),
                 GoRoute(
                   path: 'payments/:id',
-                  builder: (_, state) => CustomerPaymentsScreen(
-                    initialCustomerId: int.parse(state.pathParameters['id']!),
+                  builder: (_, state) => _guardRoute(
+                    '/customers',
+                    CustomerPaymentsScreen(
+                      initialCustomerId:
+                          int.parse(state.pathParameters['id']!),
+                    ),
                   ),
                 ),
               ]),
           GoRoute(
               path: '/suppliers',
-              builder: (_, __) => const SuppliersScreen(),
+              builder: (_, __) => _guardRoute('/suppliers', const SuppliersScreen()),
               routes: [
                 GoRoute(
                   path: 'payments/:id',
-                  builder: (_, state) => SupplierPaymentsScreen(
-                    supplierId: int.parse(state.pathParameters['id']!),
+                  builder: (_, state) => _guardRoute(
+                    '/suppliers',
+                    SupplierPaymentsScreen(
+                      supplierId: int.parse(state.pathParameters['id']!),
+                    ),
                   ),
                 ),
                 GoRoute(
                   path: 'profile/:id',
-                  builder: (_, state) => SupplierProfileScreen(
-                    supplierId: int.parse(state.pathParameters['id']!),
+                  builder: (_, state) => _guardRoute(
+                    '/suppliers',
+                    SupplierProfileScreen(
+                      supplierId: int.parse(state.pathParameters['id']!),
+                    ),
                   ),
                 ),
               ]),
           GoRoute(
             path: '/purchases',
-            builder: (_, __) => const PurchasesListScreen(),
+            builder: (_, __) =>
+                _guardRoute('/purchases', const PurchasesListScreen()),
             routes: [
               GoRoute(
-                  path: 'new', builder: (_, __) => const PurchaseFormScreen()),
+                  path: 'new',
+                  builder: (_, __) => _guardRoute(
+                        '/purchases',
+                        const PurchaseFormScreen(),
+                      )),
               GoRoute(
                 path: 'edit/:id',
-                builder: (_, state) => PurchaseFormScreen(
-                    editId: int.tryParse(state.pathParameters['id'] ?? '')),
+                builder: (_, state) => _guardRoute(
+                  '/purchases',
+                  PurchaseFormScreen(
+                      editId:
+                          int.tryParse(state.pathParameters['id'] ?? '')),
+                ),
               ),
             ],
           ),
           GoRoute(
               path: '/opening-stock',
-              builder: (_, __) => const OpeningStockScreen()),
+              builder: (_, __) =>
+                  _guardRoute('/opening-stock', const OpeningStockScreen())),
           GoRoute(
-              path: '/inventory', builder: (_, __) => const InventoryScreen()),
+              path: '/inventory',
+              builder: (_, __) =>
+                  _guardRoute('/inventory', const InventoryScreen())),
           GoRoute(
               path: '/customer-returns',
-              builder: (_, __) => const CustomerReturnsScreen()),
+              builder: (_, __) => _guardRoute(
+                    '/customer-returns',
+                    const CustomerReturnsScreen(),
+                  )),
           GoRoute(
               path: '/supplier-returns',
-              builder: (_, __) => const SupplierReturnsScreen()),
-          GoRoute(path: '/reports', builder: (_, __) => const ReportsScreen()),
+              builder: (_, __) => _guardRoute(
+                    '/supplier-returns',
+                    const SupplierReturnsScreen(),
+                  )),
+          GoRoute(
+              path: '/reports',
+              builder: (_, __) => _guardRoute('/reports', const ReportsScreen())),
           GoRoute(
             path: '/return-analytics',
-            builder: (_, __) =>
-                const ReturnAnalyticsDashboardScreen(),
+            builder: (_, __) => _guardRoute(
+              '/return-analytics',
+              const ReturnAnalyticsDashboardScreen(),
+            ),
           ),
           GoRoute(
             path: '/invoice-history',
-            builder: (_, __) => const InvoiceHistoryScreen(),
+            builder: (_, __) => _guardRoute(
+              '/invoice-history',
+              const InvoiceHistoryScreen(),
+            ),
           ),
-          GoRoute(path: '/users', builder: (_, __) => const UsersScreen()),
-          GoRoute(path: '/roles', builder: (_, __) => const RolesScreen()),
+          GoRoute(
+              path: '/users',
+              builder: (_, __) => _guardRoute('/users', const UsersScreen())),
+          GoRoute(
+              path: '/roles',
+              builder: (_, __) => _guardRoute('/roles', const RolesScreen())),
           GoRoute(
             path: '/backup',
-            builder: (_, __) => const BackupScreen(),
+            builder: (_, __) => _guardRoute('/backup', const BackupScreen()),
             routes: [
               GoRoute(
                 path: 'settings',
-                builder: (_, __) => const SettingsScreen(),
+                builder: (_, __) => _guardRoute(
+                  '/backup',
+                  const SettingsScreen(),
+                ),
               ),
             ],
           ),
           GoRoute(
-              path: '/pricing', builder: (_, __) => const PricingRulesScreen()),
+              path: '/pricing',
+              builder: (_, __) =>
+                  _guardRoute('/pricing', const PricingRulesScreen())),
           GoRoute(
               path: '/loyalty-settings',
-              builder: (_, __) => const LoyaltySettingsScreen()),
+              builder: (_, __) => _guardRoute(
+                    '/loyalty-settings',
+                    const LoyaltySettingsScreen(),
+                  )),
         ],
       ),
     ],

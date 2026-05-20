@@ -9,6 +9,9 @@ import '../../../core/services/partial_return_service.dart';
 import '../../../core/services/receipt_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../../auth/permissions/permission_keys.dart';
+import '../../auth/providers/permission_provider.dart';
+import '../../auth/utils/permission_actions.dart';
 import '../../pos/models/invoice_models.dart';
 import '../../pos/providers/pos_products_provider.dart';
 import '../../products/providers/products_provider.dart';
@@ -97,6 +100,14 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
   }
 
   Future<void> _confirmFullReturn(BuildContext context) async {
+    if (!PermissionActions.guard(
+      ref,
+      context,
+      PermissionKeys.posFullRefund,
+    )) {
+      return;
+    }
+
     final note = await _showReturnConfirmDialog(context);
     if (note == null) return;
     if (!mounted) return;
@@ -168,8 +179,8 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
   @override
   Widget build(BuildContext context) {
     final async = ref.watch(invoiceDetailProvider(widget.invoiceId));
-    final authState = ref.watch(authProvider).valueOrNull;
-    final canFullRefund = authState?.hasPermission('pos.full_refund') ?? false;
+    final canFullRefund =
+        ref.watch(permissionProvider(PermissionKeys.posFullRefund));
 
     return Directionality(
       textDirection: TextDirection.rtl,

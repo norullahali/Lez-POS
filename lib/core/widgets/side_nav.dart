@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../theme/app_colors.dart';
+import '../../features/auth/permissions/permission_keys.dart';
 import '../../features/auth/providers/auth_provider.dart';
+import '../../features/auth/providers/permission_provider.dart';
 
 class NavItem {
   final String route;
@@ -29,68 +31,68 @@ const kNavItems = [
       icon: Icons.point_of_sale_rounded,
       label: 'نقطة البيع',
       isPrimary: true,
-      permissionKey: 'pos.sell'),
+      permissionKey: PermissionKeys.posSell),
   NavItem(
       route: '/products',
       icon: Icons.inventory_2_rounded,
       label: 'المنتجات',
-      permissionKey: 'products.view'),
+      permissionKey: PermissionKeys.productsView),
   NavItem(
       route: '/categories',
       icon: Icons.category_rounded,
       label: 'الفئات',
-      permissionKey: 'products.view'),
+      permissionKey: PermissionKeys.productsView),
   NavItem(
       route: '/customers',
       icon: Icons.people_rounded,
       label: 'العملاء',
-      permissionKey: 'pos.sell'),
+      permissionKey: PermissionKeys.posSell),
   NavItem(
       route: '/suppliers',
       icon: Icons.local_shipping_rounded,
       label: 'الموردون',
-      permissionKey: 'purchases.view'),
+      permissionKey: PermissionKeys.purchasesView),
   NavItem(
       route: '/purchases',
       icon: Icons.receipt_long_rounded,
       label: 'المشتريات',
-      permissionKey: 'purchases.view'),
+      permissionKey: PermissionKeys.purchasesView),
   NavItem(
       route: '/opening-stock',
       icon: Icons.start_rounded,
       label: 'الرصيد الافتتاحي',
-      permissionKey: 'products.edit'),
+      permissionKey: PermissionKeys.productsEdit),
   NavItem(
       route: '/inventory',
       icon: Icons.warehouse_rounded,
       label: 'المخزن',
-      permissionKey: 'products.view'),
+      permissionKey: PermissionKeys.productsView),
   NavItem(
       route: '/supplier-returns',
       icon: Icons.local_shipping_rounded,
       label: 'مرتجعات الموردين',
-      permissionKey: 'purchases.edit'),
+      permissionKey: PermissionKeys.purchasesEdit),
   NavItem(
       route: '/pricing',
       icon: Icons.local_offer_rounded,
       label: 'العروض والأسعار',
-      permissionKey: 'settings.edit'),
+      permissionKey: PermissionKeys.settingsEdit),
   //vItem(route: '/loyalty-settings', icon: Icons.star_rounded, label: 'إعدادات النقاط', permissionKey: 'settings.edit'),
   NavItem(
       route: '/invoice-history',
       icon: Icons.receipt_long_rounded,
       label: 'سجل الفواتير',
-      permissionKey: 'reports.view'),
+      permissionKey: PermissionKeys.reportsView),
   NavItem(
       route: '/reports',
       icon: Icons.bar_chart_rounded,
       label: 'التقارير',
-      permissionKey: 'reports.view'),
+      permissionKey: PermissionKeys.reportsView),
   NavItem(
       route: '/return-analytics',
       icon: Icons.assignment_return_rounded,
       label: 'تحليلات المرتجعات',
-      permissionKey: 'reports.view'),
+      permissionKey: PermissionKeys.reportsView),
   //vItem(route: '/users', icon: Icons.manage_accounts_rounded, label: 'المستخدمون', permissionKey: 'users.manage'),
   //vItem(route: '/roles', icon: Icons.security_rounded, label: 'الصلاحيات', permissionKey: 'users.manage'),
   //vItem(route: '/backup', icon: Icons.backup_rounded, label: 'النسخ الاحتياطي', permissionKey: 'settings.edit'),
@@ -98,6 +100,7 @@ const kNavItems = [
     route: '/settings',
     icon: Icons.settings,
     label: 'الإعدادات',
+    permissionKey: PermissionKeys.settingsEdit,
   ),
 ];
 
@@ -107,12 +110,13 @@ class SideNav extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final permissions = ref.watch(permissionServiceProvider);
     final authState = ref.watch(authProvider).valueOrNull;
 
     // Filter items by permission
     final visibleItems = kNavItems.where((item) {
       if (item.permissionKey == null) return true;
-      return authState?.hasPermission(item.permissionKey!) ?? false;
+      return permissions.hasPermissionSync(item.permissionKey!);
     }).toList();
 
     return Container(

@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/database/app_database.dart';
+import '../permissions/permission_rules.dart';
 
 class AuthState {
   final User? user;
@@ -14,9 +15,11 @@ class AuthState {
   bool get isAuthenticated => user != null;
   
   bool hasPermission(String key) {
-    // Owner (roleId = 1) gets all permissions implicitly if needed, but we seeded them explicitly anyway.
-    if (user?.roleId == 1) return true;
-    return permissions.contains(key);
+    return PermissionRules.hasPermission(
+      roleId: user?.roleId,
+      permissions: permissions,
+      key: key,
+    );
   }
 }
 
@@ -79,7 +82,7 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
     if (user == null || !user.isActive) return null;
     
     // Check their permissions via role
-    if (user.roleId == 1) return user; // Admin
+    if (user.roleId == PermissionRules.ownerRoleId) return user; // Owner bypass
     
     final perms = await _db.usersDao.getRolePermissionsKeys(user.roleId);
     if (perms.contains(requiredPermission)) {

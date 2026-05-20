@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:drift/drift.dart' as drift;
 import '../../../core/database/app_database.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../auth/permissions/permission_keys.dart';
+import '../../auth/utils/permission_actions.dart';
 import '../providers/users_provider.dart';
 
 class RoleFormDialog extends ConsumerStatefulWidget {
@@ -37,6 +39,9 @@ class _RoleFormDialogState extends ConsumerState<RoleFormDialog> {
 
   Future<void> _submit(List<Permission> allPerms) async {
     if (!_formKey.currentState!.validate()) return;
+    if (!PermissionActions.guard(ref, context, PermissionKeys.usersManage)) {
+      return;
+    }
     
     // System roles can be edited for permissions, but name shouldn't ideally be changed, but we allow it for now or disable name.
     if (_selectedPermissions.isEmpty) {

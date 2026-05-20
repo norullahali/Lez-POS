@@ -4,7 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/services/backup_service.dart';
 import '../../../core/database/app_database.dart';
+import '../../auth/permissions/permission_keys.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../../auth/providers/permission_provider.dart';
 
 // --- State Model ---
 class BackupSettings {
@@ -109,18 +111,16 @@ class BackupSettingsNotifier extends AsyncNotifier<BackupSettings> {
 
   // --- Actions ---
   Future<void> createManualBackup() async {
-    // 1. Verify Permission
-    final authState = ref.read(authProvider).valueOrNull;
-    if (authState == null || !authState.hasPermission('backup_database')) {
+    if (!ref.read(permissionServiceProvider).hasPermissionSync(PermissionKeys.backupDatabase)) {
       throw Exception('عذراً، ليس لديك صلاحية أخذ نسخة احتياطية.');
     }
 
-    // 2. Perform Backup
+    final authState = ref.read(authProvider).valueOrNull;
     final file = await BackupService.performBackup(isAuto: false);
 
     // 3. Log Action
     await AppDatabase.instance.logsDao.insertLog(
-      userId: authState.user?.id,
+      userId: authState?.user?.id,
       actionType: 'backup_created',
       details: 'تم إنشاء نسخة احتياطية يدوياً: ${file.path}',
     );
@@ -130,15 +130,13 @@ class BackupSettingsNotifier extends AsyncNotifier<BackupSettings> {
   }
 
   Future<void> restoreFromBackup(String filePath) async {
-    // 1. Verify Permission
-    final authState = ref.read(authProvider).valueOrNull;
-    if (authState == null || !authState.hasPermission('backup_database')) {
+    if (!ref.read(permissionServiceProvider).hasPermissionSync(PermissionKeys.backupDatabase)) {
       throw Exception('عذراً، ليس لديك صلاحية استعادة النظام.');
     }
 
-    // 2. Log intention
+    final authState = ref.read(authProvider).valueOrNull;
     await AppDatabase.instance.logsDao.insertLog(
-      userId: authState.user?.id,
+      userId: authState?.user?.id,
       actionType: 'backup_restored',
       details: 'تمت استعادة نسخة احتياطية: $filePath',
     );

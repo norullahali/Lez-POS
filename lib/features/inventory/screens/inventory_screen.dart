@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/loading_overlay.dart';
+import '../../auth/permissions/permission_keys.dart';
+import '../../auth/utils/permission_actions.dart';
 import '../../products/providers/products_provider.dart';
 import '../providers/inventory_provider.dart';
 
@@ -118,6 +120,15 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> with SingleTi
     );
 
     if (confirmed == true) {
+      if (!mounted) return;
+      if (!PermissionActions.guard(
+        ref,
+        context,
+        PermissionKeys.productsEdit,
+      )) {
+        return;
+      }
+
       final qty = double.tryParse(qtyCtrl.text) ?? 0;
       if (qty <= 0) return;
       setState(() => _isLoading = true);

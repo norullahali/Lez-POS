@@ -1,9 +1,9 @@
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/database/app_database.dart';
@@ -12,16 +12,18 @@ import '../../../core/printing/printer_config.dart';
 import '../../../core/services/settings_service.dart';
 import '../../../core/utils/receipt_paper_size.dart';
 import '../../../features/pos/models/invoice_models.dart';
+import '../../auth/permissions/permission_keys.dart';
+import '../../auth/utils/permission_actions.dart';
 import '../widgets/invoice_live_preview.dart';
 
-class InvoiceSettingsScreen extends StatefulWidget {
+class InvoiceSettingsScreen extends ConsumerStatefulWidget {
   const InvoiceSettingsScreen({super.key});
 
   @override
-  State<InvoiceSettingsScreen> createState() => _InvoiceSettingsScreenState();
+  ConsumerState<InvoiceSettingsScreen> createState() => _InvoiceSettingsScreenState();
 }
 
-class _InvoiceSettingsScreenState extends State<InvoiceSettingsScreen> {
+class _InvoiceSettingsScreenState extends ConsumerState<InvoiceSettingsScreen> {
   // -- Invoice fields ---------------------------------------------------------
   final _storeNameCtrl = TextEditingController();
   final _phoneCtrl     = TextEditingController();
@@ -137,6 +139,10 @@ class _InvoiceSettingsScreenState extends State<InvoiceSettingsScreen> {
   }
 
   Future<void> _saveSettings() async {
+    if (!PermissionActions.guard(ref, context, PermissionKeys.settingsEdit)) {
+      return;
+    }
+
     final svc = SettingsService(AppDatabase.instance);
 
     // -- Invoice settings → DB (single source of truth for printing) --------

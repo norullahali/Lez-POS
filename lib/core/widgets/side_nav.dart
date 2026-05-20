@@ -86,6 +86,11 @@ const kNavItems = [
       icon: Icons.bar_chart_rounded,
       label: 'التقارير',
       permissionKey: 'reports.view'),
+  NavItem(
+      route: '/return-analytics',
+      icon: Icons.assignment_return_rounded,
+      label: 'تحليلات المرتجعات',
+      permissionKey: 'reports.view'),
   //vItem(route: '/users', icon: Icons.manage_accounts_rounded, label: 'المستخدمون', permissionKey: 'users.manage'),
   //vItem(route: '/roles', icon: Icons.security_rounded, label: 'الصلاحيات', permissionKey: 'users.manage'),
   //vItem(route: '/backup', icon: Icons.backup_rounded, label: 'النسخ الاحتياطي', permissionKey: 'settings.edit'),

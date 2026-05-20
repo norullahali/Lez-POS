@@ -10,6 +10,7 @@
 //  - Invoice status is auto-updated after each return batch.
 //  - ALL Drift Companion / generated-type usage lives in DAOs.
 
+import 'package:drift/drift.dart' show Variable;
 import '../database/app_database.dart';
 import '../constants/invoice_lifecycle.dart';
 import '../constants/movement_types.dart';
@@ -103,6 +104,26 @@ class PartialReturnService {
     }
 
     await _db.transaction(() async {
+      // -- Audit snapshots (looked up once per transaction) -----------------
+      final cashierRow = await _db.customSelect(
+        'SELECT full_name FROM users WHERE id = ?',
+        variables: [Variable.withInt(returnedByUserId)],
+        readsFrom: {_db.usersTable},
+      ).getSingleOrNull();
+      final cashierName = cashierRow?.data['full_name'] as String?;
+
+      String? customerName;
+      final customerId = inv.customerId;
+      if (customerId != null && customerId != 1) {
+        final customerRow = await _db.customSelect(
+          'SELECT name FROM customers WHERE id = ?',
+          variables: [Variable.withInt(customerId)],
+          readsFrom: {_db.customers},
+        ).getSingleOrNull();
+        customerName = customerRow?.data['name'] as String?;
+      }
+      // ---------------------------------------------------------------------
+
       for (final line in lines) {
         // 1. Validate
         final available = await getAvailableReturnQuantity(line.saleItemId);
@@ -149,9 +170,30 @@ class PartialReturnService {
           note: note,
           createdByUserId: returnedByUserId,
         );
+
+        // 6. Immutable audit row (same transaction — atomic with return)
+        await _db.returnAuditLogsDao.insertAuditLog(
+          returnType: 'partial',
+          invoiceId: saleInvoiceId,
+          saleItemId: line.saleItemId,
+          productId: line.productId,
+          returnedQuantity: line.quantity,
+          returnedAmount: line.quantity * line.unitPrice,
+          cashierUserId: returnedByUserId,
+          cashierNameSnapshot: cashierName,
+          sessionId: inv.sessionId,
+          customerId: customerId,
+          customerNameSnapshot: customerName,
+          returnReason: 'إرجاع جزئي',
+          returnNote: note,
+          stockBefore: stockBefore,
+          stockAfter: stockBefore + line.quantity,
+          referenceType: 'sale_item_return',
+          referenceId: returnLineId,
+        );
       }
 
-      // 6. Recalculate and persist invoice status
+      // 7. Recalculate and persist invoice status
       await _refreshInvoiceStatus(saleInvoiceId);
     });
   }

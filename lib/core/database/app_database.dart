@@ -35,8 +35,10 @@ import 'tables/app_settings_table.dart';
 import 'tables/notifications_table.dart';
 import 'tables/stock_movements_table.dart';
 import 'tables/sale_item_returns_table.dart';
+import 'tables/return_audit_logs_table.dart';
 import 'daos/stock_movements_dao.dart';
 import 'daos/sale_item_returns_dao.dart';
+import 'daos/return_audit_logs_dao.dart';
 import 'daos/users_dao.dart';
 import 'daos/categories_dao.dart';
 import 'daos/suppliers_dao.dart';
@@ -87,6 +89,7 @@ part 'app_database.g.dart';
     NotificationsTable,
     StockMovements,
     SaleItemReturns,
+    ReturnAuditLogs,
   ],
   daos: [
     UsersDao,
@@ -104,6 +107,7 @@ part 'app_database.g.dart';
     AppSettingsDao,
     StockMovementsDao,
     SaleItemReturnsDao,
+    ReturnAuditLogsDao,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -120,7 +124,7 @@ class AppDatabase extends _$AppDatabase {
   late final pricingDao = PricingDao(this);
 
   @override
-  int get schemaVersion => 24;
+  int get schemaVersion => 25;
 
   @override
   MigrationStrategy get migration {
@@ -622,6 +626,16 @@ class AppDatabase extends _$AppDatabase {
             );
           } catch (e) {
             debugPrint('[Migration v24] index skip: $e');
+          }
+        }
+
+        if (from < 25) {
+          debugPrint('[Migration] v25: creating return_audit_logs table...');
+          try {
+            await m.createTable(returnAuditLogs);
+            debugPrint('[Migration v25] return_audit_logs table created');
+          } catch (e) {
+            debugPrint('[Migration v25] return_audit_logs skip: $e');
           }
         }
       },

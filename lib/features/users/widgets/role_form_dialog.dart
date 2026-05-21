@@ -6,6 +6,9 @@ import '../../../core/theme/app_colors.dart';
 import '../../auth/permissions/permission_keys.dart';
 import '../../auth/utils/permission_actions.dart';
 import '../providers/users_provider.dart';
+import '../../../core/activity/activity_categories.dart';
+import '../../../core/activity/activity_types.dart';
+import '../../activity/providers/activity_context_provider.dart';
 
 class RoleFormDialog extends ConsumerStatefulWidget {
   final Role? role;
@@ -53,6 +56,10 @@ class _RoleFormDialogState extends ConsumerState<RoleFormDialog> {
 
     setState(() => _isLoading = true);
     try {
+      List<String> beforeKeys = [];
+      if (widget.role != null) {
+        beforeKeys = await ref.read(rolePermissionsProvider(widget.role!.id).future);
+      }
       final selectedIds = allPerms
           .where((p) => _selectedPermissions.contains(p.permissionKey))
           .map((p) => p.id)
@@ -72,6 +79,18 @@ class _RoleFormDialogState extends ConsumerState<RoleFormDialog> {
       );
 
       ref.invalidate(rolesProvider); // refresh list
+      if (widget.role != null) {
+        await ref.read(activityLoggerProvider).logCritical(
+          activityType: ActivityTypes.roleUpdated,
+          category: ActivityCategories.users,
+          action: 'update',
+          title: 'تعديل صلاحيات دور',
+          entityType: 'role',
+          entityId: widget.role!.id,
+          before: {'permissions': beforeKeys},
+          after: {'permissions': _selectedPermissions.toList()},
+        );
+      }
       if (mounted) Navigator.pop(context);
     } catch (e) {
       if (mounted) {

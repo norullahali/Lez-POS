@@ -9824,8 +9824,18 @@ class $RolesTable extends Roles with TableInfo<$RolesTable, Role> {
       defaultConstraints:
           GeneratedColumn.constraintIsAlways('CHECK ("is_system" IN (0, 1))'),
       defaultValue: const Constant(false));
+  static const VerificationMeta _systemKeyMeta =
+      const VerificationMeta('systemKey');
   @override
-  List<GeneratedColumn> get $columns => [id, roleName, description, isSystem];
+  late final GeneratedColumn<String> systemKey = GeneratedColumn<String>(
+      'system_key', aliasedName, true,
+      additionalChecks:
+          GeneratedColumn.checkTextLength(minTextLength: 2, maxTextLength: 50),
+      type: DriftSqlType.string,
+      requiredDuringInsert: false);
+  @override
+  List<GeneratedColumn> get $columns =>
+      [id, roleName, description, isSystem, systemKey];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -9855,6 +9865,10 @@ class $RolesTable extends Roles with TableInfo<$RolesTable, Role> {
       context.handle(_isSystemMeta,
           isSystem.isAcceptableOrUnknown(data['is_system']!, _isSystemMeta));
     }
+    if (data.containsKey('system_key')) {
+      context.handle(_systemKeyMeta,
+          systemKey.isAcceptableOrUnknown(data['system_key']!, _systemKeyMeta));
+    }
     return context;
   }
 
@@ -9872,6 +9886,8 @@ class $RolesTable extends Roles with TableInfo<$RolesTable, Role> {
           .read(DriftSqlType.string, data['${effectivePrefix}description']),
       isSystem: attachedDatabase.typeMapping
           .read(DriftSqlType.bool, data['${effectivePrefix}is_system'])!,
+      systemKey: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}system_key']),
     );
   }
 
@@ -9886,11 +9902,13 @@ class Role extends DataClass implements Insertable<Role> {
   final String roleName;
   final String? description;
   final bool isSystem;
+  final String? systemKey;
   const Role(
       {required this.id,
       required this.roleName,
       this.description,
-      required this.isSystem});
+      required this.isSystem,
+      this.systemKey});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -9900,6 +9918,9 @@ class Role extends DataClass implements Insertable<Role> {
       map['description'] = Variable<String>(description);
     }
     map['is_system'] = Variable<bool>(isSystem);
+    if (!nullToAbsent || systemKey != null) {
+      map['system_key'] = Variable<String>(systemKey);
+    }
     return map;
   }
 
@@ -9911,6 +9932,9 @@ class Role extends DataClass implements Insertable<Role> {
           ? const Value.absent()
           : Value(description),
       isSystem: Value(isSystem),
+      systemKey: systemKey == null && nullToAbsent
+          ? const Value.absent()
+          : Value(systemKey),
     );
   }
 
@@ -9922,6 +9946,7 @@ class Role extends DataClass implements Insertable<Role> {
       roleName: serializer.fromJson<String>(json['roleName']),
       description: serializer.fromJson<String?>(json['description']),
       isSystem: serializer.fromJson<bool>(json['isSystem']),
+      systemKey: serializer.fromJson<String?>(json['systemKey']),
     );
   }
   @override
@@ -9932,6 +9957,7 @@ class Role extends DataClass implements Insertable<Role> {
       'roleName': serializer.toJson<String>(roleName),
       'description': serializer.toJson<String?>(description),
       'isSystem': serializer.toJson<bool>(isSystem),
+      'systemKey': serializer.toJson<String?>(systemKey),
     };
   }
 
@@ -9939,12 +9965,14 @@ class Role extends DataClass implements Insertable<Role> {
           {int? id,
           String? roleName,
           Value<String?> description = const Value.absent(),
-          bool? isSystem}) =>
+          bool? isSystem,
+          Value<String?> systemKey = const Value.absent()}) =>
       Role(
         id: id ?? this.id,
         roleName: roleName ?? this.roleName,
         description: description.present ? description.value : this.description,
         isSystem: isSystem ?? this.isSystem,
+        systemKey: systemKey.present ? systemKey.value : this.systemKey,
       );
   Role copyWithCompanion(RolesCompanion data) {
     return Role(
@@ -9953,6 +9981,7 @@ class Role extends DataClass implements Insertable<Role> {
       description:
           data.description.present ? data.description.value : this.description,
       isSystem: data.isSystem.present ? data.isSystem.value : this.isSystem,
+      systemKey: data.systemKey.present ? data.systemKey.value : this.systemKey,
     );
   }
 
@@ -9962,13 +9991,15 @@ class Role extends DataClass implements Insertable<Role> {
           ..write('id: $id, ')
           ..write('roleName: $roleName, ')
           ..write('description: $description, ')
-          ..write('isSystem: $isSystem')
+          ..write('isSystem: $isSystem, ')
+          ..write('systemKey: $systemKey')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, roleName, description, isSystem);
+  int get hashCode =>
+      Object.hash(id, roleName, description, isSystem, systemKey);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -9976,7 +10007,8 @@ class Role extends DataClass implements Insertable<Role> {
           other.id == this.id &&
           other.roleName == this.roleName &&
           other.description == this.description &&
-          other.isSystem == this.isSystem);
+          other.isSystem == this.isSystem &&
+          other.systemKey == this.systemKey);
 }
 
 class RolesCompanion extends UpdateCompanion<Role> {
@@ -9984,29 +10016,34 @@ class RolesCompanion extends UpdateCompanion<Role> {
   final Value<String> roleName;
   final Value<String?> description;
   final Value<bool> isSystem;
+  final Value<String?> systemKey;
   const RolesCompanion({
     this.id = const Value.absent(),
     this.roleName = const Value.absent(),
     this.description = const Value.absent(),
     this.isSystem = const Value.absent(),
+    this.systemKey = const Value.absent(),
   });
   RolesCompanion.insert({
     this.id = const Value.absent(),
     required String roleName,
     this.description = const Value.absent(),
     this.isSystem = const Value.absent(),
+    this.systemKey = const Value.absent(),
   }) : roleName = Value(roleName);
   static Insertable<Role> custom({
     Expression<int>? id,
     Expression<String>? roleName,
     Expression<String>? description,
     Expression<bool>? isSystem,
+    Expression<String>? systemKey,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (roleName != null) 'role_name': roleName,
       if (description != null) 'description': description,
       if (isSystem != null) 'is_system': isSystem,
+      if (systemKey != null) 'system_key': systemKey,
     });
   }
 
@@ -10014,12 +10051,14 @@ class RolesCompanion extends UpdateCompanion<Role> {
       {Value<int>? id,
       Value<String>? roleName,
       Value<String?>? description,
-      Value<bool>? isSystem}) {
+      Value<bool>? isSystem,
+      Value<String?>? systemKey}) {
     return RolesCompanion(
       id: id ?? this.id,
       roleName: roleName ?? this.roleName,
       description: description ?? this.description,
       isSystem: isSystem ?? this.isSystem,
+      systemKey: systemKey ?? this.systemKey,
     );
   }
 
@@ -10038,6 +10077,9 @@ class RolesCompanion extends UpdateCompanion<Role> {
     if (isSystem.present) {
       map['is_system'] = Variable<bool>(isSystem.value);
     }
+    if (systemKey.present) {
+      map['system_key'] = Variable<String>(systemKey.value);
+    }
     return map;
   }
 
@@ -10047,7 +10089,8 @@ class RolesCompanion extends UpdateCompanion<Role> {
           ..write('id: $id, ')
           ..write('roleName: $roleName, ')
           ..write('description: $description, ')
-          ..write('isSystem: $isSystem')
+          ..write('isSystem: $isSystem, ')
+          ..write('systemKey: $systemKey')
           ..write(')'))
         .toString();
   }
@@ -15034,6 +15077,964 @@ class ReturnAuditLogsCompanion extends UpdateCompanion<ReturnAuditLog> {
   }
 }
 
+class $ActivityLogsTable extends ActivityLogs
+    with TableInfo<$ActivityLogsTable, ActivityLog> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ActivityLogsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+      'id', aliasedName, false,
+      hasAutoIncrement: true,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('PRIMARY KEY AUTOINCREMENT'));
+  static const VerificationMeta _createdAtMeta =
+      const VerificationMeta('createdAt');
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+      'created_at', aliasedName, false,
+      type: DriftSqlType.dateTime,
+      requiredDuringInsert: false,
+      defaultValue: currentDateAndTime);
+  static const VerificationMeta _activityTypeMeta =
+      const VerificationMeta('activityType');
+  @override
+  late final GeneratedColumn<String> activityType = GeneratedColumn<String>(
+      'activity_type', aliasedName, false,
+      additionalChecks:
+          GeneratedColumn.checkTextLength(minTextLength: 2, maxTextLength: 100),
+      type: DriftSqlType.string,
+      requiredDuringInsert: true);
+  static const VerificationMeta _categoryMeta =
+      const VerificationMeta('category');
+  @override
+  late final GeneratedColumn<String> category = GeneratedColumn<String>(
+      'category', aliasedName, false,
+      additionalChecks:
+          GeneratedColumn.checkTextLength(minTextLength: 2, maxTextLength: 50),
+      type: DriftSqlType.string,
+      requiredDuringInsert: true);
+  static const VerificationMeta _severityMeta =
+      const VerificationMeta('severity');
+  @override
+  late final GeneratedColumn<String> severity = GeneratedColumn<String>(
+      'severity', aliasedName, false,
+      additionalChecks:
+          GeneratedColumn.checkTextLength(minTextLength: 2, maxTextLength: 20),
+      type: DriftSqlType.string,
+      requiredDuringInsert: true);
+  static const VerificationMeta _userIdMeta = const VerificationMeta('userId');
+  @override
+  late final GeneratedColumn<int> userId = GeneratedColumn<int>(
+      'user_id', aliasedName, true,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      $customConstraints: 'NULL REFERENCES users(id)');
+  static const VerificationMeta _usernameSnapshotMeta =
+      const VerificationMeta('usernameSnapshot');
+  @override
+  late final GeneratedColumn<String> usernameSnapshot = GeneratedColumn<String>(
+      'username_snapshot', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _roleSnapshotMeta =
+      const VerificationMeta('roleSnapshot');
+  @override
+  late final GeneratedColumn<String> roleSnapshot = GeneratedColumn<String>(
+      'role_snapshot', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _sessionIdMeta =
+      const VerificationMeta('sessionId');
+  @override
+  late final GeneratedColumn<int> sessionId = GeneratedColumn<int>(
+      'session_id', aliasedName, true,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      $customConstraints: 'NULL REFERENCES pos_sessions(id)');
+  static const VerificationMeta _entityTypeMeta =
+      const VerificationMeta('entityType');
+  @override
+  late final GeneratedColumn<String> entityType = GeneratedColumn<String>(
+      'entity_type', aliasedName, true,
+      additionalChecks:
+          GeneratedColumn.checkTextLength(minTextLength: 2, maxTextLength: 50),
+      type: DriftSqlType.string,
+      requiredDuringInsert: false);
+  static const VerificationMeta _entityIdMeta =
+      const VerificationMeta('entityId');
+  @override
+  late final GeneratedColumn<int> entityId = GeneratedColumn<int>(
+      'entity_id', aliasedName, true,
+      type: DriftSqlType.int, requiredDuringInsert: false);
+  static const VerificationMeta _actionMeta = const VerificationMeta('action');
+  @override
+  late final GeneratedColumn<String> action = GeneratedColumn<String>(
+      'action', aliasedName, false,
+      additionalChecks:
+          GeneratedColumn.checkTextLength(minTextLength: 2, maxTextLength: 50),
+      type: DriftSqlType.string,
+      requiredDuringInsert: true);
+  static const VerificationMeta _titleMeta = const VerificationMeta('title');
+  @override
+  late final GeneratedColumn<String> title = GeneratedColumn<String>(
+      'title', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _descriptionMeta =
+      const VerificationMeta('description');
+  @override
+  late final GeneratedColumn<String> description = GeneratedColumn<String>(
+      'description', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _beforeJsonMeta =
+      const VerificationMeta('beforeJson');
+  @override
+  late final GeneratedColumn<String> beforeJson = GeneratedColumn<String>(
+      'before_json', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _afterJsonMeta =
+      const VerificationMeta('afterJson');
+  @override
+  late final GeneratedColumn<String> afterJson = GeneratedColumn<String>(
+      'after_json', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _metadataJsonMeta =
+      const VerificationMeta('metadataJson');
+  @override
+  late final GeneratedColumn<String> metadataJson = GeneratedColumn<String>(
+      'metadata_json', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _routeContextMeta =
+      const VerificationMeta('routeContext');
+  @override
+  late final GeneratedColumn<String> routeContext = GeneratedColumn<String>(
+      'route_context', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _deviceInfoMeta =
+      const VerificationMeta('deviceInfo');
+  @override
+  late final GeneratedColumn<String> deviceInfo = GeneratedColumn<String>(
+      'device_info', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _ipAddressMeta =
+      const VerificationMeta('ipAddress');
+  @override
+  late final GeneratedColumn<String> ipAddress = GeneratedColumn<String>(
+      'ip_address', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  @override
+  List<GeneratedColumn> get $columns => [
+        id,
+        createdAt,
+        activityType,
+        category,
+        severity,
+        userId,
+        usernameSnapshot,
+        roleSnapshot,
+        sessionId,
+        entityType,
+        entityId,
+        action,
+        title,
+        description,
+        beforeJson,
+        afterJson,
+        metadataJson,
+        routeContext,
+        deviceInfo,
+        ipAddress
+      ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'activity_logs';
+  @override
+  VerificationContext validateIntegrity(Insertable<ActivityLog> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(_createdAtMeta,
+          createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
+    }
+    if (data.containsKey('activity_type')) {
+      context.handle(
+          _activityTypeMeta,
+          activityType.isAcceptableOrUnknown(
+              data['activity_type']!, _activityTypeMeta));
+    } else if (isInserting) {
+      context.missing(_activityTypeMeta);
+    }
+    if (data.containsKey('category')) {
+      context.handle(_categoryMeta,
+          category.isAcceptableOrUnknown(data['category']!, _categoryMeta));
+    } else if (isInserting) {
+      context.missing(_categoryMeta);
+    }
+    if (data.containsKey('severity')) {
+      context.handle(_severityMeta,
+          severity.isAcceptableOrUnknown(data['severity']!, _severityMeta));
+    } else if (isInserting) {
+      context.missing(_severityMeta);
+    }
+    if (data.containsKey('user_id')) {
+      context.handle(_userIdMeta,
+          userId.isAcceptableOrUnknown(data['user_id']!, _userIdMeta));
+    }
+    if (data.containsKey('username_snapshot')) {
+      context.handle(
+          _usernameSnapshotMeta,
+          usernameSnapshot.isAcceptableOrUnknown(
+              data['username_snapshot']!, _usernameSnapshotMeta));
+    }
+    if (data.containsKey('role_snapshot')) {
+      context.handle(
+          _roleSnapshotMeta,
+          roleSnapshot.isAcceptableOrUnknown(
+              data['role_snapshot']!, _roleSnapshotMeta));
+    }
+    if (data.containsKey('session_id')) {
+      context.handle(_sessionIdMeta,
+          sessionId.isAcceptableOrUnknown(data['session_id']!, _sessionIdMeta));
+    }
+    if (data.containsKey('entity_type')) {
+      context.handle(
+          _entityTypeMeta,
+          entityType.isAcceptableOrUnknown(
+              data['entity_type']!, _entityTypeMeta));
+    }
+    if (data.containsKey('entity_id')) {
+      context.handle(_entityIdMeta,
+          entityId.isAcceptableOrUnknown(data['entity_id']!, _entityIdMeta));
+    }
+    if (data.containsKey('action')) {
+      context.handle(_actionMeta,
+          action.isAcceptableOrUnknown(data['action']!, _actionMeta));
+    } else if (isInserting) {
+      context.missing(_actionMeta);
+    }
+    if (data.containsKey('title')) {
+      context.handle(
+          _titleMeta, title.isAcceptableOrUnknown(data['title']!, _titleMeta));
+    } else if (isInserting) {
+      context.missing(_titleMeta);
+    }
+    if (data.containsKey('description')) {
+      context.handle(
+          _descriptionMeta,
+          description.isAcceptableOrUnknown(
+              data['description']!, _descriptionMeta));
+    }
+    if (data.containsKey('before_json')) {
+      context.handle(
+          _beforeJsonMeta,
+          beforeJson.isAcceptableOrUnknown(
+              data['before_json']!, _beforeJsonMeta));
+    }
+    if (data.containsKey('after_json')) {
+      context.handle(_afterJsonMeta,
+          afterJson.isAcceptableOrUnknown(data['after_json']!, _afterJsonMeta));
+    }
+    if (data.containsKey('metadata_json')) {
+      context.handle(
+          _metadataJsonMeta,
+          metadataJson.isAcceptableOrUnknown(
+              data['metadata_json']!, _metadataJsonMeta));
+    }
+    if (data.containsKey('route_context')) {
+      context.handle(
+          _routeContextMeta,
+          routeContext.isAcceptableOrUnknown(
+              data['route_context']!, _routeContextMeta));
+    }
+    if (data.containsKey('device_info')) {
+      context.handle(
+          _deviceInfoMeta,
+          deviceInfo.isAcceptableOrUnknown(
+              data['device_info']!, _deviceInfoMeta));
+    }
+    if (data.containsKey('ip_address')) {
+      context.handle(_ipAddressMeta,
+          ipAddress.isAcceptableOrUnknown(data['ip_address']!, _ipAddressMeta));
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  ActivityLog map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ActivityLog(
+      id: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}id'])!,
+      createdAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
+      activityType: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}activity_type'])!,
+      category: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}category'])!,
+      severity: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}severity'])!,
+      userId: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}user_id']),
+      usernameSnapshot: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}username_snapshot']),
+      roleSnapshot: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}role_snapshot']),
+      sessionId: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}session_id']),
+      entityType: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}entity_type']),
+      entityId: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}entity_id']),
+      action: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}action'])!,
+      title: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}title'])!,
+      description: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}description']),
+      beforeJson: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}before_json']),
+      afterJson: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}after_json']),
+      metadataJson: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}metadata_json']),
+      routeContext: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}route_context']),
+      deviceInfo: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}device_info']),
+      ipAddress: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}ip_address']),
+    );
+  }
+
+  @override
+  $ActivityLogsTable createAlias(String alias) {
+    return $ActivityLogsTable(attachedDatabase, alias);
+  }
+}
+
+class ActivityLog extends DataClass implements Insertable<ActivityLog> {
+  final int id;
+  final DateTime createdAt;
+  final String activityType;
+  final String category;
+  final String severity;
+  final int? userId;
+  final String? usernameSnapshot;
+  final String? roleSnapshot;
+  final int? sessionId;
+  final String? entityType;
+  final int? entityId;
+  final String action;
+  final String title;
+  final String? description;
+  final String? beforeJson;
+  final String? afterJson;
+  final String? metadataJson;
+  final String? routeContext;
+  final String? deviceInfo;
+  final String? ipAddress;
+  const ActivityLog(
+      {required this.id,
+      required this.createdAt,
+      required this.activityType,
+      required this.category,
+      required this.severity,
+      this.userId,
+      this.usernameSnapshot,
+      this.roleSnapshot,
+      this.sessionId,
+      this.entityType,
+      this.entityId,
+      required this.action,
+      required this.title,
+      this.description,
+      this.beforeJson,
+      this.afterJson,
+      this.metadataJson,
+      this.routeContext,
+      this.deviceInfo,
+      this.ipAddress});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['activity_type'] = Variable<String>(activityType);
+    map['category'] = Variable<String>(category);
+    map['severity'] = Variable<String>(severity);
+    if (!nullToAbsent || userId != null) {
+      map['user_id'] = Variable<int>(userId);
+    }
+    if (!nullToAbsent || usernameSnapshot != null) {
+      map['username_snapshot'] = Variable<String>(usernameSnapshot);
+    }
+    if (!nullToAbsent || roleSnapshot != null) {
+      map['role_snapshot'] = Variable<String>(roleSnapshot);
+    }
+    if (!nullToAbsent || sessionId != null) {
+      map['session_id'] = Variable<int>(sessionId);
+    }
+    if (!nullToAbsent || entityType != null) {
+      map['entity_type'] = Variable<String>(entityType);
+    }
+    if (!nullToAbsent || entityId != null) {
+      map['entity_id'] = Variable<int>(entityId);
+    }
+    map['action'] = Variable<String>(action);
+    map['title'] = Variable<String>(title);
+    if (!nullToAbsent || description != null) {
+      map['description'] = Variable<String>(description);
+    }
+    if (!nullToAbsent || beforeJson != null) {
+      map['before_json'] = Variable<String>(beforeJson);
+    }
+    if (!nullToAbsent || afterJson != null) {
+      map['after_json'] = Variable<String>(afterJson);
+    }
+    if (!nullToAbsent || metadataJson != null) {
+      map['metadata_json'] = Variable<String>(metadataJson);
+    }
+    if (!nullToAbsent || routeContext != null) {
+      map['route_context'] = Variable<String>(routeContext);
+    }
+    if (!nullToAbsent || deviceInfo != null) {
+      map['device_info'] = Variable<String>(deviceInfo);
+    }
+    if (!nullToAbsent || ipAddress != null) {
+      map['ip_address'] = Variable<String>(ipAddress);
+    }
+    return map;
+  }
+
+  ActivityLogsCompanion toCompanion(bool nullToAbsent) {
+    return ActivityLogsCompanion(
+      id: Value(id),
+      createdAt: Value(createdAt),
+      activityType: Value(activityType),
+      category: Value(category),
+      severity: Value(severity),
+      userId:
+          userId == null && nullToAbsent ? const Value.absent() : Value(userId),
+      usernameSnapshot: usernameSnapshot == null && nullToAbsent
+          ? const Value.absent()
+          : Value(usernameSnapshot),
+      roleSnapshot: roleSnapshot == null && nullToAbsent
+          ? const Value.absent()
+          : Value(roleSnapshot),
+      sessionId: sessionId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(sessionId),
+      entityType: entityType == null && nullToAbsent
+          ? const Value.absent()
+          : Value(entityType),
+      entityId: entityId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(entityId),
+      action: Value(action),
+      title: Value(title),
+      description: description == null && nullToAbsent
+          ? const Value.absent()
+          : Value(description),
+      beforeJson: beforeJson == null && nullToAbsent
+          ? const Value.absent()
+          : Value(beforeJson),
+      afterJson: afterJson == null && nullToAbsent
+          ? const Value.absent()
+          : Value(afterJson),
+      metadataJson: metadataJson == null && nullToAbsent
+          ? const Value.absent()
+          : Value(metadataJson),
+      routeContext: routeContext == null && nullToAbsent
+          ? const Value.absent()
+          : Value(routeContext),
+      deviceInfo: deviceInfo == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deviceInfo),
+      ipAddress: ipAddress == null && nullToAbsent
+          ? const Value.absent()
+          : Value(ipAddress),
+    );
+  }
+
+  factory ActivityLog.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ActivityLog(
+      id: serializer.fromJson<int>(json['id']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      activityType: serializer.fromJson<String>(json['activityType']),
+      category: serializer.fromJson<String>(json['category']),
+      severity: serializer.fromJson<String>(json['severity']),
+      userId: serializer.fromJson<int?>(json['userId']),
+      usernameSnapshot: serializer.fromJson<String?>(json['usernameSnapshot']),
+      roleSnapshot: serializer.fromJson<String?>(json['roleSnapshot']),
+      sessionId: serializer.fromJson<int?>(json['sessionId']),
+      entityType: serializer.fromJson<String?>(json['entityType']),
+      entityId: serializer.fromJson<int?>(json['entityId']),
+      action: serializer.fromJson<String>(json['action']),
+      title: serializer.fromJson<String>(json['title']),
+      description: serializer.fromJson<String?>(json['description']),
+      beforeJson: serializer.fromJson<String?>(json['beforeJson']),
+      afterJson: serializer.fromJson<String?>(json['afterJson']),
+      metadataJson: serializer.fromJson<String?>(json['metadataJson']),
+      routeContext: serializer.fromJson<String?>(json['routeContext']),
+      deviceInfo: serializer.fromJson<String?>(json['deviceInfo']),
+      ipAddress: serializer.fromJson<String?>(json['ipAddress']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'activityType': serializer.toJson<String>(activityType),
+      'category': serializer.toJson<String>(category),
+      'severity': serializer.toJson<String>(severity),
+      'userId': serializer.toJson<int?>(userId),
+      'usernameSnapshot': serializer.toJson<String?>(usernameSnapshot),
+      'roleSnapshot': serializer.toJson<String?>(roleSnapshot),
+      'sessionId': serializer.toJson<int?>(sessionId),
+      'entityType': serializer.toJson<String?>(entityType),
+      'entityId': serializer.toJson<int?>(entityId),
+      'action': serializer.toJson<String>(action),
+      'title': serializer.toJson<String>(title),
+      'description': serializer.toJson<String?>(description),
+      'beforeJson': serializer.toJson<String?>(beforeJson),
+      'afterJson': serializer.toJson<String?>(afterJson),
+      'metadataJson': serializer.toJson<String?>(metadataJson),
+      'routeContext': serializer.toJson<String?>(routeContext),
+      'deviceInfo': serializer.toJson<String?>(deviceInfo),
+      'ipAddress': serializer.toJson<String?>(ipAddress),
+    };
+  }
+
+  ActivityLog copyWith(
+          {int? id,
+          DateTime? createdAt,
+          String? activityType,
+          String? category,
+          String? severity,
+          Value<int?> userId = const Value.absent(),
+          Value<String?> usernameSnapshot = const Value.absent(),
+          Value<String?> roleSnapshot = const Value.absent(),
+          Value<int?> sessionId = const Value.absent(),
+          Value<String?> entityType = const Value.absent(),
+          Value<int?> entityId = const Value.absent(),
+          String? action,
+          String? title,
+          Value<String?> description = const Value.absent(),
+          Value<String?> beforeJson = const Value.absent(),
+          Value<String?> afterJson = const Value.absent(),
+          Value<String?> metadataJson = const Value.absent(),
+          Value<String?> routeContext = const Value.absent(),
+          Value<String?> deviceInfo = const Value.absent(),
+          Value<String?> ipAddress = const Value.absent()}) =>
+      ActivityLog(
+        id: id ?? this.id,
+        createdAt: createdAt ?? this.createdAt,
+        activityType: activityType ?? this.activityType,
+        category: category ?? this.category,
+        severity: severity ?? this.severity,
+        userId: userId.present ? userId.value : this.userId,
+        usernameSnapshot: usernameSnapshot.present
+            ? usernameSnapshot.value
+            : this.usernameSnapshot,
+        roleSnapshot:
+            roleSnapshot.present ? roleSnapshot.value : this.roleSnapshot,
+        sessionId: sessionId.present ? sessionId.value : this.sessionId,
+        entityType: entityType.present ? entityType.value : this.entityType,
+        entityId: entityId.present ? entityId.value : this.entityId,
+        action: action ?? this.action,
+        title: title ?? this.title,
+        description: description.present ? description.value : this.description,
+        beforeJson: beforeJson.present ? beforeJson.value : this.beforeJson,
+        afterJson: afterJson.present ? afterJson.value : this.afterJson,
+        metadataJson:
+            metadataJson.present ? metadataJson.value : this.metadataJson,
+        routeContext:
+            routeContext.present ? routeContext.value : this.routeContext,
+        deviceInfo: deviceInfo.present ? deviceInfo.value : this.deviceInfo,
+        ipAddress: ipAddress.present ? ipAddress.value : this.ipAddress,
+      );
+  ActivityLog copyWithCompanion(ActivityLogsCompanion data) {
+    return ActivityLog(
+      id: data.id.present ? data.id.value : this.id,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      activityType: data.activityType.present
+          ? data.activityType.value
+          : this.activityType,
+      category: data.category.present ? data.category.value : this.category,
+      severity: data.severity.present ? data.severity.value : this.severity,
+      userId: data.userId.present ? data.userId.value : this.userId,
+      usernameSnapshot: data.usernameSnapshot.present
+          ? data.usernameSnapshot.value
+          : this.usernameSnapshot,
+      roleSnapshot: data.roleSnapshot.present
+          ? data.roleSnapshot.value
+          : this.roleSnapshot,
+      sessionId: data.sessionId.present ? data.sessionId.value : this.sessionId,
+      entityType:
+          data.entityType.present ? data.entityType.value : this.entityType,
+      entityId: data.entityId.present ? data.entityId.value : this.entityId,
+      action: data.action.present ? data.action.value : this.action,
+      title: data.title.present ? data.title.value : this.title,
+      description:
+          data.description.present ? data.description.value : this.description,
+      beforeJson:
+          data.beforeJson.present ? data.beforeJson.value : this.beforeJson,
+      afterJson: data.afterJson.present ? data.afterJson.value : this.afterJson,
+      metadataJson: data.metadataJson.present
+          ? data.metadataJson.value
+          : this.metadataJson,
+      routeContext: data.routeContext.present
+          ? data.routeContext.value
+          : this.routeContext,
+      deviceInfo:
+          data.deviceInfo.present ? data.deviceInfo.value : this.deviceInfo,
+      ipAddress: data.ipAddress.present ? data.ipAddress.value : this.ipAddress,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ActivityLog(')
+          ..write('id: $id, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('activityType: $activityType, ')
+          ..write('category: $category, ')
+          ..write('severity: $severity, ')
+          ..write('userId: $userId, ')
+          ..write('usernameSnapshot: $usernameSnapshot, ')
+          ..write('roleSnapshot: $roleSnapshot, ')
+          ..write('sessionId: $sessionId, ')
+          ..write('entityType: $entityType, ')
+          ..write('entityId: $entityId, ')
+          ..write('action: $action, ')
+          ..write('title: $title, ')
+          ..write('description: $description, ')
+          ..write('beforeJson: $beforeJson, ')
+          ..write('afterJson: $afterJson, ')
+          ..write('metadataJson: $metadataJson, ')
+          ..write('routeContext: $routeContext, ')
+          ..write('deviceInfo: $deviceInfo, ')
+          ..write('ipAddress: $ipAddress')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+      id,
+      createdAt,
+      activityType,
+      category,
+      severity,
+      userId,
+      usernameSnapshot,
+      roleSnapshot,
+      sessionId,
+      entityType,
+      entityId,
+      action,
+      title,
+      description,
+      beforeJson,
+      afterJson,
+      metadataJson,
+      routeContext,
+      deviceInfo,
+      ipAddress);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ActivityLog &&
+          other.id == this.id &&
+          other.createdAt == this.createdAt &&
+          other.activityType == this.activityType &&
+          other.category == this.category &&
+          other.severity == this.severity &&
+          other.userId == this.userId &&
+          other.usernameSnapshot == this.usernameSnapshot &&
+          other.roleSnapshot == this.roleSnapshot &&
+          other.sessionId == this.sessionId &&
+          other.entityType == this.entityType &&
+          other.entityId == this.entityId &&
+          other.action == this.action &&
+          other.title == this.title &&
+          other.description == this.description &&
+          other.beforeJson == this.beforeJson &&
+          other.afterJson == this.afterJson &&
+          other.metadataJson == this.metadataJson &&
+          other.routeContext == this.routeContext &&
+          other.deviceInfo == this.deviceInfo &&
+          other.ipAddress == this.ipAddress);
+}
+
+class ActivityLogsCompanion extends UpdateCompanion<ActivityLog> {
+  final Value<int> id;
+  final Value<DateTime> createdAt;
+  final Value<String> activityType;
+  final Value<String> category;
+  final Value<String> severity;
+  final Value<int?> userId;
+  final Value<String?> usernameSnapshot;
+  final Value<String?> roleSnapshot;
+  final Value<int?> sessionId;
+  final Value<String?> entityType;
+  final Value<int?> entityId;
+  final Value<String> action;
+  final Value<String> title;
+  final Value<String?> description;
+  final Value<String?> beforeJson;
+  final Value<String?> afterJson;
+  final Value<String?> metadataJson;
+  final Value<String?> routeContext;
+  final Value<String?> deviceInfo;
+  final Value<String?> ipAddress;
+  const ActivityLogsCompanion({
+    this.id = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.activityType = const Value.absent(),
+    this.category = const Value.absent(),
+    this.severity = const Value.absent(),
+    this.userId = const Value.absent(),
+    this.usernameSnapshot = const Value.absent(),
+    this.roleSnapshot = const Value.absent(),
+    this.sessionId = const Value.absent(),
+    this.entityType = const Value.absent(),
+    this.entityId = const Value.absent(),
+    this.action = const Value.absent(),
+    this.title = const Value.absent(),
+    this.description = const Value.absent(),
+    this.beforeJson = const Value.absent(),
+    this.afterJson = const Value.absent(),
+    this.metadataJson = const Value.absent(),
+    this.routeContext = const Value.absent(),
+    this.deviceInfo = const Value.absent(),
+    this.ipAddress = const Value.absent(),
+  });
+  ActivityLogsCompanion.insert({
+    this.id = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    required String activityType,
+    required String category,
+    required String severity,
+    this.userId = const Value.absent(),
+    this.usernameSnapshot = const Value.absent(),
+    this.roleSnapshot = const Value.absent(),
+    this.sessionId = const Value.absent(),
+    this.entityType = const Value.absent(),
+    this.entityId = const Value.absent(),
+    required String action,
+    required String title,
+    this.description = const Value.absent(),
+    this.beforeJson = const Value.absent(),
+    this.afterJson = const Value.absent(),
+    this.metadataJson = const Value.absent(),
+    this.routeContext = const Value.absent(),
+    this.deviceInfo = const Value.absent(),
+    this.ipAddress = const Value.absent(),
+  })  : activityType = Value(activityType),
+        category = Value(category),
+        severity = Value(severity),
+        action = Value(action),
+        title = Value(title);
+  static Insertable<ActivityLog> custom({
+    Expression<int>? id,
+    Expression<DateTime>? createdAt,
+    Expression<String>? activityType,
+    Expression<String>? category,
+    Expression<String>? severity,
+    Expression<int>? userId,
+    Expression<String>? usernameSnapshot,
+    Expression<String>? roleSnapshot,
+    Expression<int>? sessionId,
+    Expression<String>? entityType,
+    Expression<int>? entityId,
+    Expression<String>? action,
+    Expression<String>? title,
+    Expression<String>? description,
+    Expression<String>? beforeJson,
+    Expression<String>? afterJson,
+    Expression<String>? metadataJson,
+    Expression<String>? routeContext,
+    Expression<String>? deviceInfo,
+    Expression<String>? ipAddress,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (createdAt != null) 'created_at': createdAt,
+      if (activityType != null) 'activity_type': activityType,
+      if (category != null) 'category': category,
+      if (severity != null) 'severity': severity,
+      if (userId != null) 'user_id': userId,
+      if (usernameSnapshot != null) 'username_snapshot': usernameSnapshot,
+      if (roleSnapshot != null) 'role_snapshot': roleSnapshot,
+      if (sessionId != null) 'session_id': sessionId,
+      if (entityType != null) 'entity_type': entityType,
+      if (entityId != null) 'entity_id': entityId,
+      if (action != null) 'action': action,
+      if (title != null) 'title': title,
+      if (description != null) 'description': description,
+      if (beforeJson != null) 'before_json': beforeJson,
+      if (afterJson != null) 'after_json': afterJson,
+      if (metadataJson != null) 'metadata_json': metadataJson,
+      if (routeContext != null) 'route_context': routeContext,
+      if (deviceInfo != null) 'device_info': deviceInfo,
+      if (ipAddress != null) 'ip_address': ipAddress,
+    });
+  }
+
+  ActivityLogsCompanion copyWith(
+      {Value<int>? id,
+      Value<DateTime>? createdAt,
+      Value<String>? activityType,
+      Value<String>? category,
+      Value<String>? severity,
+      Value<int?>? userId,
+      Value<String?>? usernameSnapshot,
+      Value<String?>? roleSnapshot,
+      Value<int?>? sessionId,
+      Value<String?>? entityType,
+      Value<int?>? entityId,
+      Value<String>? action,
+      Value<String>? title,
+      Value<String?>? description,
+      Value<String?>? beforeJson,
+      Value<String?>? afterJson,
+      Value<String?>? metadataJson,
+      Value<String?>? routeContext,
+      Value<String?>? deviceInfo,
+      Value<String?>? ipAddress}) {
+    return ActivityLogsCompanion(
+      id: id ?? this.id,
+      createdAt: createdAt ?? this.createdAt,
+      activityType: activityType ?? this.activityType,
+      category: category ?? this.category,
+      severity: severity ?? this.severity,
+      userId: userId ?? this.userId,
+      usernameSnapshot: usernameSnapshot ?? this.usernameSnapshot,
+      roleSnapshot: roleSnapshot ?? this.roleSnapshot,
+      sessionId: sessionId ?? this.sessionId,
+      entityType: entityType ?? this.entityType,
+      entityId: entityId ?? this.entityId,
+      action: action ?? this.action,
+      title: title ?? this.title,
+      description: description ?? this.description,
+      beforeJson: beforeJson ?? this.beforeJson,
+      afterJson: afterJson ?? this.afterJson,
+      metadataJson: metadataJson ?? this.metadataJson,
+      routeContext: routeContext ?? this.routeContext,
+      deviceInfo: deviceInfo ?? this.deviceInfo,
+      ipAddress: ipAddress ?? this.ipAddress,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (activityType.present) {
+      map['activity_type'] = Variable<String>(activityType.value);
+    }
+    if (category.present) {
+      map['category'] = Variable<String>(category.value);
+    }
+    if (severity.present) {
+      map['severity'] = Variable<String>(severity.value);
+    }
+    if (userId.present) {
+      map['user_id'] = Variable<int>(userId.value);
+    }
+    if (usernameSnapshot.present) {
+      map['username_snapshot'] = Variable<String>(usernameSnapshot.value);
+    }
+    if (roleSnapshot.present) {
+      map['role_snapshot'] = Variable<String>(roleSnapshot.value);
+    }
+    if (sessionId.present) {
+      map['session_id'] = Variable<int>(sessionId.value);
+    }
+    if (entityType.present) {
+      map['entity_type'] = Variable<String>(entityType.value);
+    }
+    if (entityId.present) {
+      map['entity_id'] = Variable<int>(entityId.value);
+    }
+    if (action.present) {
+      map['action'] = Variable<String>(action.value);
+    }
+    if (title.present) {
+      map['title'] = Variable<String>(title.value);
+    }
+    if (description.present) {
+      map['description'] = Variable<String>(description.value);
+    }
+    if (beforeJson.present) {
+      map['before_json'] = Variable<String>(beforeJson.value);
+    }
+    if (afterJson.present) {
+      map['after_json'] = Variable<String>(afterJson.value);
+    }
+    if (metadataJson.present) {
+      map['metadata_json'] = Variable<String>(metadataJson.value);
+    }
+    if (routeContext.present) {
+      map['route_context'] = Variable<String>(routeContext.value);
+    }
+    if (deviceInfo.present) {
+      map['device_info'] = Variable<String>(deviceInfo.value);
+    }
+    if (ipAddress.present) {
+      map['ip_address'] = Variable<String>(ipAddress.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ActivityLogsCompanion(')
+          ..write('id: $id, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('activityType: $activityType, ')
+          ..write('category: $category, ')
+          ..write('severity: $severity, ')
+          ..write('userId: $userId, ')
+          ..write('usernameSnapshot: $usernameSnapshot, ')
+          ..write('roleSnapshot: $roleSnapshot, ')
+          ..write('sessionId: $sessionId, ')
+          ..write('entityType: $entityType, ')
+          ..write('entityId: $entityId, ')
+          ..write('action: $action, ')
+          ..write('title: $title, ')
+          ..write('description: $description, ')
+          ..write('beforeJson: $beforeJson, ')
+          ..write('afterJson: $afterJson, ')
+          ..write('metadataJson: $metadataJson, ')
+          ..write('routeContext: $routeContext, ')
+          ..write('deviceInfo: $deviceInfo, ')
+          ..write('ipAddress: $ipAddress')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -15086,6 +16087,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       $SaleItemReturnsTable(this);
   late final $ReturnAuditLogsTable returnAuditLogs =
       $ReturnAuditLogsTable(this);
+  late final $ActivityLogsTable activityLogs = $ActivityLogsTable(this);
   late final UsersDao usersDao = UsersDao(this as AppDatabase);
   late final CategoriesDao categoriesDao = CategoriesDao(this as AppDatabase);
   late final SuppliersDao suppliersDao = SuppliersDao(this as AppDatabase);
@@ -15108,6 +16110,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       SaleItemReturnsDao(this as AppDatabase);
   late final ReturnAuditLogsDao returnAuditLogsDao =
       ReturnAuditLogsDao(this as AppDatabase);
+  late final ActivityLogsDao activityLogsDao =
+      ActivityLogsDao(this as AppDatabase);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -15145,7 +16149,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         notificationsTable,
         stockMovements,
         saleItemReturns,
-        returnAuditLogs
+        returnAuditLogs,
+        activityLogs
       ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules(
@@ -24127,12 +25132,14 @@ typedef $$RolesTableCreateCompanionBuilder = RolesCompanion Function({
   required String roleName,
   Value<String?> description,
   Value<bool> isSystem,
+  Value<String?> systemKey,
 });
 typedef $$RolesTableUpdateCompanionBuilder = RolesCompanion Function({
   Value<int> id,
   Value<String> roleName,
   Value<String?> description,
   Value<bool> isSystem,
+  Value<String?> systemKey,
 });
 
 class $$RolesTableFilterComposer extends Composer<_$AppDatabase, $RolesTable> {
@@ -24154,6 +25161,9 @@ class $$RolesTableFilterComposer extends Composer<_$AppDatabase, $RolesTable> {
 
   ColumnFilters<bool> get isSystem => $composableBuilder(
       column: $table.isSystem, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get systemKey => $composableBuilder(
+      column: $table.systemKey, builder: (column) => ColumnFilters(column));
 }
 
 class $$RolesTableOrderingComposer
@@ -24176,6 +25186,9 @@ class $$RolesTableOrderingComposer
 
   ColumnOrderings<bool> get isSystem => $composableBuilder(
       column: $table.isSystem, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get systemKey => $composableBuilder(
+      column: $table.systemKey, builder: (column) => ColumnOrderings(column));
 }
 
 class $$RolesTableAnnotationComposer
@@ -24198,6 +25211,9 @@ class $$RolesTableAnnotationComposer
 
   GeneratedColumn<bool> get isSystem =>
       $composableBuilder(column: $table.isSystem, builder: (column) => column);
+
+  GeneratedColumn<String> get systemKey =>
+      $composableBuilder(column: $table.systemKey, builder: (column) => column);
 }
 
 class $$RolesTableTableManager extends RootTableManager<
@@ -24227,24 +25243,28 @@ class $$RolesTableTableManager extends RootTableManager<
             Value<String> roleName = const Value.absent(),
             Value<String?> description = const Value.absent(),
             Value<bool> isSystem = const Value.absent(),
+            Value<String?> systemKey = const Value.absent(),
           }) =>
               RolesCompanion(
             id: id,
             roleName: roleName,
             description: description,
             isSystem: isSystem,
+            systemKey: systemKey,
           ),
           createCompanionCallback: ({
             Value<int> id = const Value.absent(),
             required String roleName,
             Value<String?> description = const Value.absent(),
             Value<bool> isSystem = const Value.absent(),
+            Value<String?> systemKey = const Value.absent(),
           }) =>
               RolesCompanion.insert(
             id: id,
             roleName: roleName,
             description: description,
             isSystem: isSystem,
+            systemKey: systemKey,
           ),
           withReferenceMapper: (p0) => p0
               .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
@@ -27756,6 +28776,404 @@ typedef $$ReturnAuditLogsTableProcessedTableManager = ProcessedTableManager<
     ),
     ReturnAuditLog,
     PrefetchHooks Function()>;
+typedef $$ActivityLogsTableCreateCompanionBuilder = ActivityLogsCompanion
+    Function({
+  Value<int> id,
+  Value<DateTime> createdAt,
+  required String activityType,
+  required String category,
+  required String severity,
+  Value<int?> userId,
+  Value<String?> usernameSnapshot,
+  Value<String?> roleSnapshot,
+  Value<int?> sessionId,
+  Value<String?> entityType,
+  Value<int?> entityId,
+  required String action,
+  required String title,
+  Value<String?> description,
+  Value<String?> beforeJson,
+  Value<String?> afterJson,
+  Value<String?> metadataJson,
+  Value<String?> routeContext,
+  Value<String?> deviceInfo,
+  Value<String?> ipAddress,
+});
+typedef $$ActivityLogsTableUpdateCompanionBuilder = ActivityLogsCompanion
+    Function({
+  Value<int> id,
+  Value<DateTime> createdAt,
+  Value<String> activityType,
+  Value<String> category,
+  Value<String> severity,
+  Value<int?> userId,
+  Value<String?> usernameSnapshot,
+  Value<String?> roleSnapshot,
+  Value<int?> sessionId,
+  Value<String?> entityType,
+  Value<int?> entityId,
+  Value<String> action,
+  Value<String> title,
+  Value<String?> description,
+  Value<String?> beforeJson,
+  Value<String?> afterJson,
+  Value<String?> metadataJson,
+  Value<String?> routeContext,
+  Value<String?> deviceInfo,
+  Value<String?> ipAddress,
+});
+
+class $$ActivityLogsTableFilterComposer
+    extends Composer<_$AppDatabase, $ActivityLogsTable> {
+  $$ActivityLogsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get activityType => $composableBuilder(
+      column: $table.activityType, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get category => $composableBuilder(
+      column: $table.category, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get severity => $composableBuilder(
+      column: $table.severity, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get userId => $composableBuilder(
+      column: $table.userId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get usernameSnapshot => $composableBuilder(
+      column: $table.usernameSnapshot,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get roleSnapshot => $composableBuilder(
+      column: $table.roleSnapshot, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get sessionId => $composableBuilder(
+      column: $table.sessionId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get entityType => $composableBuilder(
+      column: $table.entityType, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get entityId => $composableBuilder(
+      column: $table.entityId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get action => $composableBuilder(
+      column: $table.action, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get title => $composableBuilder(
+      column: $table.title, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get description => $composableBuilder(
+      column: $table.description, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get beforeJson => $composableBuilder(
+      column: $table.beforeJson, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get afterJson => $composableBuilder(
+      column: $table.afterJson, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get metadataJson => $composableBuilder(
+      column: $table.metadataJson, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get routeContext => $composableBuilder(
+      column: $table.routeContext, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get deviceInfo => $composableBuilder(
+      column: $table.deviceInfo, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get ipAddress => $composableBuilder(
+      column: $table.ipAddress, builder: (column) => ColumnFilters(column));
+}
+
+class $$ActivityLogsTableOrderingComposer
+    extends Composer<_$AppDatabase, $ActivityLogsTable> {
+  $$ActivityLogsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get activityType => $composableBuilder(
+      column: $table.activityType,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get category => $composableBuilder(
+      column: $table.category, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get severity => $composableBuilder(
+      column: $table.severity, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get userId => $composableBuilder(
+      column: $table.userId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get usernameSnapshot => $composableBuilder(
+      column: $table.usernameSnapshot,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get roleSnapshot => $composableBuilder(
+      column: $table.roleSnapshot,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get sessionId => $composableBuilder(
+      column: $table.sessionId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get entityType => $composableBuilder(
+      column: $table.entityType, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get entityId => $composableBuilder(
+      column: $table.entityId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get action => $composableBuilder(
+      column: $table.action, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get title => $composableBuilder(
+      column: $table.title, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get description => $composableBuilder(
+      column: $table.description, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get beforeJson => $composableBuilder(
+      column: $table.beforeJson, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get afterJson => $composableBuilder(
+      column: $table.afterJson, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get metadataJson => $composableBuilder(
+      column: $table.metadataJson,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get routeContext => $composableBuilder(
+      column: $table.routeContext,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get deviceInfo => $composableBuilder(
+      column: $table.deviceInfo, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get ipAddress => $composableBuilder(
+      column: $table.ipAddress, builder: (column) => ColumnOrderings(column));
+}
+
+class $$ActivityLogsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $ActivityLogsTable> {
+  $$ActivityLogsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<String> get activityType => $composableBuilder(
+      column: $table.activityType, builder: (column) => column);
+
+  GeneratedColumn<String> get category =>
+      $composableBuilder(column: $table.category, builder: (column) => column);
+
+  GeneratedColumn<String> get severity =>
+      $composableBuilder(column: $table.severity, builder: (column) => column);
+
+  GeneratedColumn<int> get userId =>
+      $composableBuilder(column: $table.userId, builder: (column) => column);
+
+  GeneratedColumn<String> get usernameSnapshot => $composableBuilder(
+      column: $table.usernameSnapshot, builder: (column) => column);
+
+  GeneratedColumn<String> get roleSnapshot => $composableBuilder(
+      column: $table.roleSnapshot, builder: (column) => column);
+
+  GeneratedColumn<int> get sessionId =>
+      $composableBuilder(column: $table.sessionId, builder: (column) => column);
+
+  GeneratedColumn<String> get entityType => $composableBuilder(
+      column: $table.entityType, builder: (column) => column);
+
+  GeneratedColumn<int> get entityId =>
+      $composableBuilder(column: $table.entityId, builder: (column) => column);
+
+  GeneratedColumn<String> get action =>
+      $composableBuilder(column: $table.action, builder: (column) => column);
+
+  GeneratedColumn<String> get title =>
+      $composableBuilder(column: $table.title, builder: (column) => column);
+
+  GeneratedColumn<String> get description => $composableBuilder(
+      column: $table.description, builder: (column) => column);
+
+  GeneratedColumn<String> get beforeJson => $composableBuilder(
+      column: $table.beforeJson, builder: (column) => column);
+
+  GeneratedColumn<String> get afterJson =>
+      $composableBuilder(column: $table.afterJson, builder: (column) => column);
+
+  GeneratedColumn<String> get metadataJson => $composableBuilder(
+      column: $table.metadataJson, builder: (column) => column);
+
+  GeneratedColumn<String> get routeContext => $composableBuilder(
+      column: $table.routeContext, builder: (column) => column);
+
+  GeneratedColumn<String> get deviceInfo => $composableBuilder(
+      column: $table.deviceInfo, builder: (column) => column);
+
+  GeneratedColumn<String> get ipAddress =>
+      $composableBuilder(column: $table.ipAddress, builder: (column) => column);
+}
+
+class $$ActivityLogsTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $ActivityLogsTable,
+    ActivityLog,
+    $$ActivityLogsTableFilterComposer,
+    $$ActivityLogsTableOrderingComposer,
+    $$ActivityLogsTableAnnotationComposer,
+    $$ActivityLogsTableCreateCompanionBuilder,
+    $$ActivityLogsTableUpdateCompanionBuilder,
+    (
+      ActivityLog,
+      BaseReferences<_$AppDatabase, $ActivityLogsTable, ActivityLog>
+    ),
+    ActivityLog,
+    PrefetchHooks Function()> {
+  $$ActivityLogsTableTableManager(_$AppDatabase db, $ActivityLogsTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$ActivityLogsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$ActivityLogsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$ActivityLogsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<int> id = const Value.absent(),
+            Value<DateTime> createdAt = const Value.absent(),
+            Value<String> activityType = const Value.absent(),
+            Value<String> category = const Value.absent(),
+            Value<String> severity = const Value.absent(),
+            Value<int?> userId = const Value.absent(),
+            Value<String?> usernameSnapshot = const Value.absent(),
+            Value<String?> roleSnapshot = const Value.absent(),
+            Value<int?> sessionId = const Value.absent(),
+            Value<String?> entityType = const Value.absent(),
+            Value<int?> entityId = const Value.absent(),
+            Value<String> action = const Value.absent(),
+            Value<String> title = const Value.absent(),
+            Value<String?> description = const Value.absent(),
+            Value<String?> beforeJson = const Value.absent(),
+            Value<String?> afterJson = const Value.absent(),
+            Value<String?> metadataJson = const Value.absent(),
+            Value<String?> routeContext = const Value.absent(),
+            Value<String?> deviceInfo = const Value.absent(),
+            Value<String?> ipAddress = const Value.absent(),
+          }) =>
+              ActivityLogsCompanion(
+            id: id,
+            createdAt: createdAt,
+            activityType: activityType,
+            category: category,
+            severity: severity,
+            userId: userId,
+            usernameSnapshot: usernameSnapshot,
+            roleSnapshot: roleSnapshot,
+            sessionId: sessionId,
+            entityType: entityType,
+            entityId: entityId,
+            action: action,
+            title: title,
+            description: description,
+            beforeJson: beforeJson,
+            afterJson: afterJson,
+            metadataJson: metadataJson,
+            routeContext: routeContext,
+            deviceInfo: deviceInfo,
+            ipAddress: ipAddress,
+          ),
+          createCompanionCallback: ({
+            Value<int> id = const Value.absent(),
+            Value<DateTime> createdAt = const Value.absent(),
+            required String activityType,
+            required String category,
+            required String severity,
+            Value<int?> userId = const Value.absent(),
+            Value<String?> usernameSnapshot = const Value.absent(),
+            Value<String?> roleSnapshot = const Value.absent(),
+            Value<int?> sessionId = const Value.absent(),
+            Value<String?> entityType = const Value.absent(),
+            Value<int?> entityId = const Value.absent(),
+            required String action,
+            required String title,
+            Value<String?> description = const Value.absent(),
+            Value<String?> beforeJson = const Value.absent(),
+            Value<String?> afterJson = const Value.absent(),
+            Value<String?> metadataJson = const Value.absent(),
+            Value<String?> routeContext = const Value.absent(),
+            Value<String?> deviceInfo = const Value.absent(),
+            Value<String?> ipAddress = const Value.absent(),
+          }) =>
+              ActivityLogsCompanion.insert(
+            id: id,
+            createdAt: createdAt,
+            activityType: activityType,
+            category: category,
+            severity: severity,
+            userId: userId,
+            usernameSnapshot: usernameSnapshot,
+            roleSnapshot: roleSnapshot,
+            sessionId: sessionId,
+            entityType: entityType,
+            entityId: entityId,
+            action: action,
+            title: title,
+            description: description,
+            beforeJson: beforeJson,
+            afterJson: afterJson,
+            metadataJson: metadataJson,
+            routeContext: routeContext,
+            deviceInfo: deviceInfo,
+            ipAddress: ipAddress,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$ActivityLogsTableProcessedTableManager = ProcessedTableManager<
+    _$AppDatabase,
+    $ActivityLogsTable,
+    ActivityLog,
+    $$ActivityLogsTableFilterComposer,
+    $$ActivityLogsTableOrderingComposer,
+    $$ActivityLogsTableAnnotationComposer,
+    $$ActivityLogsTableCreateCompanionBuilder,
+    $$ActivityLogsTableUpdateCompanionBuilder,
+    (
+      ActivityLog,
+      BaseReferences<_$AppDatabase, $ActivityLogsTable, ActivityLog>
+    ),
+    ActivityLog,
+    PrefetchHooks Function()>;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -27826,4 +29244,6 @@ class $AppDatabaseManager {
       $$SaleItemReturnsTableTableManager(_db, _db.saleItemReturns);
   $$ReturnAuditLogsTableTableManager get returnAuditLogs =>
       $$ReturnAuditLogsTableTableManager(_db, _db.returnAuditLogs);
+  $$ActivityLogsTableTableManager get activityLogs =>
+      $$ActivityLogsTableTableManager(_db, _db.activityLogs);
 }

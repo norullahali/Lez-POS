@@ -9,6 +9,9 @@ import '../../auth/permissions/permission_keys.dart';
 import '../../auth/permissions/role_identity.dart';
 import '../../auth/utils/permission_actions.dart';
 import '../providers/users_provider.dart';
+import '../../../core/activity/activity_categories.dart';
+import '../../../core/activity/activity_types.dart';
+import '../../activity/providers/activity_context_provider.dart';
 
 class UserFormDialog extends ConsumerStatefulWidget {
   final User? user;
@@ -93,6 +96,14 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
           pinCode: drift.Value(_pinCodeCtrl.text.trim().isEmpty ? null : _pinCodeCtrl.text.trim()),
         );
         await usersNotifier.updateUser(updated);
+        await ref.read(activityLoggerProvider).logEntityUpdate(
+          activityType: ActivityTypes.userUpdated,
+          category: ActivityCategories.users,
+          entityType: 'user',
+          entityId: updated.id,
+          title: 'تعديل مستخدم',
+          description: updated.username,
+        );
       } else {
         if (_passwordCtrl.text.isEmpty) {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
@@ -110,6 +121,17 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
           refundLimit: drift.Value(double.tryParse(_refundLimitCtrl.text.trim()) ?? 0.0),
           pinCode: drift.Value(_pinCodeCtrl.text.trim().isEmpty ? null : _pinCodeCtrl.text.trim()),
         ));
+        final created = await AppDatabase.instance.usersDao.getUserByUsername(_usernameCtrl.text.trim());
+        if (created != null) {
+          await ref.read(activityLoggerProvider).logEntityCreate(
+            activityType: ActivityTypes.userCreated,
+            category: ActivityCategories.users,
+            entityType: 'user',
+            entityId: created.id,
+            title: 'إنشاء مستخدم',
+            description: created.username,
+          );
+        }
       }
       if (mounted) Navigator.pop(context);
     } catch (e) {

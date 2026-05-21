@@ -7,6 +7,9 @@ import '../../../core/database/app_database.dart';
 import '../../auth/permissions/permission_keys.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../auth/providers/permission_provider.dart';
+import '../../../core/activity/activity_categories.dart';
+import '../../../core/activity/activity_types.dart';
+import '../../../core/services/activity_logger_service.dart';
 
 // --- State Model ---
 class BackupSettings {
@@ -115,17 +118,22 @@ class BackupSettingsNotifier extends AsyncNotifier<BackupSettings> {
       throw Exception('عذراً، ليس لديك صلاحية أخذ نسخة احتياطية.');
     }
 
-    final authState = ref.read(authProvider).valueOrNull;
     final file = await BackupService.performBackup(isAuto: false);
 
-    // 3. Log Action
+    await ActivityLoggerService(AppDatabase.instance).logInfo(
+      activityType: ActivityTypes.backupCreated,
+      category: ActivityCategories.backup,
+      action: 'create',
+      title: 'نسخ احتياطي يدوي',
+      metadata: {'path': file.path},
+    );
+
     await AppDatabase.instance.logsDao.insertLog(
-      userId: authState?.user?.id,
+      userId: ref.read(authProvider).valueOrNull?.user?.id,
       actionType: 'backup_created',
       details: 'تم إنشاء نسخة احتياطية يدوياً: ${file.path}',
     );
-    
-    // Refresh log stream
+
     ref.invalidate(recentLogsProvider);
   }
 

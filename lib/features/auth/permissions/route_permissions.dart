@@ -1,10 +1,6 @@
 // lib/features/auth/permissions/route_permissions.dart
-//
-// Maps application routes to required permission keys.
 import 'permission_keys.dart';
 
-/// Returns the permission required for [location], or null if any
-/// authenticated user may access the route.
 String? permissionForRoute(String location) {
   final normalized = location.split('?').first;
 
@@ -46,6 +42,8 @@ const _routePermissionEntries = [
   _RoutePermission('/reports', PermissionKeys.reportsView),
   _RoutePermission('/return-analytics', PermissionKeys.reportsView),
   _RoutePermission('/invoice-history', PermissionKeys.reportsView),
+  _RoutePermission('/activity', PermissionKeys.auditView),
+  _RoutePermission('/activity/timeline', PermissionKeys.auditView),
   _RoutePermission('/users', PermissionKeys.usersManage),
   _RoutePermission('/roles', PermissionKeys.usersManage),
   _RoutePermission('/backup', PermissionKeys.settingsEdit),

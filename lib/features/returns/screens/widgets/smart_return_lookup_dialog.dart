@@ -10,6 +10,9 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../invoices/widgets/invoice_details_dialog.dart';
 import '../../models/smart_return_result.dart';
 import '../../providers/smart_return_lookup_provider.dart';
+import '../../../../core/activity/activity_categories.dart';
+import '../../../../core/activity/activity_types.dart';
+import '../../../activity/providers/activity_context_provider.dart';
 
 // ---------------------------------------------------------------------------
 // Entry point
@@ -76,7 +79,14 @@ class _SmartReturnLookupDialogState
   }
 
   void _openInvoice(BuildContext context, int invoiceId) {
-    // Open the existing partial-return-capable dialog
+    ref.read(activityLoggerProvider).logInfo(
+      activityType: ActivityTypes.returnSmartLookup,
+      category: ActivityCategories.returns,
+      action: 'lookup_open',
+      title: 'فتح فاتورة من البحث الذكي',
+      entityType: 'invoice',
+      entityId: invoiceId,
+    );
     showDialog<void>(
       context: context,
       barrierDismissible: false,

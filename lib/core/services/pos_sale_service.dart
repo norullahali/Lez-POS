@@ -5,6 +5,9 @@ import '../constants/movement_types.dart';
 import '../services/settings_service.dart';
 import '../services/stock_guard.dart';
 import '../../features/loyalty/services/loyalty_service.dart';
+import '../activity/activity_categories.dart';
+import '../activity/activity_types.dart';
+import 'activity_logger_service.dart';
 
 /// Service to handle POS sales and returns orchestration.
 class PosSaleService {
@@ -57,6 +60,19 @@ class PosSaleService {
 
         // 1. Insert SalesInvoice record
         final invoiceId = await db.into(db.salesInvoices).insert(invoice);
+
+        await ActivityLoggerService(db).logInfo(
+          activityType: ActivityTypes.invoiceCreated,
+          category: ActivityCategories.sales,
+          action: 'create',
+          title: 'إنشاء فاتورة',
+          entityType: 'invoice',
+          entityId: invoiceId,
+          metadata: {
+            'invoiceNumber': invoice.invoiceNumber.value,
+            'total': invoice.total.value,
+          },
+        );
 
         // 2. Process items using batch for performance
         await db.batch((batch) {

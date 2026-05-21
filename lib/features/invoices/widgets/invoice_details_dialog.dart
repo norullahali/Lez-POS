@@ -6,6 +6,9 @@ import 'package:intl/intl.dart' hide TextDirection;
 import '../../../core/constants/invoice_lifecycle.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/services/partial_return_service.dart';
+import '../../../core/activity/activity_categories.dart';
+import '../../../core/activity/activity_types.dart';
+import '../../activity/providers/activity_context_provider.dart';
 import '../../../core/services/receipt_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../auth/providers/auth_provider.dart';
@@ -76,6 +79,15 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
         returnedByName: meta?.returnedByName,
       );
       if (!context.mounted) return;
+      await ref.read(activityLoggerProvider).logInfo(
+        activityType: ActivityTypes.invoiceReprinted,
+        category: ActivityCategories.sales,
+        action: 'reprint',
+        title: 'إعادة طباعة فاتورة',
+        entityType: 'invoice',
+        entityId: widget.invoiceId,
+        metadata: {'invoiceNumber': data.header.invoiceNumber},
+      );
       messenger?.showSnackBar(
         const SnackBar(content: Text('تم إرسال الفاتورة للطباعة')),
       );
@@ -116,6 +128,15 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
     final userId = authState?.user?.id;
     if (userId == null) {
       if (!context.mounted) return;
+      await ref.read(activityLoggerProvider).logWarning(
+        activityType: ActivityTypes.returnFull,
+        category: ActivityCategories.returns,
+        action: 'full_return',
+        title: 'إرجاع كامل لفاتورة',
+        entityType: 'invoice',
+        entityId: widget.invoiceId,
+        metadata: {'note': note},
+      );
       ScaffoldMessenger.maybeOf(context)?.showSnackBar(
         const SnackBar(
           content: Text('تعذر التحقق من هوية المستخدم. الرجاء تسجيل الدخول مجدداً.'),

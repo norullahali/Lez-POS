@@ -8,6 +8,9 @@ import '../../auth/permissions/permission_keys.dart';
 import '../../auth/utils/permission_actions.dart';
 import '../../products/providers/products_provider.dart';
 import '../providers/inventory_provider.dart';
+import '../../../core/activity/activity_categories.dart';
+import '../../../core/activity/activity_types.dart';
+import '../../activity/providers/activity_context_provider.dart';
 
 class InventoryScreen extends ConsumerStatefulWidget {
   const InventoryScreen({super.key});
@@ -138,6 +141,20 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> with SingleTi
           quantityChange: isAddition ? qty : -qty,
           adjustmentType: adjustmentType,
           reason: reasonCtrl.text.trim(),
+        );
+        await ref.read(activityLoggerProvider).logWarning(
+          activityType: ActivityTypes.stockAdjusted,
+          category: ActivityCategories.inventory,
+          action: 'adjust',
+          title: 'تسوية مخزون',
+          entityType: 'product',
+          entityId: productId,
+          metadata: {
+            'productName': productName,
+            'quantityChange': isAddition ? qty : -qty,
+            'adjustmentType': adjustmentType,
+            'reason': reasonCtrl.text.trim(),
+          },
         );
         if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تمت التسوية بنجاح'), backgroundColor: AppColors.success));
       } finally {

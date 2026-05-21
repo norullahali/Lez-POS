@@ -5,6 +5,9 @@ import '../../../core/database/app_database.dart';
 import '../../pos/providers/pos_products_provider.dart';
 import '../models/product_model.dart';
 import '../repositories/products_repository.dart';
+import '../../../core/activity/activity_categories.dart';
+import '../../../core/activity/activity_types.dart';
+import '../../../core/services/activity_logger_service.dart';
 
 final productsRepositoryProvider = Provider<ProductsRepository>((ref) {
   return ProductsRepository(AppDatabase.instance);
@@ -36,10 +39,21 @@ class ProductsNotifier extends AsyncNotifier<List<ProductModel>> {
   Future<void> add(ProductModel model) async {
     await ref.read(productsRepositoryProvider).add(model);
     ref.invalidateSelf();
-    // Re-fetch the newly added product from DB so it gets the generated ID
+    ProductModel? newProd;
     if (model.barcode.isNotEmpty) {
-      final newProd = await ref.read(productsRepositoryProvider).findByBarcode(model.barcode);
+      newProd = await ref.read(productsRepositoryProvider).findByBarcode(model.barcode);
       if (newProd != null) ref.read(posProductsProvider.notifier).syncProduct(newProd);
+    }
+    newProd ??= await ref.read(productsRepositoryProvider).findByBarcode(model.barcode);
+    if (newProd?.id != null) {
+      await ActivityLoggerService(AppDatabase.instance).logEntityCreate(
+        activityType: ActivityTypes.productCreated,
+        category: ActivityCategories.inventory,
+        entityType: 'product',
+        entityId: newProd!.id!,
+        title: 'إضافة منتج',
+        description: newProd.name,
+      );
     }
   }
 
@@ -47,6 +61,16 @@ class ProductsNotifier extends AsyncNotifier<List<ProductModel>> {
     await ref.read(productsRepositoryProvider).update(model);
     ref.invalidateSelf();
     ref.read(posProductsProvider.notifier).syncProduct(model);
+    if (model.id != null) {
+      await ActivityLoggerService(AppDatabase.instance).logEntityUpdate(
+        activityType: ActivityTypes.productUpdated,
+        category: ActivityCategories.inventory,
+        entityType: 'product',
+        entityId: model.id!,
+        title: 'تعديل منتج',
+        description: model.name,
+      );
+    }
   }
 
   Future<void> toggle(int id, bool isActive) async {
@@ -58,6 +82,14 @@ class ProductsNotifier extends AsyncNotifier<List<ProductModel>> {
       final p = await ref.read(productsRepositoryProvider).getProductById(id);
       if (p != null) ref.read(posProductsProvider.notifier).syncProduct(p);
     }
+    await ActivityLoggerService(AppDatabase.instance).logEntityUpdate(
+      activityType: ActivityTypes.productToggled,
+      category: ActivityCategories.inventory,
+      entityType: 'product',
+      entityId: id,
+      title: 'تعديل حالة منتج',
+      after: {'isActive': isActive},
+    );
   }
 
   Future<void> search(String query) async {

@@ -15,6 +15,9 @@ import '../../../features/pos/models/invoice_models.dart';
 import '../../auth/permissions/permission_keys.dart';
 import '../../auth/utils/permission_actions.dart';
 import '../widgets/invoice_live_preview.dart';
+import '../../../core/activity/activity_categories.dart';
+import '../../../core/activity/activity_types.dart';
+import '../../activity/providers/activity_context_provider.dart';
 
 class InvoiceSettingsScreen extends ConsumerStatefulWidget {
   const InvoiceSettingsScreen({super.key});
@@ -164,6 +167,13 @@ class _InvoiceSettingsScreenState extends ConsumerState<InvoiceSettingsScreen> {
       printerPort:       int.tryParse(_printerPortCtrl.text.trim()) ?? 9100,
       bluetoothDeviceId: _btDeviceIdCtrl.text.trim().isEmpty  ? null : _btDeviceIdCtrl.text.trim(),
     ));
+
+    await ref.read(activityLoggerProvider).logInfo(
+      activityType: ActivityTypes.settingsUpdated,
+      category: ActivityCategories.settings,
+      action: 'update',
+      title: 'تحديث إعدادات الفاتورة',
+    );
 
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(

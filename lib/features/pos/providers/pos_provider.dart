@@ -10,6 +10,9 @@ import '../../products/models/product_model.dart';
 import '../../pricing/services/pricing_engine.dart';
 import '../../pricing/providers/pricing_provider.dart';
 import '../../../core/services/pos_sale_service.dart';
+import '../../../core/activity/activity_categories.dart';
+import '../../../core/activity/activity_types.dart';
+import '../../../core/services/activity_logger_service.dart';
 
 import 'package:drift/drift.dart' show Value;
 import '../../../core/services/invoice_number_service.dart';
@@ -35,6 +38,16 @@ class PosSessionNotifier extends AsyncNotifier<PosSession?> {
         .read(posRepositoryProvider)
         .openSession(cashierName, openingCash, userId);
     ref.invalidateSelf();
+    final session = ref.read(posSessionProvider).valueOrNull;
+    await ActivityLoggerService(AppDatabase.instance).logInfo(
+      activityType: ActivityTypes.sessionOpened,
+      category: ActivityCategories.sessions,
+      action: 'open',
+      title: 'فتح جلسة نقطة البيع',
+      entityType: 'pos_session',
+      entityId: session?.id,
+      metadata: {'cashierName': cashierName, 'openingCash': openingCash},
+    );
   }
 
   /// Closes the active session.
@@ -65,6 +78,19 @@ class PosSessionNotifier extends AsyncNotifier<PosSession?> {
           notes: notes,
         );
     ref.invalidateSelf();
+    await ActivityLoggerService(AppDatabase.instance).logInfo(
+      activityType: ActivityTypes.sessionClosed,
+      category: ActivityCategories.sessions,
+      action: 'close',
+      title: 'إغلاق جلسة نقطة البيع',
+      entityType: 'pos_session',
+      entityId: session.id,
+      metadata: {
+        'closingCash': closingCash,
+        'expectedCash': expectedCash,
+        'difference': difference,
+      },
+    );
     return {
       ...summary,
       'expectedCash': expectedCash,

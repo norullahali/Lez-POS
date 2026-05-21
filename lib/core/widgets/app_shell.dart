@@ -1,10 +1,12 @@
 // lib/core/widgets/app_shell.dart
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../features/activity/providers/activity_context_provider.dart';
 import '../theme/app_colors.dart';
 import 'side_nav.dart';
 import 'package:go_router/go_router.dart';
 
-class AppShell extends StatelessWidget {
+class AppShell extends ConsumerWidget {
   final Widget child;
   final String currentRoute;
   final String? title;
@@ -13,7 +15,8 @@ class AppShell extends StatelessWidget {
       {super.key, required this.child, required this.currentRoute, this.title});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    ref.watch(activityContextSyncProvider);
     debugPrint('CURRENT ROUTE: $currentRoute');
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -62,6 +65,8 @@ class _TopBar extends StatelessWidget {
       '/users': 'إدارة المستخدمين',
       '/roles': 'الأدوار والصلاحيات',
       '/backup': 'النسخ الاحتياطي',
+      '/activity': 'سجل النشاط',
+      '/activity/timeline': 'الجدول الزمني',
     };
     return titles[route] ?? 'Lez POS';
   }

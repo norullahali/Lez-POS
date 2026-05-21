@@ -4,6 +4,10 @@ import 'package:flutter/foundation.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/database/app_database.dart';
+import '../../../core/activity/activity_categories.dart';
+import '../../../core/activity/activity_context.dart';
+import '../../../core/activity/activity_types.dart';
+import '../../../core/services/activity_logger_service.dart';
 import '../permissions/permission_rules.dart';
 import '../permissions/role_identity.dart';
 
@@ -43,11 +47,20 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
 
   Future<void> login(String username, String password) async {
     state = const AsyncLoading();
+    final logger = ActivityLoggerService(_db);
     state = await AsyncValue.guard(() async {
       debugPrint('[AuthNotifier] login: attempting for user "$username"...');
       final user = await _db.usersDao.getUserByUsername(username);
       if (user == null || !user.isActive) {
         debugPrint('[AuthNotifier] login: user not found or inactive.');
+        await logger.logWarning(
+          activityType: ActivityTypes.loginFailed,
+          category: ActivityCategories.auth,
+          action: 'login',
+          title: 'فشل تسجيل الدخول',
+          description: 'مستخدم غير موجود أو غير مفعّل',
+          contextOverride: ActivityContextSnapshot(username: username),
+        );
         throw Exception('المستخدم غير موجود أو غير مفعل');
       }
 
@@ -55,6 +68,14 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
       debugPrint('[AuthNotifier] login: checking password hash...');
       if (user.passwordHash != hashedPassword) {
         debugPrint('[AuthNotifier] login: incorrect password. stored=${user.passwordHash}, provided=$hashedPassword');
+        await logger.logWarning(
+          activityType: ActivityTypes.loginFailed,
+          category: ActivityCategories.auth,
+          action: 'login',
+          title: 'فشل تسجيل الدخول',
+          description: 'كلمة مرور غير صحيحة',
+          contextOverride: ActivityContextSnapshot(username: username),
+        );
         throw Exception('كلمة المرور غير صحيحة');
       }
 
@@ -62,6 +83,26 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
       // Fetch user's permissions
       final perms = await _db.usersDao.getRolePermissionsKeys(user.roleId);
       debugPrint('[AuthNotifier] login: permissions loaded: $perms');
+
+      String? roleName;
+      try {
+        final role = await _db.usersDao.getRoleById(user.roleId);
+        roleName = role?.roleName;
+      } catch (_) {}
+      ActivityContextHolder.update(ActivityContextSnapshot(
+        userId: user.id,
+        username: user.username,
+        roleName: roleName,
+      ));
+      await logger.logInfo(
+        activityType: ActivityTypes.loginSuccess,
+        category: ActivityCategories.auth,
+        action: 'login',
+        title: 'تسجيل دخول ناجح',
+        description: user.username,
+        entityType: 'user',
+        entityId: user.id,
+      );
 
       return AuthState(user: user, permissions: perms);
     });
@@ -73,6 +114,18 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
 
   void logout() {
     debugPrint('[AuthNotifier] logout.');
+    final user = state.valueOrNull?.user;
+    if (user != null) {
+      ActivityLoggerService(_db).logInfo(
+        activityType: ActivityTypes.logout,
+        category: ActivityCategories.auth,
+        action: 'logout',
+        title: 'تسجيل خروج',
+        description: user.username,
+        entityType: 'user',
+        entityId: user.id,
+      );
+    }
     state = const AsyncData(AuthState());
   }
 

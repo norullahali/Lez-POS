@@ -14,6 +14,9 @@ import 'package:drift/drift.dart' show Variable;
 import '../database/app_database.dart';
 import '../constants/invoice_lifecycle.dart';
 import '../constants/movement_types.dart';
+import '../activity/activity_categories.dart';
+import '../activity/activity_types.dart';
+import 'activity_logger_service.dart';
 
 // Describes one product line being partially returned.
 class PartialReturnLine {
@@ -196,6 +199,16 @@ class PartialReturnService {
       // 7. Recalculate and persist invoice status
       await _refreshInvoiceStatus(saleInvoiceId);
     });
+
+    await ActivityLoggerService(_db).logWarning(
+      activityType: ActivityTypes.returnPartial,
+      category: ActivityCategories.returns,
+      action: 'partial_return',
+      title: 'إرجاع جزئي لفاتورة',
+      entityType: 'invoice',
+      entityId: saleInvoiceId,
+      metadata: {'lines': lines.length, 'note': note},
+    );
   }
 
   // ---- Invoice status auto-update -----------------------------------------

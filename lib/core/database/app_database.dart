@@ -124,7 +124,7 @@ class AppDatabase extends _$AppDatabase {
   late final pricingDao = PricingDao(this);
 
   @override
-  int get schemaVersion => 25;
+  int get schemaVersion => 26;
 
   @override
   MigrationStrategy get migration {
@@ -638,6 +638,26 @@ class AppDatabase extends _$AppDatabase {
             debugPrint('[Migration v25] return_audit_logs skip: $e');
           }
         }
+
+        if (from < 26) {
+          debugPrint('[Migration] v26: adding roles.system_key column...');
+          try {
+            await m.addColumn(roles, roles.systemKey);
+            debugPrint('[Migration v26] roles.system_key column added');
+          } catch (e) {
+            debugPrint('[Migration v26] roles.system_key skip: $e');
+          }
+          try {
+            await customStatement(
+              "UPDATE roles SET system_key = 'owner' "
+              "WHERE role_name = 'المالك' AND is_system = 1 "
+              "AND (system_key IS NULL OR system_key = '')",
+            );
+            debugPrint('[Migration v26] owner system_key backfilled');
+          } catch (e) {
+            debugPrint('[Migration v26] owner system_key backfill skip: $e');
+          }
+        }
       },
       beforeOpen: (details) async {
         await customStatement('PRAGMA foreign_keys = ON');
@@ -669,7 +689,7 @@ class AppDatabase extends _$AppDatabase {
       // 1. Insert Default Roles
       try {
         await customStatement(
-          "INSERT OR IGNORE INTO roles (id, role_name, description, is_system) VALUES (1, 'المالك', 'صلاحيات كاملة على النظام', 1)",
+          "INSERT OR IGNORE INTO roles (id, role_name, description, is_system, system_key) VALUES (1, 'المالك', 'صلاحيات كاملة على النظام', 1, 'owner')",
         );
       } catch (e) {
         debugPrint('[Seed] roles error: $e');
@@ -700,6 +720,15 @@ class AppDatabase extends _$AppDatabase {
       try {
         await customStatement(
           "UPDATE roles SET is_system = 1 WHERE id IN (1, 2, 3, 4)",
+        );
+      } catch (_) {}
+
+      // Ensure owner role has stable system_key (idempotent for fresh + legacy seeds)
+      try {
+        await customStatement(
+          "UPDATE roles SET system_key = 'owner' "
+          "WHERE role_name = 'المالك' AND is_system = 1 "
+          "AND (system_key IS NULL OR system_key = '')",
         );
       } catch (_) {}
 

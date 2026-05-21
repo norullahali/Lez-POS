@@ -68,14 +68,47 @@ class UsersDao extends DatabaseAccessor<AppDatabase> with _$UsersDaoMixin {
 
   Future<List<Permission>> getAllPermissions() => select(permissions).get();
 
-  Future<Role?> getSystemOwnerRole() => (select(roles)
-        ..where(
-          (r) =>
-              r.roleName.equals(SystemRoles.ownerRoleName) &
-              r.isSystem.equals(true),
-        )
-        ..limit(1))
-      .getSingleOrNull();
+  Future<Role?> getSystemOwnerRole() async {
+    final byKey = await (select(roles)
+          ..where((r) => r.systemKey.equals(SystemRoles.ownerKey))
+          ..limit(1))
+        .getSingleOrNull();
+    if (byKey != null) return byKey;
+
+    // Legacy fallback before startup sync completes (backward compatibility).
+    return (select(roles)
+          ..where(
+            (r) =>
+                r.roleName.equals(SystemRoles.ownerDisplayName) &
+                r.isSystem.equals(true),
+          )
+          ..limit(1))
+        .getSingleOrNull();
+  }
+
+  /// Returns true when a legacy owner role was updated with [SystemRoles.ownerKey].
+  Future<bool> ensureOwnerSystemKey() async {
+    final existingByKey = await (select(roles)
+          ..where((r) => r.systemKey.equals(SystemRoles.ownerKey))
+          ..limit(1))
+        .getSingleOrNull();
+    if (existingByKey != null) return false;
+
+    final legacyOwner = await (select(roles)
+          ..where(
+            (r) =>
+                r.roleName.equals(SystemRoles.ownerDisplayName) &
+                r.isSystem.equals(true),
+          )
+          ..limit(1))
+        .getSingleOrNull();
+    if (legacyOwner == null) return false;
+
+    await (update(roles)..where((r) => r.id.equals(legacyOwner.id))).write(
+      const RolesCompanion(systemKey: Value(SystemRoles.ownerKey)),
+    );
+    return true;
+  }
 
   Future<Permission?> getPermissionByKey(String key) => (select(permissions)
         ..where((p) => p.permissionKey.equals(key))

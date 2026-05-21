@@ -6,4 +6,5 @@ class Roles extends Table {
   TextColumn get roleName => text().withLength(min: 2, max: 50).unique()();
   TextColumn get description => text().nullable()();
   BoolColumn get isSystem => boolean().withDefault(const Constant(false))();
+  TextColumn get systemKey => text().nullable().withLength(min: 2, max: 50)();
 }

@@ -4,6 +4,7 @@ import '../tables/users_table.dart';
 import '../tables/roles_table.dart';
 import '../tables/permissions_table.dart';
 import '../tables/role_permissions_table.dart';
+import '../../../features/auth/permissions/system_roles.dart';
 
 part 'users_dao.g.dart';
 
@@ -66,4 +67,39 @@ class UsersDao extends DatabaseAccessor<AppDatabase> with _$UsersDaoMixin {
   }
 
   Future<List<Permission>> getAllPermissions() => select(permissions).get();
+
+  Future<Role?> getSystemOwnerRole() => (select(roles)
+        ..where(
+          (r) =>
+              r.roleName.equals(SystemRoles.ownerRoleName) &
+              r.isSystem.equals(true),
+        )
+        ..limit(1))
+      .getSingleOrNull();
+
+  Future<Permission?> getPermissionByKey(String key) => (select(permissions)
+        ..where((p) => p.permissionKey.equals(key))
+        ..limit(1))
+      .getSingleOrNull();
+
+  Future<int> insertPermission({
+    required String permissionKey,
+    required String description,
+  }) =>
+      into(permissions).insert(
+        PermissionsCompanion.insert(
+          permissionKey: permissionKey,
+          description: description,
+        ),
+      );
+
+  Future<void> grantPermissionToRole(int roleId, int permissionId) async {
+    await into(rolePermissions).insert(
+      RolePermissionsCompanion.insert(
+        roleId: roleId,
+        permissionId: permissionId,
+      ),
+      mode: InsertMode.insertOrIgnore,
+    );
+  }
 }

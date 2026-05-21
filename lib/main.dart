@@ -3,12 +3,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'app.dart';
+import 'core/bootstrap/app_bootstrap.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Set preferred window size for desktop
   await SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: []);
+
+  await AppBootstrap.initialize();
 
   runApp(
     const ProviderScope(

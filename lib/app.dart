@@ -75,6 +75,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: '/unauthorized',
             builder: (_, state) => UnauthorizedScreen(
               attemptedRoute: state.uri.queryParameters['from'],
+              requiredPermission: state.uri.queryParameters['permission'],
             ),
           ),
           GoRoute(

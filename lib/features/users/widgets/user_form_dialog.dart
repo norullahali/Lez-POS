@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../auth/permissions/permission_keys.dart';
+import '../../auth/permissions/role_identity.dart';
 import '../../auth/utils/permission_actions.dart';
 import '../providers/users_provider.dart';
 
@@ -63,8 +64,10 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
 
     final isEditing = widget.user != null;
 
-    // Prevent deactivating the last owner (roleId = 1)
-    if (isEditing && widget.user!.roleId == 1 && !_isActive) {
+    // Prevent deactivating owner accounts
+    if (isEditing &&
+        RoleIdentity.isOwnerRole(widget.user!.roleId) &&
+        !_isActive) {
       // In a real app we'd check if it's the LAST owner, but for safety, we just warn:
       // Actually per requirements: "Never allow the last Owner account to be deactivated."
       // Let's assume for now any owner deactivation is risky, or check if he is the only owner.

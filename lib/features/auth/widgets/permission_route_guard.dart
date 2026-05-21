@@ -26,6 +26,9 @@ class PermissionRouteGuard extends ConsumerWidget {
     if (required == null) return child;
     final allowed = ref.watch(permissionProvider(required));
     if (allowed) return child;
-    return UnauthorizedScreen(attemptedRoute: route);
+    return UnauthorizedScreen(
+      attemptedRoute: route,
+      requiredPermission: required,
+    );
   }
 }

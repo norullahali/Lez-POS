@@ -9,6 +9,8 @@ import '../../../core/activity/activity_severity.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/search_field.dart';
 import '../providers/activity_logs_provider.dart';
+import '../utils/activity_entity_navigation.dart';
+import '../widgets/activity_category_icon.dart';
 import '../widgets/activity_log_detail_dialog.dart';
 import '../widgets/activity_severity_chip.dart';
 
@@ -96,7 +98,8 @@ class _ActivityLogsScreenState extends ConsumerState<ActivityLogsScreen> {
                   SizedBox(
                     width: 200,
                     child: DropdownButtonFormField<String?>(
-                      value: filter.category,
+                      key: ValueKey('activity-filter-category-${filter.category}'),
+                      initialValue: filter.category,
                       decoration: const InputDecoration(
                         labelText: '\u0627\u0644\u0641\u0626\u0629',
                         border: OutlineInputBorder(),
@@ -120,7 +123,8 @@ class _ActivityLogsScreenState extends ConsumerState<ActivityLogsScreen> {
                   SizedBox(
                     width: 180,
                     child: DropdownButtonFormField<String?>(
-                      value: filter.severity,
+                      key: ValueKey('activity-filter-severity-${filter.severity}'),
+                      initialValue: filter.severity,
                       decoration: const InputDecoration(
                         labelText: '\u0627\u0644\u0623\u0647\u0645\u064a\u0629',
                         border: OutlineInputBorder(),
@@ -181,21 +185,43 @@ class _ActivityLogsScreenState extends ConsumerState<ActivityLogsScreen> {
                                 DataColumn(label: Text('\u0627\u0644\u0641\u0626\u0629')),
                                 DataColumn(label: Text('\u0627\u0644\u0623\u0647\u0645\u064a\u0629')),
                                 DataColumn(label: Text('\u0627\u0644\u0639\u0646\u0648\u0627\u0646')),
+                                DataColumn(label: Text('\u0627\u0644\u0643\u064a\u0627\u0646')),
                                 DataColumn(label: Text('\u0627\u0644\u0625\u062c\u0631\u0627\u0621')),
                               ],
                               rows: page.items.map((log) {
+                                final entityLabel = ActivityEntityNavigation.linkLabel(log);
                                 return DataRow(
                                   onSelectChanged: (_) => showActivityLogDetailDialog(context, log),
                                   cells: [
                                     DataCell(Text(_dateFormat.format(log.createdAt), style: const TextStyle(fontSize: 12))),
                                     DataCell(Text(log.usernameSnapshot ?? '\u2014')),
-                                    DataCell(Text(ActivityCategories.labelAr(log.category))),
-                                    DataCell(ActivitySeverityChip(severity: log.severity)),
+                                    DataCell(Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        ActivityCategoryIcon(category: log.category, size: 16),
+                                        const SizedBox(width: 6),
+                                        Text(ActivityCategories.labelAr(log.category), style: const TextStyle(fontSize: 12)),
+                                      ],
+                                    )),
+                                    DataCell(ActivitySeverityChip(severity: log.severity, showIcon: true)),
                                     DataCell(
                                       SizedBox(
-                                        width: 260,
+                                        width: 220,
                                         child: Text(log.title, overflow: TextOverflow.ellipsis, maxLines: 2),
                                       ),
+                                    ),
+                                    DataCell(
+                                      entityLabel == null
+                                          ? const Text('\u2014', style: TextStyle(color: AppColors.textHint))
+                                          : TextButton(
+                                              style: TextButton.styleFrom(
+                                                padding: EdgeInsets.zero,
+                                                minimumSize: Size.zero,
+                                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                              ),
+                                              onPressed: () => ActivityEntityNavigation.open(context, ref, log),
+                                              child: Text(entityLabel, style: const TextStyle(fontSize: 12)),
+                                            ),
                                     ),
                                     DataCell(Text(log.action)),
                                   ],

@@ -92,11 +92,10 @@ final activityLogsFilterProvider = StateProvider<ActivityLogsFilter>((ref) {
   return const ActivityLogsFilter();
 });
 
-final activityLogsPageProvider = FutureProvider<ActivityLogsPage>((ref) async {
+final activityLogsPageProvider = FutureProvider.autoDispose<ActivityLogsPage>((ref) async {
   final filter = ref.watch(activityLogsFilterProvider);
   final repo = ref.watch(activityLogsRepositoryProvider);
   final q = filter.toQuery();
-  final items = await repo.queryPage(q);
   final countQ = ActivityLogQuery(
     userId: q.userId,
     category: q.category,
@@ -108,6 +107,13 @@ final activityLogsPageProvider = FutureProvider<ActivityLogsPage>((ref) async {
     from: q.from,
     to: q.to,
   );
-  final total = await repo.count(countQ);
-  return ActivityLogsPage(items: items, total: total, filter: filter);
+  final results = await Future.wait([
+    repo.queryPage(q),
+    repo.count(countQ),
+  ]);
+  return ActivityLogsPage(
+    items: results[0] as List<ActivityLog>,
+    total: results[1] as int,
+    filter: filter,
+  );
 });

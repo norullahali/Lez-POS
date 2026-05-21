@@ -1,4 +1,5 @@
-// lib/core/activity/activity_categories.dart
+import 'package:flutter/material.dart';
+
 class ActivityCategories {
   ActivityCategories._();
 
@@ -35,5 +36,18 @@ class ActivityCategories {
         sessions => 'الجلسات',
         backup => 'النسخ الاحتياطي',
         _ => category,
+      };
+
+  static IconData iconFor(String category) => switch (category) {
+        auth => Icons.shield_outlined,
+        sales => Icons.point_of_sale_outlined,
+        returns => Icons.undo_rounded,
+        inventory => Icons.inventory_2_outlined,
+        users => Icons.people_outline_rounded,
+        settings => Icons.settings_outlined,
+        security => Icons.security_rounded,
+        sessions => Icons.schedule_rounded,
+        backup => Icons.backup_outlined,
+        _ => Icons.history_rounded,
       };
 }

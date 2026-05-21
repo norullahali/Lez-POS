@@ -205,7 +205,8 @@ final routerProvider = Provider<GoRouter>((ref) {
             builder: (_, __) => _guardRoute(
               '/return-analytics',
               const ReturnAnalyticsDashboardScreen(),
-
+            ),
+          ),
           GoRoute(
             path: '/activity',
             builder: (_, __) => _guardRoute('/activity', const ActivityLogsScreen()),
@@ -215,7 +216,6 @@ final routerProvider = Provider<GoRouter>((ref) {
                 builder: (_, __) => _guardRoute('/activity/timeline', const UserTimelineScreen()),
               ),
             ],
-          ),            ),
           ),
           GoRoute(
             path: '/invoice-history',

@@ -8,6 +8,7 @@ import '../../../core/activity/activity_categories.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../users/providers/users_provider.dart';
 import '../providers/activity_logs_provider.dart';
+import '../widgets/activity_category_icon.dart';
 import '../widgets/activity_log_detail_dialog.dart';
 import '../widgets/activity_severity_chip.dart';
 
@@ -49,7 +50,8 @@ class UserTimelineScreen extends ConsumerWidget {
             data: (users) {
               final activeUsers = users.where((u) => u.isActive).toList();
               return DropdownButtonFormField<int?>(
-                value: filter.userId,
+                key: ValueKey('activity-timeline-user-${filter.userId}'),
+                initialValue: filter.userId,
                 decoration: const InputDecoration(
                   labelText: '\u0627\u062e\u062a\u0631 \u0627\u0644\u0645\u0633\u062a\u062e\u062f\u0645',
                   border: OutlineInputBorder(),
@@ -103,10 +105,10 @@ class UserTimelineScreen extends ConsumerWidget {
                               onTap: () => showActivityLogDetailDialog(context, log),
                               leading: CircleAvatar(
                                 backgroundColor: AppColors.primarySurface,
-                                child: Icon(
-                                  Icons.history_rounded,
+                                child: ActivityCategoryIcon(
+                                  category: log.category,
+                                  size: 18,
                                   color: AppColors.primary,
-                                  size: 20,
                                 ),
                               ),
                               title: Text(log.title, style: const TextStyle(fontWeight: FontWeight.w600)),
@@ -114,7 +116,7 @@ class UserTimelineScreen extends ConsumerWidget {
                                 '${ActivityCategories.labelAr(log.category)} \u2022 ${log.action}\n${df.format(log.createdAt)}',
                               ),
                               isThreeLine: true,
-                              trailing: ActivitySeverityChip(severity: log.severity),
+                              trailing: ActivitySeverityChip(severity: log.severity, showIcon: true),
                             );
                           },
                         ),

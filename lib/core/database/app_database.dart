@@ -36,9 +36,11 @@ import 'tables/notifications_table.dart';
 import 'tables/stock_movements_table.dart';
 import 'tables/sale_item_returns_table.dart';
 import 'tables/return_audit_logs_table.dart';
+import 'tables/activity_logs_table.dart';
 import 'daos/stock_movements_dao.dart';
 import 'daos/sale_item_returns_dao.dart';
 import 'daos/return_audit_logs_dao.dart';
+import 'daos/activity_logs_dao.dart';
 import 'daos/users_dao.dart';
 import 'daos/categories_dao.dart';
 import 'daos/suppliers_dao.dart';
@@ -90,6 +92,7 @@ part 'app_database.g.dart';
     StockMovements,
     SaleItemReturns,
     ReturnAuditLogs,
+    ActivityLogs,
   ],
   daos: [
     UsersDao,
@@ -108,6 +111,7 @@ part 'app_database.g.dart';
     StockMovementsDao,
     SaleItemReturnsDao,
     ReturnAuditLogsDao,
+    ActivityLogsDao,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -124,7 +128,7 @@ class AppDatabase extends _$AppDatabase {
   late final pricingDao = PricingDao(this);
 
   @override
-  int get schemaVersion => 26;
+  int get schemaVersion => 27;
 
   @override
   MigrationStrategy get migration {
@@ -656,6 +660,16 @@ class AppDatabase extends _$AppDatabase {
             debugPrint('[Migration v26] owner system_key backfilled');
           } catch (e) {
             debugPrint('[Migration v26] owner system_key backfill skip: $e');
+          }
+        }
+
+        if (from < 27) {
+          debugPrint('[Migration] v27: creating activity_logs table...');
+          try {
+            await m.createTable(activityLogs);
+            debugPrint('[Migration v27] activity_logs table created');
+          } catch (e) {
+            debugPrint('[Migration v27] activity_logs skip: $e');
           }
         }
       },

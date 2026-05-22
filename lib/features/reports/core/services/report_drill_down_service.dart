@@ -5,6 +5,7 @@ import 'package:drift/drift.dart' show Variable;
 
 import '../../../../core/database/app_database.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../activity/providers/activity_logs_provider.dart';
 import '../../../auth/permissions/permission_keys.dart';
 import '../../../auth/providers/permission_provider.dart';
 import '../../../invoices/widgets/invoice_details_dialog.dart';
@@ -38,7 +39,32 @@ class ReportDrillDownService {
         await _openInvoice(context, target.id);
       case ReportDrillDownEntityType.invoiceHistory:
         context.push('/invoices');
+      case ReportDrillDownEntityType.user:
+        await _openUserTimeline(context, ref, target.id);
     }
+  }
+
+  static Future<void> _openUserTimeline(
+    BuildContext context,
+    WidgetRef ref,
+    int userId,
+  ) async {
+    final exists = await AppDatabase.instance.customSelect(
+      'SELECT id FROM users WHERE id = ?',
+      variables: [Variable.withInt(userId)],
+      readsFrom: {AppDatabase.instance.usersTable},
+    ).getSingleOrNull();
+
+    if (!context.mounted) return;
+    if (exists == null) {
+      _snack(context, 'المستخدم #$userId غير موجود.');
+      return;
+    }
+
+    ref.read(activityLogsFilterProvider.notifier).update(
+          (f) => f.copyWith(userId: userId, page: 0),
+        );
+    context.push('/activity/timeline');
   }
 
   static bool _canNavigate(WidgetRef ref, ReportDrillDownEntityType type) {
@@ -52,6 +78,8 @@ class ReportDrillDownService {
       ReportDrillDownEntityType.invoice ||
       ReportDrillDownEntityType.invoiceHistory =>
         ref.read(canViewReportsProvider),
+      ReportDrillDownEntityType.user =>
+        ref.read(permissionProvider(PermissionKeys.auditView)),
     };
   }
 

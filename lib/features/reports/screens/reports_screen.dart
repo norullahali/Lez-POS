@@ -24,6 +24,7 @@ import '../core/widgets/report_metric_grid.dart';
 import '../core/widgets/report_tab_keep_alive.dart';
 import '../core/widgets/report_table_widgets.dart';
 import '../providers/reports_provider.dart';
+import '../modules/shared/advanced_analytics_tabs.dart';
 import '../../suppliers/providers/supplier_accounts_provider.dart';
 
 class ReportsScreen extends ConsumerStatefulWidget {
@@ -43,8 +44,9 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> with SingleTicker
   @override
   void initState() {
     super.initState();
-    final initialIndex = ref.read(reportSessionProvider).activeTabIndex.clamp(0, 7);
-    _tabCtrl = TabController(length: 8, vsync: this, initialIndex: initialIndex);
+    final maxIndex = ReportTabId.values.length - 1;
+    final initialIndex = ref.read(reportSessionProvider).activeTabIndex.clamp(0, maxIndex);
+    _tabCtrl = TabController(length: ReportTabId.values.length, vsync: this, initialIndex: initialIndex);
     _tabCtrl.addListener(_syncTabToSession);
   }
 
@@ -83,6 +85,17 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> with SingleTicker
               Tab(icon: Icon(Icons.people_alt_rounded), text: 'أفضل العملاء'),
               Tab(icon: Icon(Icons.account_balance_wallet_rounded), text: 'الذمم المدينة'),
               Tab(icon: Icon(Icons.payment_rounded), text: 'الذمم الدائنة'),
+              Tab(icon: Icon(Icons.insights_rounded), text: 'تحليل الأرباح'),
+              Tab(icon: Icon(Icons.sync_alt_rounded), text: 'التدفق النقدي'),
+              Tab(icon: Icon(Icons.undo_rounded), text: 'أثر المرتجعات'),
+              Tab(icon: Icon(Icons.swap_vert_rounded), text: 'حركة المخزون'),
+              Tab(icon: Icon(Icons.receipt_long_rounded), text: 'تقارير الضريبة'),
+              Tab(icon: Icon(Icons.badge_rounded), text: 'أداء الموظفين'),
+              Tab(icon: Icon(Icons.grid_on_rounded), text: 'خريطة الساعات'),
+              Tab(icon: Icon(Icons.category_rounded), text: 'أداء التصنيفات'),
+              Tab(icon: Icon(Icons.speed_rounded), text: 'سرعة المنتجات'),
+              Tab(icon: Icon(Icons.dashboard_rounded), text: 'لوحة تنفيذية'),
+              Tab(icon: Icon(Icons.compare_arrows_rounded), text: 'تحليل مقارن'),
             ],
           ),
         ),
@@ -98,6 +111,17 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> with SingleTicker
               ReportTabKeepAlive(child: _TopCustomersTab(nfInt: _nfInt)),
               ReportTabKeepAlive(child: _DebtReportTab(nfInt: _nfInt)),
               ReportTabKeepAlive(child: _PayableReportTab(nfInt: _nfInt)),
+              ReportTabKeepAlive(child: ProfitAnalysisTab(nfInt: _nfInt)),
+              ReportTabKeepAlive(child: CashFlowTab(nfInt: _nfInt)),
+              ReportTabKeepAlive(child: ReturnImpactTab(nfInt: _nfInt)),
+              ReportTabKeepAlive(child: InventoryMovementTab(nfInt: _nfInt)),
+              ReportTabKeepAlive(child: TaxReportsTab(nfInt: _nfInt)),
+              ReportTabKeepAlive(child: EmployeePerformanceTab(nfInt: _nfInt)),
+              ReportTabKeepAlive(child: HourlyHeatmapTab(nfInt: _nfInt)),
+              ReportTabKeepAlive(child: CategoryPerformanceTab(nfInt: _nfInt)),
+              ReportTabKeepAlive(child: ProductVelocityTab(nfInt: _nfInt)),
+              ReportTabKeepAlive(child: ExecutiveDashboardTab(nfInt: _nfInt)),
+              ReportTabKeepAlive(child: ComparativeAnalyticsTab(nfInt: _nfInt)),
             ],
           ),
         ),

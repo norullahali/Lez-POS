@@ -14,6 +14,18 @@ final canViewAnalyticsProvider = Provider<bool>((ref) {
   return ref.watch(permissionProvider(PermissionKeys.analyticsView));
 });
 
+final canViewExecutiveAnalyticsProvider = Provider<bool>((ref) {
+  return ref.watch(permissionProvider(PermissionKeys.analyticsExecutive));
+});
+
+final canViewFinancialAnalyticsProvider = Provider<bool>((ref) {
+  return ref.watch(permissionProvider(PermissionKeys.analyticsFinancial));
+});
+
+final canViewInventoryAnalyticsProvider = Provider<bool>((ref) {
+  return ref.watch(permissionProvider(PermissionKeys.analyticsInventory));
+});
+
 final canViewProductsForReportsProvider = Provider<bool>((ref) {
   return ref.watch(permissionProvider(PermissionKeys.productsView));
 });

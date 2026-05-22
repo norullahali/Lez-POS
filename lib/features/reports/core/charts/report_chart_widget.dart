@@ -79,18 +79,9 @@ class _LineChartBody extends StatelessWidget {
       LineChartData(
         minY: 0,
         maxY: maxY * 1.15,
-        gridData: FlGridData(
-          show: true,
-          drawVerticalLine: false,
-          getDrawingHorizontalLine: (v) => FlLine(color: Colors.grey.withValues(alpha: 0.15)),
-        ),
-        titlesData: _axisTitles(
-          series.points.map((p) => p.label).toList(),
-          zeroBased: true,
-          yFormatter: config.yAxisFormatter,
-        ),
-        borderData: FlBorderData(show: false),
         lineTouchData: LineTouchData(
+          enabled: true,
+          handleBuiltInTouches: true,
           touchTooltipData: LineTouchTooltipData(
             getTooltipItems: (spots) => spots.map((s) {
               final i = s.x.toInt();
@@ -102,6 +93,17 @@ class _LineChartBody extends StatelessWidget {
             }).toList(),
           ),
         ),
+        gridData: FlGridData(
+          show: true,
+          drawVerticalLine: false,
+          getDrawingHorizontalLine: (v) => FlLine(color: Colors.grey.withValues(alpha: 0.15)),
+        ),
+        titlesData: _axisTitles(
+          series.points.map((p) => p.label).toList(),
+          zeroBased: true,
+          yFormatter: config.yAxisFormatter,
+        ),
+        borderData: FlBorderData(show: false),
         lineBarsData: [
           LineChartBarData(
             spots: spots,
@@ -116,6 +118,7 @@ class _LineChartBody extends StatelessWidget {
           ),
         ],
       ),
+      duration: config.animationDuration,
     );
   }
 
@@ -193,12 +196,20 @@ class _BarChartBody extends StatelessWidget {
   String _formatY(double value) => config.yAxisFormatter?.call(value) ?? value.toStringAsFixed(0);
 }
 
-class _PieChartBody extends StatelessWidget {
+class _PieChartBody extends StatefulWidget {
   const _PieChartBody({required this.config});
   final ReportChartConfig config;
 
   @override
+  State<_PieChartBody> createState() => _PieChartBodyState();
+}
+
+class _PieChartBodyState extends State<_PieChartBody> {
+  int? _touchedIndex;
+
+  @override
   Widget build(BuildContext context) {
+    final config = widget.config;
     final points = config.series.first.points;
     final total = points.fold<double>(0, (s, p) => s + p.value);
     if (total <= 0) {
@@ -214,21 +225,55 @@ class _PieChartBody extends StatelessWidget {
       AppColors.error,
     ];
 
-    return PieChart(
-      PieChartData(
-        sectionsSpace: 2,
-        centerSpaceRadius: 36,
-        sections: points.asMap().entries.map((e) {
-          final pct = (e.value.value / total) * 100;
-          return PieChartSectionData(
-            value: e.value.value,
-            title: '${pct.toStringAsFixed(0)}%',
-            radius: 56,
-            color: colors[e.key % colors.length],
-            titleStyle: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700),
-          );
-        }).toList(),
-      ),
+    return Column(
+      children: [
+        Expanded(
+          child: PieChart(
+            PieChartData(
+              sectionsSpace: 2,
+              centerSpaceRadius: 36,
+              pieTouchData: PieTouchData(
+                touchCallback: (event, response) {
+                  setState(() {
+                    if (!event.isInterestedForInteractions || response?.touchedSection == null) {
+                      _touchedIndex = null;
+                      return;
+                    }
+                    _touchedIndex = response!.touchedSection!.touchedSectionIndex;
+                    final idx = _touchedIndex!;
+                    if (idx >= 0 && idx < points.length) {
+                      config.onPointTap?.call(points[idx], config.series.first.id);
+                    }
+                  });
+                },
+              ),
+              sections: points.asMap().entries.map((e) {
+                final pct = (e.value.value / total) * 100;
+                final touched = e.key == _touchedIndex;
+                return PieChartSectionData(
+                  value: e.value.value,
+                  title: touched ? '${pct.toStringAsFixed(1)}%' : '${pct.toStringAsFixed(0)}%',
+                  radius: touched ? 62 : 56,
+                  color: colors[e.key % colors.length],
+                  titleStyle: TextStyle(
+                    color: Colors.white,
+                    fontSize: touched ? 12 : 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        ),
+        if (_touchedIndex != null && _touchedIndex! < points.length)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text(
+              '${points[_touchedIndex!].label}: ${config.yAxisFormatter?.call(points[_touchedIndex!].value) ?? points[_touchedIndex!].value.toStringAsFixed(0)}',
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+            ),
+          ),
+      ],
     );
   }
 }

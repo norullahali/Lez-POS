@@ -1,0 +1,31 @@
+/// Barrel exports for the reporting core infrastructure.
+library;
+
+export 'charts/report_chart_card.dart';
+export 'charts/report_chart_legend.dart';
+export 'charts/report_chart_widget.dart';
+export 'exports/report_export_models.dart';
+export 'exports/report_export_service.dart';
+export 'filters/report_filter_provider.dart';
+export 'filters/report_session_provider.dart';
+export 'filters/report_session_state.dart';
+export 'models/report_chart_models.dart';
+export 'models/report_date_preset.dart';
+export 'models/report_drill_down.dart';
+export 'models/report_filter_model.dart';
+export 'models/report_metric_model.dart';
+export 'models/report_tab_id.dart';
+export 'providers/report_permissions.dart';
+export 'services/report_drill_down_actions.dart';
+export 'services/report_drill_down_service.dart';
+export 'services/report_query_cache.dart';
+export 'widgets/report_async_body.dart';
+export 'widgets/report_empty_view.dart';
+export 'widgets/report_error_view.dart';
+export 'widgets/report_filter_bar.dart';
+export 'widgets/report_loading_view.dart';
+export 'widgets/report_metric_card.dart';
+export 'widgets/report_metric_grid.dart';
+export 'widgets/report_skeleton_view.dart';
+export 'widgets/report_tab_keep_alive.dart';
+export 'widgets/report_table_widgets.dart';

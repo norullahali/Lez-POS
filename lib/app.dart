@@ -40,6 +40,7 @@ import 'package:lez_pos/features/settings/screens/settings_home_screen.dart';
 import 'package:lez_pos/features/settings/screens/invoice_settings_screen.dart';
 import 'package:lez_pos/features/invoices/screens/invoice_history_screen.dart';
 import 'package:lez_pos/features/returns/screens/return_analytics_dashboard_screen.dart';
+import 'features/operations/screens/notification_center_screen.dart';
 import 'features/activity/screens/activity_logs_screen.dart';
 import 'features/activity/screens/user_timeline_screen.dart';
 
@@ -205,6 +206,13 @@ final routerProvider = Provider<GoRouter>((ref) {
             builder: (_, __) => _guardRoute(
               '/return-analytics',
               const ReturnAnalyticsDashboardScreen(),
+            ),
+          ),
+          GoRoute(
+            path: '/operations/notifications',
+            builder: (_, __) => _guardRoute(
+              '/operations/notifications',
+              const NotificationCenterScreen(),
             ),
           ),
           GoRoute(

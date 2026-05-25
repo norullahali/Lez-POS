@@ -20,6 +20,10 @@ class PermissionKeys {
   static const analyticsFinancial = 'analytics.financial';
   static const analyticsInventory = 'analytics.inventory';
 
+  static const operationsView = 'operations.view';
+  static const operationsManage = 'operations.manage';
+  static const alertsView = 'alerts.view';
+
   static const settingsEdit = 'settings.edit';
   static const backupDatabase = 'backup_database';
 
@@ -44,6 +48,9 @@ class PermissionKeys {
     analyticsExecutive,
     analyticsFinancial,
     analyticsInventory,
+    operationsView,
+    operationsManage,
+    alertsView,
     settingsEdit,
     backupDatabase,
     usersManage,
@@ -67,6 +74,9 @@ class PermissionKeys {
     analyticsExecutive: 'عرض لوحة الإدارة التنفيذية',
     analyticsFinancial: 'عرض التحليلات المالية المتقدمة',
     analyticsInventory: 'عرض تحليلات المخزون المتقدمة',
+    operationsView: 'عرض الذكاء التشغيلي والرؤى',
+    operationsManage: 'إدارة التنبيهات والتقارير المجدولة',
+    alertsView: 'عرض مركز الإشعارات والتنبيهات',
     settingsEdit: 'تعديل إعدادات النظام',
     backupDatabase: 'أخذ نسخة احتياطية من قاعدة البيانات',
     usersManage: 'إدارة المستخدمين والصلاحيات',

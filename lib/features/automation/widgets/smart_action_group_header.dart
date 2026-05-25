@@ -22,8 +22,12 @@ class SmartActionGroupHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final critical = section.items.where((i) => i.severity == SmartActionSeverity.critical).length;
-    final warning = section.items.where((i) => i.severity == SmartActionSeverity.warning).length;
+    final critical = section.items
+        .where((i) => i.severity == SmartActionSeverity.critical)
+        .length;
+    final warning = section.items
+        .where((i) => i.severity == SmartActionSeverity.warning)
+        .length;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 2),
@@ -74,7 +78,8 @@ class SmartActionGroupHeader extends StatelessWidget {
                 AnimatedRotation(
                   turns: collapsed ? 0 : 0.5,
                   duration: const Duration(milliseconds: 180),
-                  child: const Icon(Icons.expand_more_rounded, size: 18, color: AppColors.textSecondary),
+                  child: const Icon(Icons.expand_more_rounded,
+                      size: 18, color: AppColors.textSecondary),
                 ),
               ],
             ),
@@ -109,7 +114,8 @@ class SmartActionSectionBlock extends StatelessWidget {
         ),
         AnimatedCrossFade(
           duration: const Duration(milliseconds: 180),
-          crossFadeState: collapsed ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+          crossFadeState:
+              collapsed ? CrossFadeState.showSecond : CrossFadeState.showFirst,
           firstCurve: Curves.easeOut,
           secondCurve: Curves.easeIn,
           sizeCurve: Curves.easeOut,

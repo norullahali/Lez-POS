@@ -67,7 +67,10 @@ class _BusinessGuidanceTileState extends State<BusinessGuidanceTile> {
                               Expanded(
                                 child: Text(
                                   item.whatHappened,
-                                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .titleSmall
+                                      ?.copyWith(
                                         fontWeight: FontWeight.w700,
                                         fontSize: 13.5,
                                         height: 1.2,
@@ -94,7 +97,8 @@ class _BusinessGuidanceTileState extends State<BusinessGuidanceTile> {
                               ),
                               if (audit != null)
                                 OperationalMetricChip(
-                                  label: AutomationUiHelpers.confidenceShort(audit.confidence),
+                                  label: AutomationUiHelpers.confidenceShort(
+                                      audit.confidence),
                                   icon: Icons.insights_outlined,
                                   color: AppColors.info,
                                   background: AppColors.infoLight,
@@ -104,7 +108,8 @@ class _BusinessGuidanceTileState extends State<BusinessGuidanceTile> {
                                   label: 'تكرر ${item.occurrenceCount}×',
                                   icon: Icons.repeat_rounded,
                                 ),
-                              if (AutomationUiHelpers.isFresh(item.lastRefreshedAt))
+                              if (AutomationUiHelpers.isFresh(
+                                  item.lastRefreshedAt))
                                 const OperationalMetricChip(
                                   label: 'جديد',
                                   icon: Icons.fiber_new_rounded,
@@ -118,23 +123,28 @@ class _BusinessGuidanceTileState extends State<BusinessGuidanceTile> {
                             'لماذا: ${item.whyDetected}',
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  color: AppColors.textSecondary,
-                                  fontSize: 11.5,
-                                  height: 1.25,
-                                ),
+                            style:
+                                Theme.of(context).textTheme.bodySmall?.copyWith(
+                                      color: AppColors.textSecondary,
+                                      fontSize: 11.5,
+                                      height: 1.25,
+                                    ),
                           ),
                           const SizedBox(height: 4),
                           Container(
                             width: double.infinity,
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 6),
                             decoration: BoxDecoration(
                               color: style.background.withValues(alpha: 0.55),
                               borderRadius: BorderRadius.circular(6),
                             ),
                             child: Text(
                               'الخطوة التالية: ${item.nextStep}',
-                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodyMedium
+                                  ?.copyWith(
                                     fontWeight: FontWeight.w700,
                                     fontSize: 12,
                                     height: 1.25,
@@ -145,7 +155,10 @@ class _BusinessGuidanceTileState extends State<BusinessGuidanceTile> {
                             const SizedBox(height: 4),
                             Text(
                               'آخر تحديث ${AutomationUiHelpers.relativeTimeAr(item.lastRefreshedAt)}',
-                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(
                                     color: AppColors.textHint,
                                     fontSize: 10.5,
                                   ),
@@ -156,14 +169,19 @@ class _BusinessGuidanceTileState extends State<BusinessGuidanceTile> {
                             Align(
                               alignment: Alignment.centerLeft,
                               child: TextButton.icon(
-                                onPressed: () => OperationsNavigation.navigate(context, item.actionRoute),
+                                onPressed: () => OperationsNavigation.navigate(
+                                    context, item.actionRoute),
                                 style: TextButton.styleFrom(
                                   visualDensity: VisualDensity.compact,
                                   minimumSize: const Size(0, 28),
-                                  padding: const EdgeInsets.symmetric(horizontal: 6),
-                                  textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+                                  padding:
+                                      const EdgeInsets.symmetric(horizontal: 6),
+                                  textStyle: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600),
                                 ),
-                                icon: const Icon(Icons.arrow_back_rounded, size: 14),
+                                icon: const Icon(Icons.arrow_back_rounded,
+                                    size: 14),
                                 label: const Text('عرض التفاصيل'),
                               ),
                             ),

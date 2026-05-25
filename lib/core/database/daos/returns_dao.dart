@@ -23,12 +23,11 @@ class ReturnsDao extends DatabaseAccessor<AppDatabase> with _$ReturnsDaoMixin {
   // --- Customer Returns ---
   Future<List<CustomerReturn>> getAllCustomerReturns() =>
       (select(customerReturns)
-        ..orderBy([(r) => OrderingTerm.desc(r.returnDate)]))
+            ..orderBy([(r) => OrderingTerm.desc(r.returnDate)]))
           .get();
 
   Future<List<CustomerReturnItem>> getCustomerReturnItems(int returnId) =>
-      (select(customerReturnItems)
-        ..where((i) => i.returnId.equals(returnId)))
+      (select(customerReturnItems)..where((i) => i.returnId.equals(returnId)))
           .get();
 
   Future<int> saveCustomerReturn({
@@ -97,10 +96,6 @@ class ReturnsDao extends DatabaseAccessor<AppDatabase> with _$ReturnsDaoMixin {
       if (inv.invoiceStatus == InvoiceLifecycleStatus.returned) {
         throw StateError('الفاتورة مرتجعة مسبقاً');
       }
-      if (inv.invoiceStatus == InvoiceLifecycleStatus.partiallyReturned) {
-        throw StateError(
-            'الفاتورة مرتجعة جزئياً - استخدم نظام الإرجاع الجزئي لإرجاع الكميات المتبقية');
-      }
 
       final dup = await (select(customerReturns)
             ..where((r) => r.originalInvoiceId.equals(invoiceId)))
@@ -119,8 +114,8 @@ class ReturnsDao extends DatabaseAccessor<AppDatabase> with _$ReturnsDaoMixin {
       final itemPayloads = <Map<String, dynamic>>[];
 
       for (final line in saleLines) {
-        final p = await attachedDatabase.productsDao
-            .getProductById(line.productId);
+        final p =
+            await attachedDatabase.productsDao.getProductById(line.productId);
         final name = p?.name ?? 'منتج #${line.productId}';
         returnHeaderTotal += line.total;
         itemPayloads.add({
@@ -130,29 +125,8 @@ class ReturnsDao extends DatabaseAccessor<AppDatabase> with _$ReturnsDaoMixin {
           'price': line.unitPrice,
           'cost': line.unitCost,
           'lineTotal': line.total,
-          'saleItemId': line.id,
         });
       }
-
-      // -- Audit snapshots (looked up once before the item loop) ------------
-      final cashierRow = await customSelect(
-        'SELECT full_name FROM users WHERE id = ?',
-        variables: [Variable.withInt(returnedByUserId)],
-        readsFrom: {db.usersTable},
-      ).getSingleOrNull();
-      final cashierName = cashierRow?.data['full_name'] as String?;
-
-      String? customerName;
-      final customerId = inv.customerId;
-      if (customerId != null && customerId != 1) {
-        final customerRow = await customSelect(
-          'SELECT name FROM customers WHERE id = ?',
-          variables: [Variable.withInt(customerId)],
-          readsFrom: {db.customers},
-        ).getSingleOrNull();
-        customerName = customerRow?.data['name'] as String?;
-      }
-      // ---------------------------------------------------------------------
 
       final returnNumber =
           'RET-$invoiceId-${DateTime.now().millisecondsSinceEpoch}';
@@ -192,16 +166,6 @@ class ReturnsDao extends DatabaseAccessor<AppDatabase> with _$ReturnsDaoMixin {
         final price = (item['price'] as num).toDouble();
         final cost = (item['cost'] as num?)?.toDouble() ?? 0.0;
         final lineTotal = (item['lineTotal'] as num).toDouble();
-        final saleItemId = item['saleItemId'] as int?;
-
-        // Capture stock BEFORE restoration for audit snapshot
-        final stockBeforeRow = await customSelect(
-          'SELECT current_stock FROM products WHERE id = ?',
-          variables: [Variable.withInt(productId)],
-          readsFrom: {db.products},
-        ).getSingleOrNull();
-        final stockBefore =
-            (stockBeforeRow?.data['current_stock'] as num?)?.toDouble();
 
         final itemId = await into(customerReturnItems).insert(
           CustomerReturnItemsCompanion(
@@ -231,31 +195,9 @@ class ReturnsDao extends DatabaseAccessor<AppDatabase> with _$ReturnsDaoMixin {
           variables: [Variable.withReal(qty), Variable.withInt(productId)],
           updates: {db.products},
         );
-
-        // -- Immutable audit row (inside the same transaction) --------------
-        final stockAfter = stockBefore != null ? stockBefore + qty : null;
-        await attachedDatabase.returnAuditLogsDao.insertAuditLog(
-          returnType: 'full',
-          invoiceId: invoiceId,
-          saleItemId: saleItemId,
-          productId: productId,
-          returnedQuantity: qty,
-          returnedAmount: lineTotal,
-          cashierUserId: returnedByUserId,
-          cashierNameSnapshot: cashierName,
-          sessionId: inv.sessionId,
-          customerId: customerId,
-          customerNameSnapshot: customerName,
-          returnReason: 'إرجاع كامل للفاتورة',
-          returnNote: note.trim().isEmpty ? null : note.trim(),
-          stockBefore: stockBefore,
-          stockAfter: stockAfter,
-          referenceType: 'customer_return',
-          referenceId: returnId,
-        );
-        // ------------------------------------------------------------------
       }
 
+      final customerId = inv.customerId;
       if (inv.debtAmount > 0 && customerId != null && customerId != 1) {
         await attachedDatabase.customerAccountsDao.recordReturn(
           customerId: customerId,
@@ -272,12 +214,11 @@ class ReturnsDao extends DatabaseAccessor<AppDatabase> with _$ReturnsDaoMixin {
   // --- Supplier Returns ---
   Future<List<SupplierReturn>> getAllSupplierReturns() =>
       (select(supplierReturns)
-        ..orderBy([(r) => OrderingTerm.desc(r.returnDate)]))
+            ..orderBy([(r) => OrderingTerm.desc(r.returnDate)]))
           .get();
 
   Future<List<SupplierReturnItem>> getSupplierReturnItems(int returnId) =>
-      (select(supplierReturnItems)
-        ..where((i) => i.returnId.equals(returnId)))
+      (select(supplierReturnItems)..where((i) => i.returnId.equals(returnId)))
           .get();
 
   Future<int> saveSupplierReturn({

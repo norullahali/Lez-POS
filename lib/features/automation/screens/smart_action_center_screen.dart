@@ -19,10 +19,12 @@ class SmartActionCenterScreen extends ConsumerStatefulWidget {
   const SmartActionCenterScreen({super.key});
 
   @override
-  ConsumerState<SmartActionCenterScreen> createState() => _SmartActionCenterScreenState();
+  ConsumerState<SmartActionCenterScreen> createState() =>
+      _SmartActionCenterScreenState();
 }
 
-class _SmartActionCenterScreenState extends ConsumerState<SmartActionCenterScreen>
+class _SmartActionCenterScreenState
+    extends ConsumerState<SmartActionCenterScreen>
     with SingleTickerProviderStateMixin {
   SmartActionCategory? _categoryFilter;
   final Set<SmartActionGroup> _collapsedGroups = {};
@@ -74,7 +76,8 @@ class _SmartActionCenterScreenState extends ConsumerState<SmartActionCenterScree
                   controller: _tabController,
                   isScrollable: true,
                   tabAlignment: TabAlignment.start,
-                  labelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                  labelStyle: const TextStyle(
+                      fontWeight: FontWeight.w700, fontSize: 13),
                   unselectedLabelStyle: const TextStyle(fontSize: 13),
                   indicatorSize: TabBarIndicatorSize.label,
                   tabs: const [
@@ -120,7 +123,8 @@ class _SmartActionCenterScreenState extends ConsumerState<SmartActionCenterScree
 
   Widget _actionsTab(AsyncValue<List<SmartActionGroupedSection>> groupedAsync) {
     return groupedAsync.when(
-      loading: () => _centeredContent(const AutomationLoadingSkeleton(lines: 5)),
+      loading: () =>
+          _centeredContent(const AutomationLoadingSkeleton(lines: 5)),
       error: (e, _) => _centeredContent(
         AutomationErrorState(message: 'خطأ: $e', onRetry: _refresh),
       ),
@@ -129,17 +133,23 @@ class _SmartActionCenterScreenState extends ConsumerState<SmartActionCenterScree
             sections.expand((SmartActionGroupedSection s) => s.items).toList();
         final List<SmartActionItem> filtered = _categoryFilter == null
             ? flat
-            : flat.where((SmartActionItem a) => a.category == _categoryFilter).toList();
-        final List<SmartActionGroupedSection> filteredSections = _categoryFilter == null
-            ? sections
-            : sections
-                .map(
-                  (SmartActionGroupedSection s) => s.copyWith(
-                    items: s.items.where((SmartActionItem a) => a.category == _categoryFilter).toList(),
-                  ),
-                )
-                .where((SmartActionGroupedSection s) => s.items.isNotEmpty)
+            : flat
+                .where((SmartActionItem a) => a.category == _categoryFilter)
                 .toList();
+        final List<SmartActionGroupedSection> filteredSections =
+            _categoryFilter == null
+                ? sections
+                : sections
+                    .map(
+                      (SmartActionGroupedSection s) => s.copyWith(
+                        items: s.items
+                            .where((SmartActionItem a) =>
+                                a.category == _categoryFilter)
+                            .toList(),
+                      ),
+                    )
+                    .where((SmartActionGroupedSection s) => s.items.isNotEmpty)
+                    .toList();
 
         return _centeredContent(
           Column(
@@ -160,7 +170,8 @@ class _SmartActionCenterScreenState extends ConsumerState<SmartActionCenterScree
                               final section = filteredSections[index];
                               return SmartActionSectionBlock(
                                 section: section,
-                                collapsed: _collapsedGroups.contains(section.group),
+                                collapsed:
+                                    _collapsedGroups.contains(section.group),
                                 onToggle: () => _toggleGroup(section.group),
                               );
                             },
@@ -168,7 +179,8 @@ class _SmartActionCenterScreenState extends ConsumerState<SmartActionCenterScree
                         : ListView.builder(
                             padding: const EdgeInsets.only(bottom: 12, top: 4),
                             itemCount: filtered.length,
-                            itemBuilder: (context, index) => SmartActionCard(action: filtered[index]),
+                            itemBuilder: (context, index) =>
+                                SmartActionCard(action: filtered[index]),
                           ),
               ),
             ],
@@ -180,7 +192,8 @@ class _SmartActionCenterScreenState extends ConsumerState<SmartActionCenterScree
 
   Widget _guidanceTab(AsyncValue<List<BusinessGuidanceItem>> guidanceAsync) {
     return guidanceAsync.when(
-      loading: () => _centeredContent(const AutomationLoadingSkeleton(lines: 4)),
+      loading: () =>
+          _centeredContent(const AutomationLoadingSkeleton(lines: 4)),
       error: (e, _) => _centeredContent(
         AutomationErrorState(message: 'خطأ: $e', onRetry: _refresh),
       ),
@@ -207,7 +220,8 @@ class _SmartActionCenterScreenState extends ConsumerState<SmartActionCenterScree
 
   Widget _reorderTab(AsyncValue<List<ReorderSuggestion>> reorderAsync) {
     return reorderAsync.when(
-      loading: () => _centeredContent(const AutomationLoadingSkeleton(lines: 5)),
+      loading: () =>
+          _centeredContent(const AutomationLoadingSkeleton(lines: 5)),
       error: (e, _) => _centeredContent(
         AutomationErrorState(message: 'خطأ: $e', onRetry: _refresh),
       ),

@@ -21,7 +21,10 @@ class _SmartActionCardState extends State<SmartActionCard> {
 
   void _snack(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), behavior: SnackBarBehavior.floating, duration: const Duration(seconds: 2)),
+      SnackBar(
+          content: Text(message),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2)),
     );
   }
 
@@ -109,7 +112,8 @@ class _SmartActionCardState extends State<SmartActionCard> {
                     width: 4,
                     decoration: BoxDecoration(
                       color: style.color,
-                      borderRadius: const BorderRadius.horizontal(right: Radius.circular(10)),
+                      borderRadius: const BorderRadius.horizontal(
+                          right: Radius.circular(10)),
                     ),
                   ),
                   Expanded(
@@ -126,7 +130,10 @@ class _SmartActionCardState extends State<SmartActionCard> {
                                   action.title,
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
-                                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .titleSmall
+                                      ?.copyWith(
                                         fontWeight: FontWeight.w700,
                                         height: 1.2,
                                         fontSize: 13.5,
@@ -156,7 +163,10 @@ class _SmartActionCardState extends State<SmartActionCard> {
                                   .map(
                                     (m) => Text(
                                       '${m.label}: ${m.value}',
-                                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall
+                                          ?.copyWith(
                                             color: AppColors.textSecondary,
                                             fontSize: 10.5,
                                           ),
@@ -170,18 +180,22 @@ class _SmartActionCardState extends State<SmartActionCard> {
                             action.reason,
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  color: AppColors.textSecondary,
-                                  height: 1.25,
-                                  fontSize: 11.5,
-                                ),
+                            style:
+                                Theme.of(context).textTheme.bodySmall?.copyWith(
+                                      color: AppColors.textSecondary,
+                                      height: 1.25,
+                                      fontSize: 11.5,
+                                    ),
                           ),
                           const SizedBox(height: 3),
                           Text(
                             action.recommendation,
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodyMedium
+                                ?.copyWith(
                                   fontWeight: FontWeight.w600,
                                   fontSize: 12,
                                   height: 1.25,
@@ -193,7 +207,10 @@ class _SmartActionCardState extends State<SmartActionCard> {
                               action.conflicts.first.resolutionHintAr,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(
                                     color: AppColors.warning,
                                     fontSize: 11,
                                   ),
@@ -202,10 +219,11 @@ class _SmartActionCardState extends State<SmartActionCard> {
                           const SizedBox(height: 4),
                           Text(
                             _freshnessLine(),
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  color: AppColors.textHint,
-                                  fontSize: 10.5,
-                                ),
+                            style:
+                                Theme.of(context).textTheme.bodySmall?.copyWith(
+                                      color: AppColors.textHint,
+                                      fontSize: 10.5,
+                                    ),
                           ),
                           const SizedBox(height: 6),
                           _footerActions(context),
@@ -247,7 +265,8 @@ class _SmartActionCardState extends State<SmartActionCard> {
         _actionBtn(
           label: 'إقرار',
           icon: Icons.check_circle_outline_rounded,
-          onPressed: () => _snack('الإقرار يتطلب موافقة يدوية — لا يتم تنفيذ إجراء تلقائي'),
+          onPressed: () =>
+              _snack('الإقرار يتطلب موافقة يدوية — لا يتم تنفيذ إجراء تلقائي'),
         ),
         _actionBtn(
           label: 'حل',

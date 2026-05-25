@@ -10,9 +10,9 @@ class AutomationLoadingSkeleton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView.separated(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       itemCount: lines,
-      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      separatorBuilder: (_, __) => const SizedBox(height: 6),
       itemBuilder: (_, __) => const _SkeletonCard(),
     );
   }
@@ -24,41 +24,25 @@ class _SkeletonCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 88,
+      height: 68,
       decoration: BoxDecoration(
         color: AppColors.surface,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(9),
         border: Border.all(color: AppColors.border),
       ),
-      padding: const EdgeInsets.all(10),
+      padding: const EdgeInsets.all(8),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Container(
-            height: 10,
-            width: 180,
-            decoration: BoxDecoration(
-              color: AppColors.surfaceVariant,
-              borderRadius: BorderRadius.circular(4),
-            ),
+            height: 9,
+            width: 160,
+            decoration: BoxDecoration(color: AppColors.surfaceVariant, borderRadius: BorderRadius.circular(4)),
           ),
           const Spacer(),
           Container(
-            height: 8,
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: AppColors.surfaceVariant,
-              borderRadius: BorderRadius.circular(4),
-            ),
-          ),
-          const SizedBox(height: 6),
-          Container(
-            height: 8,
-            width: 240,
-            decoration: BoxDecoration(
-              color: AppColors.surfaceVariant,
-              borderRadius: BorderRadius.circular(4),
-            ),
+            height: 7,
+            decoration: BoxDecoration(color: AppColors.surfaceVariant, borderRadius: BorderRadius.circular(4)),
           ),
         ],
       ),
@@ -82,12 +66,12 @@ class AutomationEmptyState extends StatelessWidget {
   Widget build(BuildContext context) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(20),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 40, color: AppColors.textHint),
-            const SizedBox(height: 10),
+            Icon(icon, size: 36, color: AppColors.textHint),
+            const SizedBox(height: 8),
             Text(
               title,
               style: Theme.of(context).textTheme.titleSmall?.copyWith(
@@ -120,18 +104,18 @@ class AutomationErrorState extends StatelessWidget {
   Widget build(BuildContext context) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(20),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.error_outline_rounded, size: 36, color: AppColors.error),
+            const Icon(Icons.error_outline_rounded, size: 32, color: AppColors.error),
             const SizedBox(height: 8),
             Text(message, textAlign: TextAlign.center),
             if (onRetry != null) ...[
-              const SizedBox(height: 10),
+              const SizedBox(height: 8),
               TextButton.icon(
                 onPressed: onRetry,
-                icon: const Icon(Icons.refresh, size: 16),
+                icon: const Icon(Icons.refresh, size: 15),
                 label: const Text('اعادة المحاولة'),
               ),
             ],

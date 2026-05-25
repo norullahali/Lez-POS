@@ -105,21 +105,25 @@ class _SmartActionCenterScreenState extends ConsumerState<SmartActionCenterScree
     );
   }
 
-  Widget _actionsTab(AsyncValue groupedAsync) {
+  Widget _actionsTab(AsyncValue<List<SmartActionGroupedSection>> groupedAsync) {
     return groupedAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, _) => Center(child: Text('خطأ: $e')),
-      data: (sections) {
-        final typedSections = sections;
-        final flat = typedSections.expand((s) => s.items).toList();
-        final filtered = _categoryFilter == null
+      data: (List<SmartActionGroupedSection> sections) {
+        final List<SmartActionItem> flat =
+            sections.expand((SmartActionGroupedSection s) => s.items).toList();
+        final List<SmartActionItem> filtered = _categoryFilter == null
             ? flat
-            : flat.where((a) => a.category == _categoryFilter).toList();
-        final filteredSections = _categoryFilter == null
-            ? typedSections
-            : typedSections
-                .map((s) => s.copyWith(items: s.items.where((a) => a.category == _categoryFilter).toList()))
-                .where((s) => s.items.isNotEmpty)
+            : flat.where((SmartActionItem a) => a.category == _categoryFilter).toList();
+        final List<SmartActionGroupedSection> filteredSections = _categoryFilter == null
+            ? sections
+            : sections
+                .map(
+                  (SmartActionGroupedSection s) => s.copyWith(
+                    items: s.items.where((SmartActionItem a) => a.category == _categoryFilter).toList(),
+                  ),
+                )
+                .where((SmartActionGroupedSection s) => s.items.isNotEmpty)
                 .toList();
 
         return Column(
@@ -150,10 +154,15 @@ class _SmartActionCenterScreenState extends ConsumerState<SmartActionCenterScree
             Expanded(
               child: filtered.isEmpty
                   ? Center(
-                      child: Text('لا توجد إجراءات', style: TextStyle(color: AppColors.textHint)),
+                      child: Text(
+                        'لا توجد إجراءات',
+                        style: TextStyle(color: AppColors.textHint),
+                      ),
                     )
                   : ListView.builder(
-                      itemCount: _categoryFilter == null ? _groupedItemCount(filteredSections) : filtered.length,
+                      itemCount: _categoryFilter == null
+                          ? _groupedItemCount(filteredSections)
+                          : filtered.length,
                       itemBuilder: (context, index) {
                         if (_categoryFilter != null) {
                           return SmartActionCard(action: filtered[index]);

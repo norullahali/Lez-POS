@@ -41,6 +41,7 @@ import 'package:lez_pos/features/settings/screens/invoice_settings_screen.dart';
 import 'package:lez_pos/features/invoices/screens/invoice_history_screen.dart';
 import 'package:lez_pos/features/returns/screens/return_analytics_dashboard_screen.dart';
 import 'features/operations/screens/notification_center_screen.dart';
+import 'features/automation/screens/smart_action_center_screen.dart';
 import 'features/activity/screens/activity_logs_screen.dart';
 import 'features/activity/screens/user_timeline_screen.dart';
 
@@ -213,6 +214,13 @@ final routerProvider = Provider<GoRouter>((ref) {
             builder: (_, __) => _guardRoute(
               '/operations/notifications',
               const NotificationCenterScreen(),
+            ),
+          ),
+          GoRoute(
+            path: '/automation/actions',
+            builder: (_, __) => _guardRoute(
+              '/automation/actions',
+              const SmartActionCenterScreen(),
             ),
           ),
           GoRoute(

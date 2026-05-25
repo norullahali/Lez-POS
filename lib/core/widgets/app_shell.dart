@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../features/activity/providers/activity_context_provider.dart';
 import '../../features/operations/providers/operations_providers.dart';
+import '../../features/automation/providers/automation_providers.dart';
 import '../../features/operations/widgets/notification_bell.dart';
 import '../theme/app_colors.dart';
 import 'side_nav.dart';
@@ -20,6 +21,7 @@ class AppShell extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     ref.watch(activityContextSyncProvider);
     ref.watch(operationsStartupProvider);
+    ref.watch(automationStartupProvider);
     debugPrint('CURRENT ROUTE: $currentRoute');
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -71,6 +73,7 @@ class _TopBar extends StatelessWidget {
       '/activity': 'سجل النشاط',
       '/activity/timeline': 'الجدول الزمني',
       '/operations/notifications': 'مركز الإشعارات',
+      '/automation/actions': 'مركز الإجراءات',
     };
     return titles[route] ?? 'Lez POS';
   }

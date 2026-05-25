@@ -24,6 +24,10 @@ class PermissionKeys {
   static const operationsManage = 'operations.manage';
   static const alertsView = 'alerts.view';
 
+  static const automationView = 'automation.view';
+  static const automationManage = 'automation.manage';
+  static const workflowsManage = 'workflows.manage';
+
   static const settingsEdit = 'settings.edit';
   static const backupDatabase = 'backup_database';
 
@@ -51,6 +55,9 @@ class PermissionKeys {
     operationsView,
     operationsManage,
     alertsView,
+    automationView,
+    automationManage,
+    workflowsManage,
     settingsEdit,
     backupDatabase,
     usersManage,
@@ -77,6 +84,9 @@ class PermissionKeys {
     operationsView: 'عرض الذكاء التشغيلي والرؤى',
     operationsManage: 'إدارة التنبيهات والتقارير المجدولة',
     alertsView: 'عرض مركز الإشعارات والتنبيهات',
+    automationView: 'عرض مركز الإجراءات والأتمتة',
+    automationManage: 'إدارة مهام الأتمتة والقواعد',
+    workflowsManage: 'إدارة سير العمل المقترح',
     settingsEdit: 'تعديل إعدادات النظام',
     backupDatabase: 'أخذ نسخة احتياطية من قاعدة البيانات',
     usersManage: 'إدارة المستخدمين والصلاحيات',

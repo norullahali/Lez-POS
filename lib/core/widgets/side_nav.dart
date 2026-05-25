@@ -89,6 +89,11 @@ const kNavItems = [
       label: 'التقارير',
       permissionKey: PermissionKeys.reportsView),
   NavItem(
+      route: '/automation/actions',
+      icon: Icons.auto_awesome_rounded,
+      label: 'مركز الإجراءات',
+      permissionKey: PermissionKeys.automationView),
+  NavItem(
       route: '/return-analytics',
       icon: Icons.assignment_return_rounded,
       label: 'تحليلات المرتجعات',

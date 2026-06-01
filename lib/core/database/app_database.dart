@@ -33,6 +33,14 @@ import 'tables/logs_table.dart';
 import 'tables/pricing_rules_table.dart';
 import 'tables/app_settings_table.dart';
 import 'tables/notifications_table.dart';
+import 'tables/stock_movements_table.dart';
+import 'tables/sale_item_returns_table.dart';
+import 'tables/return_audit_logs_table.dart';
+import 'tables/activity_logs_table.dart';
+import 'daos/stock_movements_dao.dart';
+import 'daos/sale_item_returns_dao.dart';
+import 'daos/return_audit_logs_dao.dart';
+import 'daos/activity_logs_dao.dart';
 import 'daos/users_dao.dart';
 import 'daos/categories_dao.dart';
 import 'daos/suppliers_dao.dart';
@@ -81,6 +89,10 @@ part 'app_database.g.dart';
     PricingRuleActions,
     AppSettings,
     NotificationsTable,
+    StockMovements,
+    SaleItemReturns,
+    ReturnAuditLogs,
+    ActivityLogs,
   ],
   daos: [
     UsersDao,
@@ -96,6 +108,10 @@ part 'app_database.g.dart';
     ReturnsDao,
     LogsDao,
     AppSettingsDao,
+    StockMovementsDao,
+    SaleItemReturnsDao,
+    ReturnAuditLogsDao,
+    ActivityLogsDao,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -112,7 +128,7 @@ class AppDatabase extends _$AppDatabase {
   late final pricingDao = PricingDao(this);
 
   @override
-  int get schemaVersion => 21;
+  int get schemaVersion => 28;
 
   @override
   MigrationStrategy get migration {
@@ -504,8 +520,7 @@ class AppDatabase extends _$AppDatabase {
           // Normalise any Eastern-Arabic (٠-٩) and Persian (۰-۹) digits that
           // were previously stored in the barcode column to ASCII digits (0-9).
           // SQLite REPLACE() is idempotent: already-English barcodes are unchanged.
-          debugPrint(
-              '[Migration] v18: normalising Arabic/Persian digits in product barcodes...');
+          debugPrint('[Migration] v18: normalising Arabic/Persian digits in product barcodes...');
           try {
             await customStatement('''
               UPDATE products SET barcode =
@@ -531,8 +546,7 @@ class AppDatabase extends _$AppDatabase {
           // StockGuard (added previously) prevents new negative writes, but
           // historical data may still have negative current_stock values.
           // This migration makes the DB consistent with the UI safeStock guard.
-          debugPrint(
-              '[Migration] v19: clamping negative current_stock values to 0...');
+          debugPrint('[Migration] v19: clamping negative current_stock values to 0...');
           try {
             await customStatement(
               'UPDATE products SET current_stock = 0 WHERE current_stock < 0',
@@ -550,14 +564,12 @@ class AppDatabase extends _$AppDatabase {
               'ALTER TABLE sales_invoices ADD COLUMN invoice_status TEXT NOT NULL DEFAULT \'completed\'',
             );
           } catch (e) {
-            debugPrint(
-                '[Migration v20] alter sales_invoices invoice_status skip: $e');
+            debugPrint('[Migration v20] alter sales_invoices invoice_status skip: $e');
           }
         }
 
         if (from < 21) {
-          debugPrint(
-              '[Migration] v21: sales_invoices return metadata columns...');
+          debugPrint('[Migration] v21: sales_invoices return metadata columns...');
           for (final ddl in [
             'ALTER TABLE sales_invoices ADD COLUMN return_date INTEGER',
             'ALTER TABLE sales_invoices ADD COLUMN return_note TEXT',
@@ -568,6 +580,155 @@ class AppDatabase extends _$AppDatabase {
             } catch (e) {
               debugPrint('[Migration v21] skip: $e');
             }
+          }
+        }
+
+        if (from < 22) {
+          debugPrint('[Migration] v22: creating stock_movements table...');
+          try {
+            await m.createTable(stockMovements);
+            debugPrint('[Migration v22] stock_movements table created');
+          } catch (e) {
+            debugPrint('[Migration v22] stock_movements skip: $e');
+          }
+        }
+
+        if (from < 23) {
+          debugPrint('[Migration] v23: creating sale_item_returns table...');
+          try {
+            await m.createTable(saleItemReturns);
+            debugPrint('[Migration v23] sale_item_returns table created');
+          } catch (e) {
+            debugPrint('[Migration v23] sale_item_returns skip: $e');
+          }
+          // Update invoice_status CHECK constraint is not enforced in SQLite
+          // so 'partially_returned' works without DDL changes to sales_invoices.
+        }
+
+        if (from < 24) {
+          debugPrint('[Migration] v24: adding session close columns to pos_sessions...');
+          for (final ddl in [
+            'ALTER TABLE pos_sessions ADD COLUMN closed_by_user_id INTEGER',
+            'ALTER TABLE pos_sessions ADD COLUMN expected_cash_amount REAL',
+            'ALTER TABLE pos_sessions ADD COLUMN cash_difference REAL',
+            'ALTER TABLE pos_sessions ADD COLUMN notes TEXT',
+          ]) {
+            try {
+              await customStatement(ddl);
+              debugPrint('[Migration v24] executed: $ddl');
+            } catch (e) {
+              debugPrint('[Migration v24] skip ($ddl): $e');
+            }
+          }
+          // Backfill index for status lookups
+          try {
+            await customStatement(
+              'CREATE INDEX IF NOT EXISTS ps_status_idx ON pos_sessions (is_closed)',
+            );
+            await customStatement(
+              'CREATE INDEX IF NOT EXISTS ps_user_idx ON pos_sessions (created_by_user_id)',
+            );
+          } catch (e) {
+            debugPrint('[Migration v24] index skip: $e');
+          }
+        }
+
+        if (from < 25) {
+          debugPrint('[Migration] v25: creating return_audit_logs table...');
+          try {
+            await m.createTable(returnAuditLogs);
+            debugPrint('[Migration v25] return_audit_logs table created');
+          } catch (e) {
+            debugPrint('[Migration v25] return_audit_logs skip: $e');
+          }
+        }
+
+        if (from < 26) {
+          debugPrint('[Migration] v26: adding roles.system_key column...');
+          try {
+            await m.addColumn(roles, roles.systemKey);
+            debugPrint('[Migration v26] roles.system_key column added');
+          } catch (e) {
+            debugPrint('[Migration v26] roles.system_key skip: $e');
+          }
+          try {
+            await customStatement(
+              "UPDATE roles SET system_key = 'owner' "
+              "WHERE role_name = 'المالك' AND is_system = 1 "
+              "AND (system_key IS NULL OR system_key = '')",
+            );
+            debugPrint('[Migration v26] owner system_key backfilled');
+          } catch (e) {
+            debugPrint('[Migration v26] owner system_key backfill skip: $e');
+          }
+        }
+
+        if (from < 27) {
+          debugPrint('[Migration] v27: creating activity_logs table...');
+          try {
+            await m.createTable(activityLogs);
+            debugPrint('[Migration v27] activity_logs table created');
+          } catch (e) {
+            debugPrint('[Migration v27] activity_logs skip: $e');
+          }
+        }
+
+        if (from < 28) {
+          debugPrint('[Migration] v28: backfilling return_audit_logs...');
+          try {
+            await customStatement('''
+              INSERT INTO return_audit_logs (
+                created_at, return_type, invoice_id, product_id,
+                returned_quantity, returned_amount, return_reason, return_note,
+                reference_type, reference_id
+              )
+              SELECT
+                cr.return_date,
+                CASE WHEN cr.original_invoice_id IS NOT NULL THEN 'full' ELSE 'manual' END,
+                cr.original_invoice_id,
+                cri.product_id,
+                cri.quantity,
+                cri.total,
+                cr.reason,
+                cr.notes,
+                'customer_return_items',
+                cri.id
+              FROM customer_return_items cri
+              INNER JOIN customer_returns cr ON cr.id = cri.return_id
+              WHERE NOT EXISTS (
+                SELECT 1 FROM return_audit_logs ral
+                WHERE ral.reference_type = 'customer_return_items'
+                  AND ral.reference_id = cri.id
+              )
+            ''');
+            await customStatement('''
+              INSERT INTO return_audit_logs (
+                created_at, return_type, invoice_id, sale_item_id, product_id,
+                returned_quantity, returned_amount, cashier_user_id, return_note,
+                reference_type, reference_id
+              )
+              SELECT
+                sir.created_at,
+                'partial',
+                sir.sale_invoice_id,
+                sir.sale_item_id,
+                sir.product_id,
+                sir.returned_quantity,
+                sir.return_total,
+                sir.returned_by_user_id,
+                sir.return_reason_note,
+                'sale_item_return',
+                sir.id
+              FROM sale_item_returns sir
+              WHERE NOT EXISTS (
+                SELECT 1 FROM return_audit_logs ral
+                WHERE ral.reference_type = 'sale_item_return'
+                  AND ral.reference_id = sir.id
+              )
+            ''');
+            debugPrint('[Migration v28] return_audit_logs backfill complete');
+          } catch (e) {
+            debugPrint('[Migration v28] return_audit_logs backfill skip: $e');
           }
         }
       },
@@ -601,7 +762,7 @@ class AppDatabase extends _$AppDatabase {
       // 1. Insert Default Roles
       try {
         await customStatement(
-          "INSERT OR IGNORE INTO roles (id, role_name, description, is_system) VALUES (1, 'المالك', 'صلاحيات كاملة على النظام', 1)",
+          "INSERT OR IGNORE INTO roles (id, role_name, description, is_system, system_key) VALUES (1, 'المالك', 'صلاحيات كاملة على النظام', 1, 'owner')",
         );
       } catch (e) {
         debugPrint('[Seed] roles error: $e');
@@ -632,6 +793,15 @@ class AppDatabase extends _$AppDatabase {
       try {
         await customStatement(
           "UPDATE roles SET is_system = 1 WHERE id IN (1, 2, 3, 4)",
+        );
+      } catch (_) {}
+
+      // Ensure owner role has stable system_key (idempotent for fresh + legacy seeds)
+      try {
+        await customStatement(
+          "UPDATE roles SET system_key = 'owner' "
+          "WHERE role_name = 'المالك' AND is_system = 1 "
+          "AND (system_key IS NULL OR system_key = '')",
         );
       } catch (_) {}
 

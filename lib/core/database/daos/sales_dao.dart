@@ -16,38 +16,49 @@ class SalesDao extends DatabaseAccessor<AppDatabase> with _$SalesDaoMixin {
   SalesDao(super.db);
 
   // --- Sessions ---
-  Future<PosSession?> getOpenSession() => (select(posSessions)
-        ..where((s) => s.isClosed.equals(false))
+  Future<PosSession?> getOpenSession() =>
+      (select(posSessions)..where((s) => s.isClosed.equals(false))
         ..orderBy([(s) => OrderingTerm.desc(s.openedAt)])
         ..limit(1))
-      .getSingleOrNull();
+          .getSingleOrNull();
 
   Future<int> openSession(PosSessionsCompanion session) =>
       into(posSessions).insert(session);
 
-  Future<int> closeSession(int sessionId, double closingCash) =>
+  Future<int> closeSession({
+    required int sessionId,
+    required double closingCash,
+    double? expectedCashAmount,
+    double? cashDifference,
+    int? closedByUserId,
+    String? notes,
+  }) =>
       (update(posSessions)..where((s) => s.id.equals(sessionId))).write(
         PosSessionsCompanion(
           isClosed: const Value(true),
           closedAt: Value(DateTime.now()),
           closingCash: Value(closingCash),
+          closedByUserId: Value(closedByUserId),
+          expectedCashAmount: Value(expectedCashAmount),
+          cashDifference: Value(cashDifference),
+          notes: Value(notes),
         ),
       );
 
   Future<List<PosSession>> getAllSessions() =>
-      (select(posSessions)..orderBy([(s) => OrderingTerm.desc(s.openedAt)]))
-          .get();
+      (select(posSessions)..orderBy([(s) => OrderingTerm.desc(s.openedAt)])).get();
 
   // --- Sales ---
   Future<List<SalesInvoice>> getAllInvoices() =>
-      (select(salesInvoices)..orderBy([(i) => OrderingTerm.desc(i.saleDate)]))
+      (select(salesInvoices)
+        ..orderBy([(i) => OrderingTerm.desc(i.saleDate)]))
           .get();
 
   Future<List<SalesInvoice>> getInvoicesByDateRange(
-          DateTime from, DateTime to) =>
+      DateTime from, DateTime to) =>
       (select(salesInvoices)
-            ..where((i) => i.saleDate.isBetweenValues(from, to))
-            ..orderBy([(i) => OrderingTerm.desc(i.saleDate)]))
+        ..where((i) => i.saleDate.isBetweenValues(from, to))
+        ..orderBy([(i) => OrderingTerm.desc(i.saleDate)]))
           .get();
 
   Future<SalesInvoice?> getInvoiceById(int id) =>
@@ -63,11 +74,11 @@ class SalesDao extends DatabaseAccessor<AppDatabase> with _$SalesDaoMixin {
   /// Daily totals for dashboard
   Future<Map<String, dynamic>> getDailyTotals(DateTime date) async {
     try {
-      final start = DateTime(date.year, date.month, date.day);
-      final end = start.add(const Duration(days: 1));
-      debugPrint('[SalesDao] getDailyTotals: $start -> $end');
-      final result = await customSelect(
-        '''SELECT COUNT(*) as count, COALESCE(SUM(total), 0) as total,
+    final start = DateTime(date.year, date.month, date.day);
+    final end = start.add(const Duration(days: 1));
+    debugPrint('[SalesDao] getDailyTotals: $start -> $end');
+    final result = await customSelect(
+      '''SELECT COUNT(*) as count, COALESCE(SUM(total), 0) as total,
          COALESCE(SUM(si.total - COALESCE(costs.cost,0)), 0) as profit,
          COALESCE(SUM(cash_paid), 0) as cash, COALESCE(SUM(card_paid), 0) as card
          FROM sales_invoices si
@@ -76,20 +87,13 @@ class SalesDao extends DatabaseAccessor<AppDatabase> with _$SalesDaoMixin {
          ) costs ON costs.invoice_id = si.id
          WHERE si.sale_date >= ? AND si.sale_date < ?
          AND IFNULL(si.invoice_status, 'completed') != 'returned' ''',
-        variables: [Variable(start), Variable(end)],
-        readsFrom: {salesInvoices, saleItems},
-      ).getSingleOrNull();
-      return result?.data ??
-          {'count': 0, 'total': 0.0, 'profit': 0.0, 'cash': 0.0, 'card': 0.0};
+      variables: [Variable(start), Variable(end)],
+      readsFrom: {salesInvoices, saleItems},
+    ).getSingleOrNull();
+    return result?.data ?? {'count': 0, 'total': 0.0, 'profit': 0.0, 'cash': 0.0, 'card': 0.0};
     } catch (e, st) {
       debugPrint('[SalesDao] getDailyTotals error: $e\n$st');
-      return {
-        'count': 0,
-        'total': 0.0,
-        'profit': 0.0,
-        'cash': 0.0,
-        'card': 0.0
-      };
+      return {'count': 0, 'total': 0.0, 'profit': 0.0, 'cash': 0.0, 'card': 0.0};
     }
   }
 
@@ -118,12 +122,10 @@ class SalesDao extends DatabaseAccessor<AppDatabase> with _$SalesDaoMixin {
   }
 
   /// Top selling products
-  Future<List<Map<String, dynamic>>> getTopSellingProducts(
-      DateTime from, DateTime to,
-      {int limit = 10}) async {
+  Future<List<Map<String, dynamic>>> getTopSellingProducts(DateTime from, DateTime to, {int limit = 10}) async {
     try {
-      debugPrint('[SalesDao] getTopSellingProducts: $from -> $to');
-      final rows = await customSelect('''
+    debugPrint('[SalesDao] getTopSellingProducts: $from -> $to');
+    final rows = await customSelect('''
       SELECT si.product_id, p.name, SUM(si.quantity) as total_qty, SUM(si.total) as total_revenue
       FROM sale_items si
       JOIN products p ON p.id = si.product_id
@@ -133,10 +135,8 @@ class SalesDao extends DatabaseAccessor<AppDatabase> with _$SalesDaoMixin {
       GROUP BY si.product_id
       ORDER BY total_qty DESC
       LIMIT ?
-    ''',
-          variables: [Variable(from), Variable(to), Variable.withInt(limit)],
-          readsFrom: {saleItems, salesInvoices}).get();
-      return rows.map((r) => r.data).toList();
+    ''', variables: [Variable(from), Variable(to), Variable.withInt(limit)], readsFrom: {saleItems, salesInvoices}).get();
+    return rows.map((r) => r.data).toList();
     } catch (e, st) {
       debugPrint('[SalesDao] getTopSellingProducts error: $e\n$st');
       return [];

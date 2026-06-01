@@ -19,6 +19,7 @@ import '../../pos/models/invoice_models.dart';
 import '../../pos/providers/pos_products_provider.dart';
 import '../../products/providers/products_provider.dart';
 import '../../returns/providers/partial_return_provider.dart';
+import '../../returns/providers/return_analytics_provider.dart';
 import '../../returns/screens/customer_returns_screen.dart';
 import '../models/invoice_detail.dart';
 import '../models/invoice_history_row.dart' show invoicePaymentLabelAr;
@@ -159,6 +160,7 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
       ref.invalidate(customerReturnsProvider);
       ref.invalidate(productsNotifierProvider);
       ref.invalidate(posProductsProvider);
+      invalidateReturnAnalytics(ref);
 
       if (!context.mounted) return;
       ScaffoldMessenger.maybeOf(context)?.showSnackBar(
@@ -195,6 +197,7 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
     ref.invalidate(invoiceHistoryPageProvider);
     ref.invalidate(productsNotifierProvider);
     ref.invalidate(posProductsProvider);
+    invalidateReturnAnalytics(ref);
   }
 
   @override

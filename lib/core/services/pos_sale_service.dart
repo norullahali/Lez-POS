@@ -298,9 +298,10 @@ class PosSaleService {
 
         // Fetch product info to get cost and name
         final product = await (db.select(db.products)..where((p) => p.id.equals(productId))).getSingle();
+        final stockBefore = await db.stockDao.getStock(productId);
 
         // 2. Insert CustomerReturnItems record
-        await db.into(db.customerReturnItems).insert(
+        final itemId = await db.into(db.customerReturnItems).insert(
               CustomerReturnItemsCompanion.insert(
                 returnId: returnId,
                 productId: productId,
@@ -317,6 +318,7 @@ class PosSaleService {
               StockLedgerCompanion.insert(
                 productId: productId,
                 movementType: StockMovementType.returnIn.code,
+                referenceId: Value(itemId),
                 referenceType: const Value('customer_return_items'),
                 quantityChange: quantity, // Positive
                 unitCost: Value(product.costPrice),
@@ -330,7 +332,29 @@ class PosSaleService {
           updates: {db.products},
         );
 
-        // 4. Audit Log
+        final cashierRow = await db.customSelect(
+          'SELECT full_name FROM users WHERE id = ?',
+          variables: [Variable.withInt(userId)],
+          readsFrom: {db.usersTable},
+        ).getSingleOrNull();
+        final cashierName = cashierRow?.data['full_name'] as String?;
+
+        await db.returnAuditLogsDao.insertAuditLog(
+          returnType: 'manual',
+          productId: productId,
+          returnedQuantity: quantity,
+          returnedAmount: refundAmount,
+          cashierUserId: userId,
+          cashierNameSnapshot: cashierName,
+          returnReason: reason,
+          returnNote: 'استرجاع بدون فاتورة',
+          stockBefore: stockBefore,
+          stockAfter: stockBefore + quantity,
+          referenceType: 'customer_return_items',
+          referenceId: itemId,
+        );
+
+        // 4. Legacy log entry
         final logDetails = 'Quick Return | Product ID: $productId | Qty: $quantity | Reason: $reason';
         await db.into(db.logsTable).insert(
               LogsTableCompanion.insert(

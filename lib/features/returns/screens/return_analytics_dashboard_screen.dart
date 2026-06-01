@@ -8,6 +8,7 @@ import 'package:intl/intl.dart' hide TextDirection;
 import '../../../core/theme/app_colors.dart';
 import '../models/return_analytics_models.dart';
 import '../providers/return_analytics_provider.dart';
+import '../utils/return_analytics_date_utils.dart';
 import '../../invoices/widgets/invoice_details_dialog.dart';
 
 // ---------------------------------------------------------------------------
@@ -28,16 +29,9 @@ class _ReturnAnalyticsDashboardScreenState
   static final _dateFmt = DateFormat('yyyy/MM/dd HH:mm');
   static final _dayFmt = DateFormat('MM/dd');
 
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(recentActivityProvider.notifier).refresh();
-    });
-  }
-
   void _applyFilter(ReturnAnalyticsFilter f) {
-    ref.read(returnAnalyticsFilterProvider.notifier).state = f;
+    ref.read(returnAnalyticsFilterProvider.notifier).state =
+        ReturnAnalyticsDateUtils.normalizeFilter(f);
     ref.read(recentActivityProvider.notifier).refresh();
   }
 
@@ -119,6 +113,25 @@ class _TopBarState extends ConsumerState<_TopBar> {
   String? _returnType;
   int? _cashierUserId;
   int? _productId;
+  bool _syncedFromProvider = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _syncFromProvider());
+  }
+
+  void _syncFromProvider() {
+    final f = ref.read(returnAnalyticsFilterProvider);
+    setState(() {
+      _from = f.fromDate;
+      _to = f.toDate;
+      _returnType = f.returnType;
+      _cashierUserId = f.cashierUserId;
+      _productId = f.productId;
+      _syncedFromProvider = true;
+    });
+  }
 
   Future<void> _pickDate(bool isFrom) async {
     final picked = await showDatePicker(
@@ -149,6 +162,18 @@ class _TopBarState extends ConsumerState<_TopBar> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(returnAnalyticsFilterProvider, (previous, next) {
+      if (!_syncedFromProvider) return;
+      if (previous == next) return;
+      setState(() {
+        _from = next.fromDate;
+        _to = next.toDate;
+        _returnType = next.returnType;
+        _cashierUserId = next.cashierUserId;
+        _productId = next.productId;
+      });
+    });
+
     return Container(
       color: AppColors.surface,
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
@@ -930,7 +955,7 @@ class _RecentActivitySection extends ConsumerWidget {
               ],
             ),
           ),
-          if (state.rows.isEmpty && !state.isLoading)
+          if (state.rows.isEmpty && !state.isLoading && state.hasLoadedOnce)
             const _EmptyState('لا توجد سجلات للمعايير المحددة')
           else
             ...state.rows.map(

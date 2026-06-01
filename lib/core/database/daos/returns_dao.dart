@@ -33,24 +33,43 @@ class ReturnsDao extends DatabaseAccessor<AppDatabase> with _$ReturnsDaoMixin {
   Future<int> saveCustomerReturn({
     required CustomerReturnsCompanion header,
     required List<Map<String, dynamic>> items,
+    int? returnedByUserId,
   }) async {
     return transaction(() async {
       final returnId = await into(customerReturns).insert(header);
+
+      String? cashierName;
+      if (returnedByUserId != null) {
+        final cashierRow = await customSelect(
+          'SELECT full_name FROM users WHERE id = ?',
+          variables: [Variable.withInt(returnedByUserId)],
+          readsFrom: {attachedDatabase.usersTable},
+        ).getSingleOrNull();
+        cashierName = cashierRow?.data['full_name'] as String?;
+      }
+
+      final returnRow = await (select(customerReturns)
+            ..where((r) => r.id.equals(returnId)))
+          .getSingle();
+
       for (final item in items) {
         final productId = item['productId'] as int;
         final qty = (item['qty'] as num).toDouble();
         final price = (item['price'] as num).toDouble();
         final cost = (item['cost'] as num?)?.toDouble() ?? 0.0;
+        final lineTotal = qty * price;
+
+        final stockBefore = await attachedDatabase.stockDao.getStock(productId);
 
         final itemId = await into(customerReturnItems).insert(
           CustomerReturnItemsCompanion(
             returnId: Value(returnId),
             productId: Value(productId),
-            productName: Value(item['productName'] as String),
+            productName: Value(item['productName'] as String? ?? 'منتج #$productId'),
             quantity: Value(qty),
             unitPrice: Value(price),
             unitCost: Value(cost),
-            total: Value(qty * price),
+            total: Value(lineTotal),
           ),
         );
 
@@ -71,6 +90,23 @@ class ReturnsDao extends DatabaseAccessor<AppDatabase> with _$ReturnsDaoMixin {
           'UPDATE products SET current_stock = current_stock + ? WHERE id = ?',
           variables: [Variable.withReal(qty), Variable.withInt(productId)],
           updates: {db.products},
+        );
+
+        await attachedDatabase.returnAuditLogsDao.insertAuditLog(
+          returnType: returnRow.originalInvoiceId != null ? 'full' : 'manual',
+          invoiceId: returnRow.originalInvoiceId,
+          productId: productId,
+          returnedQuantity: qty,
+          returnedAmount: lineTotal,
+          cashierUserId: returnedByUserId,
+          cashierNameSnapshot: cashierName,
+          customerId: null,
+          returnReason: returnRow.reason,
+          returnNote: returnRow.notes,
+          stockBefore: stockBefore,
+          stockAfter: stockBefore + qty,
+          referenceType: 'customer_return_items',
+          referenceId: itemId,
         );
       }
       return returnId;
@@ -113,12 +149,31 @@ class ReturnsDao extends DatabaseAccessor<AppDatabase> with _$ReturnsDaoMixin {
       double returnHeaderTotal = 0;
       final itemPayloads = <Map<String, dynamic>>[];
 
+      final cashierRow = await customSelect(
+        'SELECT full_name FROM users WHERE id = ?',
+        variables: [Variable.withInt(returnedByUserId)],
+        readsFrom: {attachedDatabase.usersTable},
+      ).getSingleOrNull();
+      final cashierName = cashierRow?.data['full_name'] as String?;
+
+      String? customerName;
+      final customerId = inv.customerId;
+      if (customerId != null && customerId != 1) {
+        final customerRow = await customSelect(
+          'SELECT name FROM customers WHERE id = ?',
+          variables: [Variable.withInt(customerId)],
+          readsFrom: {attachedDatabase.customers},
+        ).getSingleOrNull();
+        customerName = customerRow?.data['name'] as String?;
+      }
+
       for (final line in saleLines) {
         final p =
             await attachedDatabase.productsDao.getProductById(line.productId);
         final name = p?.name ?? 'منتج #${line.productId}';
         returnHeaderTotal += line.total;
         itemPayloads.add({
+          'saleItemId': line.id,
           'productId': line.productId,
           'productName': name,
           'qty': line.quantity,
@@ -162,10 +217,13 @@ class ReturnsDao extends DatabaseAccessor<AppDatabase> with _$ReturnsDaoMixin {
 
       for (final item in itemPayloads) {
         final productId = item['productId'] as int;
+        final saleItemId = item['saleItemId'] as int;
         final qty = (item['qty'] as num).toDouble();
         final price = (item['price'] as num).toDouble();
         final cost = (item['cost'] as num?)?.toDouble() ?? 0.0;
         final lineTotal = (item['lineTotal'] as num).toDouble();
+
+        final stockBefore = await attachedDatabase.stockDao.getStock(productId);
 
         final itemId = await into(customerReturnItems).insert(
           CustomerReturnItemsCompanion(
@@ -195,9 +253,28 @@ class ReturnsDao extends DatabaseAccessor<AppDatabase> with _$ReturnsDaoMixin {
           variables: [Variable.withReal(qty), Variable.withInt(productId)],
           updates: {db.products},
         );
+
+        await attachedDatabase.returnAuditLogsDao.insertAuditLog(
+          returnType: 'full',
+          invoiceId: invoiceId,
+          saleItemId: saleItemId,
+          productId: productId,
+          returnedQuantity: qty,
+          returnedAmount: lineTotal,
+          cashierUserId: returnedByUserId,
+          cashierNameSnapshot: cashierName,
+          sessionId: inv.sessionId,
+          customerId: customerId,
+          customerNameSnapshot: customerName,
+          returnReason: 'إرجاع كامل للفاتورة',
+          returnNote: note.trim(),
+          stockBefore: stockBefore,
+          stockAfter: stockBefore + qty,
+          referenceType: 'customer_return_items',
+          referenceId: itemId,
+        );
       }
 
-      final customerId = inv.customerId;
       if (inv.debtAmount > 0 && customerId != null && customerId != 1) {
         await attachedDatabase.customerAccountsDao.recordReturn(
           customerId: customerId,

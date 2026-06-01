@@ -2,8 +2,16 @@
 //
 // READ-ONLY analytics repository for the return_audit_logs table.
 // All queries are SELECT-only. No data is ever modified here.
+import 'package:drift/drift.dart';
 import '../../../core/database/app_database.dart';
 import '../models/return_analytics_models.dart';
+import '../utils/return_analytics_date_utils.dart';
+
+class _SqlFilter {
+  const _SqlFilter(this.clause, this.variables);
+  final String clause;
+  final List<Variable> variables;
+}
 
 class ReturnAnalyticsRepository {
   final AppDatabase _db;
@@ -11,54 +19,54 @@ class ReturnAnalyticsRepository {
 
   // ---- helpers --------------------------------------------------------------
 
-  String _whereClause(ReturnAnalyticsFilter f, {String prefix = ''}) {
+  _SqlFilter _whereFilter(ReturnAnalyticsFilter f, {String prefix = ''}) {
     final parts = <String>[];
+    final vars = <Variable>[];
     final p = prefix.isEmpty ? '' : '$prefix.';
+
     if (f.fromDate != null) {
-      parts.add('${p}created_at >= ${f.fromDate!.millisecondsSinceEpoch}');
+      parts.add('${p}created_at >= ?');
+      vars.add(Variable.withInt(ReturnAnalyticsDateUtils.startMs(f.fromDate!)));
     }
     if (f.toDate != null) {
-      // include the full toDate day
-      final endOfDay = DateTime(
-              f.toDate!.year, f.toDate!.month, f.toDate!.day, 23, 59, 59)
-          .millisecondsSinceEpoch;
-      parts.add('${p}created_at <= $endOfDay');
+      parts.add('${p}created_at <= ?');
+      vars.add(Variable.withInt(ReturnAnalyticsDateUtils.endMs(f.toDate!)));
     }
     if (f.cashierUserId != null) {
-      parts.add('${p}cashier_user_id = ${f.cashierUserId}');
+      parts.add('${p}cashier_user_id = ?');
+      vars.add(Variable.withInt(f.cashierUserId!));
     }
     if (f.returnType != null) {
-      parts.add("${p}return_type = '${f.returnType}'");
+      parts.add('${p}return_type = ?');
+      vars.add(Variable.withString(f.returnType!));
     }
     if (f.productId != null) {
-      parts.add('${p}product_id = ${f.productId}');
+      parts.add('${p}product_id = ?');
+      vars.add(Variable.withInt(f.productId!));
     }
-    if (parts.isEmpty) return '';
-    return 'WHERE ${parts.join(' AND ')}';
+
+    if (parts.isEmpty) return const _SqlFilter('', []);
+    return _SqlFilter('WHERE ${parts.join(' AND ')}', vars);
   }
 
-  int get _todayMs =>
-      DateTime.now().copyWith(hour: 0, minute: 0, second: 0, millisecond: 0)
-          .millisecondsSinceEpoch;
-
-  int get _weekStartMs {
-    final now = DateTime.now();
-    final daysBack = now.weekday - 1; // Monday = 1
-    return DateTime(now.year, now.month, now.day - daysBack)
-        .millisecondsSinceEpoch;
+  String _appendSince(String baseClause, List<Variable> baseVars, int sinceMs) {
+    // Used by overview time-bucket queries; baseClause may already contain WHERE.
+    return baseClause.isEmpty
+        ? 'WHERE created_at >= ?'
+        : '$baseClause AND created_at >= ?';
   }
 
-  int get _monthStartMs {
-    final now = DateTime.now();
-    return DateTime(now.year, now.month, 1).millisecondsSinceEpoch;
-  }
+  int get _todayMs => ReturnAnalyticsDateUtils.todayStartMs;
+
+  int get _weekStartMs => ReturnAnalyticsDateUtils.weekStartMs;
+
+  int get _monthStartMs => ReturnAnalyticsDateUtils.monthStartMs;
 
   // ---- Overview -------------------------------------------------------------
 
   Future<ReturnOverview> getOverview(ReturnAnalyticsFilter f) async {
-    final where = _whereClause(f);
+    final filter = _whereFilter(f);
 
-    // Main aggregation: total + by type
     final mainRows = await _db.customSelect(
       '''SELECT
           COUNT(*)                                           AS total_count,
@@ -69,36 +77,26 @@ class ReturnAnalyticsRepository {
           COUNT(DISTINCT cashier_user_id)                    AS unique_cashiers,
           COUNT(DISTINCT product_id)                         AS unique_products
         FROM return_audit_logs
-        $where''',
+        ${filter.clause}''',
+      variables: filter.variables,
       readsFrom: {_db.returnAuditLogs},
     ).get();
 
-    final today = _todayMs;
-    final weekStart = _weekStartMs;
-    final monthStart = _monthStartMs;
-
-    // Time-range aggregation
-    String timeWhere(int since) {
-      final extra = where.isEmpty
-          ? 'WHERE created_at >= $since'
-          : '$where AND created_at >= $since';
-      return extra;
-    }
-
     Future<Map<String, dynamic>> timeAgg(int since) async {
-      final tw = timeWhere(since);
+      final clause = _appendSince(filter.clause, filter.variables, since);
+      final vars = [...filter.variables, Variable.withInt(since)];
       final rows = await _db.customSelect(
         '''SELECT COUNT(*) AS cnt, COALESCE(SUM(returned_amount), 0) AS amt
-           FROM return_audit_logs $tw''',
+           FROM return_audit_logs $clause''',
+        variables: vars,
         readsFrom: {_db.returnAuditLogs},
       ).get();
-      final row = rows.isNotEmpty ? rows.first.data : <String, dynamic>{};
-      return row;
+      return rows.isNotEmpty ? rows.first.data : <String, dynamic>{};
     }
 
-    final todayData = await timeAgg(today);
-    final weekData = await timeAgg(weekStart);
-    final monthData = await timeAgg(monthStart);
+    final todayData = await timeAgg(_todayMs);
+    final weekData = await timeAgg(_weekStartMs);
+    final monthData = await timeAgg(_monthStartMs);
 
     final main = mainRows.isNotEmpty ? mainRows.first.data : <String, dynamic>{};
 
@@ -165,27 +163,35 @@ class ReturnAnalyticsRepository {
   // ---- Daily trend (last 30 days or filtered range) -----------------------
 
   Future<List<ReturnTrendPoint>> getDailyTrend(ReturnAnalyticsFilter f) async {
-    // Use a 30-day default if no dates set
     final effectiveFrom = f.fromDate ??
         DateTime.now().subtract(const Duration(days: 29));
     final effectiveTo = f.toDate ?? DateTime.now();
-    final fromMs = DateTime(effectiveFrom.year, effectiveFrom.month,
-            effectiveFrom.day)
-        .millisecondsSinceEpoch;
-    final toMs = DateTime(
-            effectiveTo.year, effectiveTo.month, effectiveTo.day, 23, 59, 59)
-        .millisecondsSinceEpoch;
+    final fromMs = ReturnAnalyticsDateUtils.startMs(effectiveFrom);
+    final toMs = ReturnAnalyticsDateUtils.endMs(effectiveTo);
 
-    String extra = 'WHERE ral.created_at >= $fromMs AND ral.created_at <= $toMs';
+    final parts = <String>[
+      'ral.created_at >= ?',
+      'ral.created_at <= ?',
+    ];
+    final vars = <Variable>[
+      Variable.withInt(fromMs),
+      Variable.withInt(toMs),
+    ];
+
     if (f.cashierUserId != null) {
-      extra += ' AND ral.cashier_user_id = ${f.cashierUserId}';
+      parts.add('ral.cashier_user_id = ?');
+      vars.add(Variable.withInt(f.cashierUserId!));
     }
     if (f.returnType != null) {
-      extra += " AND ral.return_type = '${f.returnType}'";
+      parts.add('ral.return_type = ?');
+      vars.add(Variable.withString(f.returnType!));
     }
     if (f.productId != null) {
-      extra += ' AND ral.product_id = ${f.productId}';
+      parts.add('ral.product_id = ?');
+      vars.add(Variable.withInt(f.productId!));
     }
+
+    final where = 'WHERE ${parts.join(' AND ')}';
 
     final rows = await _db.customSelect(
       '''SELECT
@@ -193,9 +199,10 @@ class ReturnAnalyticsRepository {
           COUNT(*)                                                AS cnt,
           COALESCE(SUM(ral.returned_amount), 0)                  AS amt
         FROM return_audit_logs ral
-        $extra
+        $where
         GROUP BY day
         ORDER BY day ASC''',
+      variables: vars,
       readsFrom: {_db.returnAuditLogs},
     ).get();
 
@@ -214,7 +221,7 @@ class ReturnAnalyticsRepository {
     ReturnAnalyticsFilter f, {
     int limit = 10,
   }) async {
-    final where = _whereClause(f, prefix: 'ral');
+    final filter = _whereFilter(f, prefix: 'ral');
 
     final rows = await _db.customSelect(
       '''SELECT
@@ -225,10 +232,11 @@ class ReturnAnalyticsRepository {
           COUNT(*) AS return_count
         FROM return_audit_logs ral
         LEFT JOIN products p ON p.id = ral.product_id
-        $where
+        ${filter.clause}
         GROUP BY ral.product_id
         ORDER BY total_amt DESC
         LIMIT $limit''',
+      variables: filter.variables,
       readsFrom: {_db.returnAuditLogs, _db.products},
     ).get();
 
@@ -248,7 +256,7 @@ class ReturnAnalyticsRepository {
 
   Future<List<CashierReturnStat>> getCashierStats(
       ReturnAnalyticsFilter f) async {
-    final where = _whereClause(f);
+    final filter = _whereFilter(f);
 
     final rows = await _db.customSelect(
       '''SELECT
@@ -259,9 +267,10 @@ class ReturnAnalyticsRepository {
           COUNT(CASE WHEN return_type = 'full'    THEN 1 END) AS full_count,
           COUNT(CASE WHEN return_type = 'partial' THEN 1 END) AS partial_count
         FROM return_audit_logs
-        $where
+        ${filter.clause}
         GROUP BY cashier_user_id
         ORDER BY total_returns DESC''',
+      variables: filter.variables,
       readsFrom: {_db.returnAuditLogs},
     ).get();
 
@@ -284,13 +293,12 @@ class ReturnAnalyticsRepository {
     final flags = <SuspiciousFlag>[];
     final todayMs = _todayMs;
 
-    // 1. High daily return volume today
     final todayCountRows = await _db.customSelect(
-      'SELECT COUNT(*) AS cnt FROM return_audit_logs WHERE created_at >= $todayMs',
+      'SELECT COUNT(*) AS cnt FROM return_audit_logs WHERE created_at >= ?',
+      variables: [Variable.withInt(todayMs)],
       readsFrom: {_db.returnAuditLogs},
     ).get();
-    final todayCount =
-        (todayCountRows.first.data['cnt'] as int?) ?? 0;
+    final todayCount = (todayCountRows.first.data['cnt'] as int?) ?? 0;
     if (todayCount >= 15) {
       flags.add(SuspiciousFlag(
         title: 'حجم مرتجعات مرتفع اليوم',
@@ -301,17 +309,17 @@ class ReturnAnalyticsRepository {
       ));
     }
 
-    // 2. Cashier with excessive returns today
     final cashierTodayRows = await _db.customSelect(
       '''SELECT cashier_user_id,
                 COALESCE(cashier_name_snapshot,'—') AS name,
                 COUNT(*) AS cnt
          FROM return_audit_logs
-         WHERE created_at >= $todayMs
+         WHERE created_at >= ?
          GROUP BY cashier_user_id
          HAVING cnt >= 8
          ORDER BY cnt DESC
          LIMIT 5''',
+      variables: [Variable.withInt(todayMs)],
       readsFrom: {_db.returnAuditLogs},
     ).get();
     for (final r in cashierTodayRows) {
@@ -326,21 +334,22 @@ class ReturnAnalyticsRepository {
       ));
     }
 
-    // 3. Same product returned many times in last 7 days
-    final sevenDaysAgo =
-        DateTime.now().subtract(const Duration(days: 7)).millisecondsSinceEpoch;
+    final sevenDaysAgo = ReturnAnalyticsDateUtils.startMs(
+      DateTime.now().subtract(const Duration(days: 7)),
+    );
     final repeatedProductRows = await _db.customSelect(
       '''SELECT product_id,
                 COALESCE(p.name,'منتج #' || COALESCE(ral.product_id,'?')) AS pname,
                 COUNT(*) AS cnt
          FROM return_audit_logs ral
          LEFT JOIN products p ON p.id = ral.product_id
-         WHERE ral.created_at >= $sevenDaysAgo
+         WHERE ral.created_at >= ?
            AND ral.product_id IS NOT NULL
          GROUP BY ral.product_id
          HAVING cnt >= 5
          ORDER BY cnt DESC
          LIMIT 5''',
+      variables: [Variable.withInt(sevenDaysAgo)],
       readsFrom: {_db.returnAuditLogs, _db.products},
     ).get();
     for (final r in repeatedProductRows) {
@@ -355,16 +364,16 @@ class ReturnAnalyticsRepository {
       ));
     }
 
-    // 4. Large single return amount (top 3 biggest today)
     final largeRows = await _db.customSelect(
       '''SELECT COALESCE(cashier_name_snapshot,'—') AS name,
                 returned_amount,
                 invoice_id
          FROM return_audit_logs
-         WHERE created_at >= $todayMs
+         WHERE created_at >= ?
            AND returned_amount > 500
          ORDER BY returned_amount DESC
          LIMIT 3''',
+      variables: [Variable.withInt(todayMs)],
       readsFrom: {_db.returnAuditLogs},
     ).get();
     for (final r in largeRows) {
@@ -390,7 +399,7 @@ class ReturnAnalyticsRepository {
     int limit = 50,
     int offset = 0,
   }) async {
-    final where = _whereClause(filter, prefix: 'ral');
+    final where = _whereFilter(filter, prefix: 'ral');
 
     final rows = await _db.customSelect(
       '''SELECT
@@ -406,9 +415,10 @@ class ReturnAnalyticsRepository {
           ral.return_reason
         FROM return_audit_logs ral
         LEFT JOIN products p ON p.id = ral.product_id
-        $where
+        ${where.clause}
         ORDER BY ral.created_at DESC
         LIMIT $limit OFFSET $offset''',
+      variables: where.variables,
       readsFrom: {_db.returnAuditLogs, _db.products},
     ).get();
 
@@ -416,7 +426,7 @@ class ReturnAnalyticsRepository {
         .map((r) => RecentAuditRow(
               id: (r.data['id'] as int?) ?? 0,
               createdAt: DateTime.fromMillisecondsSinceEpoch(
-                  (r.data['created_at'] as int?) ?? 0),
+                  ReturnAnalyticsDateUtils.readTimestampMs(r.data['created_at'])),
               returnType: r.data['return_type'] as String? ?? '—',
               invoiceId: r.data['invoice_id'] as int?,
               cashierName: r.data['cashier_name'] as String? ?? '—',
@@ -431,12 +441,11 @@ class ReturnAnalyticsRepository {
         .toList();
   }
 
-  // ---- Total rows count (for pagination) ----------------------------------
-
   Future<int> getRecentActivityCount(ReturnAnalyticsFilter filter) async {
-    final where = _whereClause(filter, prefix: 'ral');
+    final where = _whereFilter(filter, prefix: 'ral');
     final rows = await _db.customSelect(
-      'SELECT COUNT(*) AS cnt FROM return_audit_logs ral $where',
+      'SELECT COUNT(*) AS cnt FROM return_audit_logs ral ${where.clause}',
+      variables: where.variables,
       readsFrom: {_db.returnAuditLogs},
     ).get();
     return (rows.first.data['cnt'] as int?) ?? 0;

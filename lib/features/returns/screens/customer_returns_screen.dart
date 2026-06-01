@@ -8,6 +8,7 @@ import '../../../core/services/pos_sale_service.dart';
 import '../../../core/widgets/manager_approval_dialog.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../products/providers/products_provider.dart';
+import '../providers/return_analytics_provider.dart';
 import 'widgets/smart_return_lookup_dialog.dart';
 
 final customerReturnsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
@@ -152,15 +153,31 @@ class _CustomerReturnsScreenState extends ConsumerState<CustomerReturnsScreen> {
               try {
                 final qty = double.tryParse(qtyCtrl.text) ?? 1;
                 final db = AppDatabase.instance;
+                final userId = ref.read(authProvider).valueOrNull?.user?.id;
+                final productName = selectedProductId != null
+                    ? products
+                        .firstWhere((p) => p.id == selectedProductId)
+                        .name
+                    : 'منتج';
                 await db.returnsDao.saveCustomerReturn(
                   header: CustomerReturnsCompanion(
                     returnNumber: drift.Value('RET-${DateTime.now().millisecondsSinceEpoch}'),
                     reason: drift.Value(noteCtrl.text.trim()),
                   ),
-                  items: [{'productId': selectedProductId, 'qty': qty, 'price': 0.0, 'discount': 0.0}],
+                  items: [
+                    {
+                      'productId': selectedProductId,
+                      'productName': productName,
+                      'qty': qty,
+                      'price': 0.0,
+                      'discount': 0.0,
+                    }
+                  ],
+                  returnedByUserId: userId,
                 );
                 ref.invalidate(customerReturnsProvider);
                 ref.invalidate(productsNotifierProvider);
+                invalidateReturnAnalytics(ref);
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('تم حفظ مرتجع العميل بنجاح'), backgroundColor: AppColors.success)
@@ -291,6 +308,7 @@ class _CustomerReturnsScreenState extends ConsumerState<CustomerReturnsScreen> {
                 
                 ref.invalidate(customerReturnsProvider);
                 ref.invalidate(productsNotifierProvider);
+                invalidateReturnAnalytics(ref);
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('تم الاسترجاع بدون فاتورة بنجاح'), backgroundColor: AppColors.success)

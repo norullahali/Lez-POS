@@ -18,6 +18,38 @@ class ReturnAnalyticsFilter {
     this.productId,
   });
 
+  /// Stable cache key derived from normalized filter dimensions.
+  String get cacheKey {
+    final from = fromDate?.millisecondsSinceEpoch ?? 'all';
+    final to = toDate?.millisecondsSinceEpoch ?? 'all';
+    final type = returnType ?? 'all';
+    final cashier = cashierUserId?.toString() ?? 'all';
+    final product = productId?.toString() ?? 'all';
+    return '${from}_${to}_${type}_${cashier}_$product';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ReturnAnalyticsFilter &&
+          runtimeType == other.runtimeType &&
+          fromDate?.millisecondsSinceEpoch ==
+              other.fromDate?.millisecondsSinceEpoch &&
+          toDate?.millisecondsSinceEpoch ==
+              other.toDate?.millisecondsSinceEpoch &&
+          cashierUserId == other.cashierUserId &&
+          returnType == other.returnType &&
+          productId == other.productId;
+
+  @override
+  int get hashCode => Object.hash(
+        fromDate?.millisecondsSinceEpoch,
+        toDate?.millisecondsSinceEpoch,
+        cashierUserId,
+        returnType,
+        productId,
+      );
+
   ReturnAnalyticsFilter copyWith({
     Object? fromDate = _sentinel,
     Object? toDate = _sentinel,

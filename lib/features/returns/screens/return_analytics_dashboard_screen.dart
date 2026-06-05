@@ -133,10 +133,22 @@ class _TopBarState extends ConsumerState<_TopBar> {
     });
   }
 
+  ReturnAnalyticsFilter _currentFilter() => ReturnAnalyticsFilter(
+        fromDate: _from,
+        toDate: _to,
+        returnType: _returnType,
+        cashierUserId: _cashierUserId,
+        productId: _productId,
+      );
+
+  void _apply() {
+    widget.onFilter(_currentFilter());
+  }
+
   Future<void> _pickDate(bool isFrom) async {
     final picked = await showDatePicker(
       context: context,
-      initialDate: DateTime.now(),
+      initialDate: _from ?? _to ?? DateTime.now(),
       firstDate: DateTime(2020),
       lastDate: DateTime.now(),
     );
@@ -148,16 +160,7 @@ class _TopBarState extends ConsumerState<_TopBar> {
         _to = picked;
       }
     });
-  }
-
-  void _apply() {
-    widget.onFilter(ReturnAnalyticsFilter(
-      fromDate: _from,
-      toDate: _to,
-      returnType: _returnType,
-      cashierUserId: _cashierUserId,
-      productId: _productId,
-    ));
+    _apply();
   }
 
   @override
@@ -225,7 +228,10 @@ class _TopBarState extends ConsumerState<_TopBar> {
                   DropdownMenuItem(
                       value: 'partial', child: Text('إرجاع جزئي')),
                 ],
-                onChanged: (v) => setState(() => _returnType = v),
+                onChanged: (v) {
+                  setState(() => _returnType = v);
+                  _apply();
+                },
                 style: const TextStyle(
                     fontSize: 13, color: AppColors.textPrimary),
               ),
@@ -247,7 +253,10 @@ class _TopBarState extends ConsumerState<_TopBar> {
                 DropdownMenuItem<int?>(value: null, child: Text('الكل')),
               ],
             ),
-            onChanged: (v) => setState(() => _cashierUserId = v),
+            onChanged: (v) {
+              setState(() => _cashierUserId = v);
+              _apply();
+            },
           ),
           const SizedBox(width: 8),
           _FilterDropdown<int?>(
@@ -265,7 +274,10 @@ class _TopBarState extends ConsumerState<_TopBar> {
                 DropdownMenuItem<int?>(value: null, child: Text('الكل')),
               ],
             ),
-            onChanged: (v) => setState(() => _productId = v),
+            onChanged: (v) {
+              setState(() => _productId = v);
+              _apply();
+            },
           ),
           const SizedBox(width: 8),
           FilledButton.icon(

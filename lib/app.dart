@@ -26,6 +26,7 @@ import 'features/inventory/screens/inventory_screen.dart';
 import 'features/returns/screens/customer_returns_screen.dart';
 import 'features/returns/screens/supplier_returns_screen.dart';
 import 'features/reports/screens/reports_screen.dart';
+import 'features/financial/screens/cash_ledger_screen.dart';
 import 'features/users/screens/users_screen.dart';
 import 'features/users/screens/roles_screen.dart';
 import 'features/customers/screens/customers_screen.dart';
@@ -202,6 +203,14 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
               path: '/reports',
               builder: (_, __) => _guardRoute('/reports', const ReportsScreen())),
+          GoRoute(
+              path: '/financial',
+              builder: (_, __) =>
+                  _guardRoute('/financial', const CashLedgerScreen())),
+          GoRoute(
+              path: '/financial/cash-ledger',
+              redirect: (_, __) => '/financial',
+          ),
           GoRoute(
             path: '/return-analytics',
             builder: (_, __) => _guardRoute(

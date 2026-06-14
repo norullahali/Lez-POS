@@ -39,7 +39,6 @@ class SaleItemReturns extends Table {
 
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
 
-  @override
   List<Index> get indexes => [
         Index(
           'sir_invoice_idx',

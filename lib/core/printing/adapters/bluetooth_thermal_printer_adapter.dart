@@ -9,7 +9,6 @@ import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:lez_pos/core/utils/receipt_paper_size.dart';
 import '../printer_capabilities.dart';
-import '../printer_config.dart';
 import '../thermal/thermal_printer_adapter.dart';
 
 /// Bluetooth ESC/POS thermal printer adapter.

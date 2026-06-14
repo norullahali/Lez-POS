@@ -33,7 +33,6 @@ class ActivityLogs extends Table {
   TextColumn get deviceInfo => text().nullable()();
   TextColumn get ipAddress => text().nullable()();
 
-  @override
   List<Index> get indexes => [
         Index('idx_activity_logs_created_at', 'created_at DESC'),
         Index('idx_activity_logs_user_id', 'user_id'),

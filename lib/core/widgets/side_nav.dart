@@ -89,6 +89,11 @@ const kNavItems = [
       label: 'التقارير',
       permissionKey: PermissionKeys.reportsView),
   NavItem(
+      route: '/financial',
+      icon: Icons.account_balance_wallet_rounded,
+      label: 'الماليات',
+      permissionKey: PermissionKeys.analyticsFinancial),
+  NavItem(
       route: '/automation/actions',
       icon: Icons.auto_awesome_rounded,
       label: 'مركز الإجراءات',
@@ -170,7 +175,10 @@ class SideNav extends ConsumerWidget {
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               children: visibleItems
                   .map((item) => _NavTile(
-                      item: item, isActive: currentRoute == item.route))
+                      item: item,
+                      isActive: currentRoute == item.route ||
+                          (item.route != '/dashboard' &&
+                              currentRoute.startsWith(item.route))))
                   .toList(),
             ),
           ),

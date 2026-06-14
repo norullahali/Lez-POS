@@ -16,7 +16,6 @@ class StockMovements extends Table {
   DateTimeColumn get createdAt =>
       dateTime().withDefault(currentDateAndTime)();
 
-  @override
   List<Index> get indexes => [
         Index(
           'smov_product_idx',

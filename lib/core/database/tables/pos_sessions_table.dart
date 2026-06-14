@@ -25,7 +25,6 @@ class PosSessions extends Table {
   TextColumn get notes => text().nullable()();
   BoolColumn get isClosed => boolean().withDefault(const Constant(false))();
 
-  @override
   List<Index> get indexes => [
         Index('ps_status_idx',
             'CREATE INDEX IF NOT EXISTS ps_status_idx ON pos_sessions (is_closed)'),

@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ffi';
 import 'package:win32/win32.dart';
@@ -10,7 +9,7 @@ class ThermalPrinterService {
     final List<int> bytes = <int>[];
 
     // -- Header -------------------------
-    bytes.addAll(_textCenter(data.storeName ?? '', bold: true, size: 2));
+    bytes.addAll(_textCenter(data.storeName, bold: true, size: 2));
 
     if (data.phone != null) {
       bytes.addAll(_textCenter(data.phone!));

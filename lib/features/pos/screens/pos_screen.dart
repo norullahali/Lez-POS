@@ -6,8 +6,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 import '../../../core/theme/app_colors.dart';
-import '../../backup/screens/settings_screen.dart';
-import '../../../core/services/settings_service.dart';
 import '../../categories/providers/categories_provider.dart';
 import '../../customers/providers/customer_accounts_provider.dart';
 import '../../loyalty/providers/loyalty_provider.dart';
@@ -16,7 +14,6 @@ import '../../products/providers/products_provider.dart';
 import '../providers/pos_products_provider.dart';
 import '../providers/cart_stock_provider.dart';
 import '../models/cart_item.dart';
-import '../models/cart_session.dart';
 import '../providers/pos_provider.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../../core/database/app_database.dart';
@@ -870,34 +867,6 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
         ),
       );
 
-// أو ترسله للطابعة / viewer
-      final pointsBefore = selectedCustomer != null && selectedCustomer.id != 1
-          ? ref
-                  .read(customerLoyaltyPointsProvider(selectedCustomer.id))
-                  .valueOrNull ??
-              0
-          : null;
-      double? pointsEarned;
-      double? pointsAfter;
-
-      final pb = pointsBefore;
-      if (pb != null) {
-        final settings = SettingsService(AppDatabase.instance);
-        final lsn = await settings.loadLoyaltySettings();
-        if (lsn.enabled) {
-          final netTotal = activeCartSnapshot.total - payment.loyaltyDiscount;
-          pointsEarned = lsn.earnedPoints(netTotal);
-          pointsAfter = pb - payment.pointsUsed + pointsEarned;
-        }
-      }
-
-      final currentDebt = payment.method == 'DEBT' || payment.method == 'MIXED'
-          ? (customerBalance - payment.cashPaid + activeCartSnapshot.total)
-          : customerBalance;
-
-      final cashierName = ref.read(authProvider).valueOrNull?.user?.fullName ??
-          session.cashierName;
-
       // clearCart() resets loyaltyPointsUsed/loyaltyDiscount too.
       ref.read(cartProvider.notifier).clearCart();
       _invoiceDiscountCtrl.text = '0';
@@ -1511,31 +1480,6 @@ class _ProductCard extends ConsumerWidget {
       ),
       ),  // GestureDetector
     );    // MouseRegion
-  }
-}
-
-class _SummaryRow extends StatelessWidget {
-  final String label;
-  final String value;
-  const _SummaryRow(this.label, this.value);
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label,
-              style: const TextStyle(color: Colors.white70, fontSize: 14)),
-          Text(value,
-              style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 15)),
-        ],
-      ),
-    );
   }
 }
 

@@ -28,4 +28,10 @@ class ActivityTypes {
 
   static const sessionOpened = 'sessions.opened';
   static const sessionClosed = 'sessions.closed';
+
+  static const expenseCreated = 'expense.created';
+  static const expenseUpdated = 'expense.updated';
+  static const expenseVoided = 'expense.voided';
+  static const expenseCategoryCreated = 'expense.category.created';
+  static const expenseCategoryUpdated = 'expense.category.updated';
 }

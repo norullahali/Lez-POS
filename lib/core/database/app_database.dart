@@ -37,10 +37,13 @@ import 'tables/stock_movements_table.dart';
 import 'tables/sale_item_returns_table.dart';
 import 'tables/return_audit_logs_table.dart';
 import 'tables/activity_logs_table.dart';
+import 'tables/expense_categories_table.dart';
+import 'tables/expense_records_table.dart';
 import 'daos/stock_movements_dao.dart';
 import 'daos/sale_item_returns_dao.dart';
 import 'daos/return_audit_logs_dao.dart';
 import 'daos/activity_logs_dao.dart';
+import 'daos/expenses_dao.dart';
 import 'daos/users_dao.dart';
 import 'daos/categories_dao.dart';
 import 'daos/suppliers_dao.dart';
@@ -93,6 +96,8 @@ part 'app_database.g.dart';
     SaleItemReturns,
     ReturnAuditLogs,
     ActivityLogs,
+    ExpenseCategories,
+    ExpenseRecords,
   ],
   daos: [
     UsersDao,
@@ -112,6 +117,7 @@ part 'app_database.g.dart';
     SaleItemReturnsDao,
     ReturnAuditLogsDao,
     ActivityLogsDao,
+    ExpensesDao,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -128,7 +134,7 @@ class AppDatabase extends _$AppDatabase {
   late final pricingDao = PricingDao(this);
 
   @override
-  int get schemaVersion => 28;
+  int get schemaVersion => 29;
 
   @override
   MigrationStrategy get migration {
@@ -730,6 +736,19 @@ class AppDatabase extends _$AppDatabase {
           } catch (e) {
             debugPrint('[Migration v28] return_audit_logs backfill skip: $e');
           }
+        }
+        if (from < 29) {
+          try {
+            await m.createTable(expenseCategories);
+          } catch (e) {
+            debugPrint('[Migration v29] create expense_categories error: $e');
+          }
+          try {
+            await m.createTable(expenseRecords);
+          } catch (e) {
+            debugPrint('[Migration v29] create expense_records error: $e');
+          }
+          debugPrint('[Migration v29] expense management tables ready');
         }
       },
       beforeOpen: (details) async {

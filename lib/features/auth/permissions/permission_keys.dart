@@ -37,6 +37,11 @@ class PermissionKeys {
   static const auditExport = 'audit.export';
   static const securityView = 'security.view';
 
+  static const financialExpensesView = 'financial.expenses.view';
+  static const financialExpensesCreate = 'financial.expenses.create';
+  static const financialExpensesEdit = 'financial.expenses.edit';
+  static const financialExpensesDelete = 'financial.expenses.delete';
+
   static const all = [
     posSell,
     posDiscount,
@@ -64,6 +69,10 @@ class PermissionKeys {
     auditView,
     auditExport,
     securityView,
+    financialExpensesView,
+    financialExpensesCreate,
+    financialExpensesEdit,
+    financialExpensesDelete,
   ];
 
   static const descriptions = <String, String>{
@@ -93,6 +102,10 @@ class PermissionKeys {
     auditView: 'عرض سجل النشاط والتدقيق',
     auditExport: 'تصدير سجل النشاط',
     securityView: 'عرض إعدادات الأمان',
+    financialExpensesView: 'عرض المصروفات وفئاتها',
+    financialExpensesCreate: 'تسجيل مصروفات جديدة',
+    financialExpensesEdit: 'تعديل المصروفات وفئاتها',
+    financialExpensesDelete: 'إلغاء المصروفات',
   };
 
   static String descriptionFor(String key) => descriptions[key] ?? key;

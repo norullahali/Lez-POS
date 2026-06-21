@@ -12,6 +12,7 @@ class ActivityCategories {
   static const security = 'security';
   static const sessions = 'sessions';
   static const backup = 'backup';
+  static const financial = 'financial';
 
   static const all = [
     auth,
@@ -23,6 +24,7 @@ class ActivityCategories {
     security,
     sessions,
     backup,
+    financial,
   ];
 
   static String labelAr(String category) => switch (category) {
@@ -35,6 +37,7 @@ class ActivityCategories {
         security => 'الأمان',
         sessions => 'الجلسات',
         backup => 'النسخ الاحتياطي',
+        financial => 'المالية',
         _ => category,
       };
 
@@ -48,6 +51,7 @@ class ActivityCategories {
         security => Icons.security_rounded,
         sessions => Icons.schedule_rounded,
         backup => Icons.backup_outlined,
+        financial => Icons.account_balance_wallet_outlined,
         _ => Icons.history_rounded,
       };
 }

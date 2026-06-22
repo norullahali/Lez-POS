@@ -116,6 +116,40 @@ WHERE ral.returned_amount > 0
       AND ral.invoice_id IS NOT NULL
       AND cr.original_invoice_id = ral.invoice_id
   )
+
+UNION ALL
+
+-- Phase 3.3: Operational expenses — derived from expense_records.
+-- Section 3: expense_records is the sole source of truth; no ledger table created.
+-- Section 4: is_voided = 0 — voided expenses are fully excluded (no reversal rows).
+-- Section 6: No double-count guard required.
+--   expense_records represent operational costs (overhead, utilities, wages, etc.)
+--   They are INDEPENDENT of purchase_invoices (goods procurement) and
+--   supplier_transactions (payment against purchase debt). Separate accounting objects.
+--   One expense_record → exactly one EXPENSE ledger entry.
+SELECT
+  'EXPENSE:' || er.id,
+  er.paid_at,
+  'EXPENSE',
+  er.amount,
+  'outflow',
+  'expense_record',
+  er.id,
+  er.created_by,
+  NULL,
+  NULL,
+  NULL,
+  COALESCE(
+    (SELECT ec.name FROM expense_categories ec WHERE ec.id = er.category_id)
+      || CASE WHEN NULLIF(TRIM(er.notes), '') IS NOT NULL
+              THEN ' \u2014 ' || er.notes
+              ELSE '' END,
+    NULLIF(TRIM(er.notes), ''),
+    '\u0645\u0635\u0631\u0648\u0641'
+  )
+FROM expense_records er
+WHERE er.is_voided = 0
+  AND er.amount > 0
 ''';
 
   Future<CashLedgerSummary> getSummary(CashLedgerFilter filter) async {
@@ -291,6 +325,8 @@ LIMIT ${filter.pageSize} OFFSET $offset
         _db.supplierTransactions,
         _db.returnAuditLogs,
         _db.customerReturns,
+        _db.expenseRecords,    // Phase 3.3
+        _db.expenseCategories, // Phase 3.3 — category name in description
       };
 }
 

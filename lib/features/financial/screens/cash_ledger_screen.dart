@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 
 import '../../../core/theme/app_colors.dart';
-import '../../reports/core/models/report_date_preset.dart';
 import '../../reports/core/models/report_filter_model.dart';
 import '../../reports/core/providers/report_permissions.dart';
 import '../../reports/core/services/report_drill_down_service.dart';
@@ -31,19 +30,8 @@ class CashLedgerScreen extends ConsumerStatefulWidget {
 
 class _CashLedgerScreenState extends ConsumerState<CashLedgerScreen> {
   final _searchCtrl = TextEditingController();
-  final _ledgerVScrollCtrl = ScrollController(); // FORENSIC TEMP
+  final _ledgerVScrollCtrl = ScrollController();
   final _df = DateFormat('yyyy/MM/dd HH:mm');
-
-  @override
-  void initState() {
-    super.initState();
-    // FORENSIC TEMP: apply "This Year" filter for runtime capture
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _onDateFilterChanged(
-        const ReportFilterModel(preset: ReportDatePreset.thisYear),
-      );
-    });
-  }
 
   @override
   void dispose() {
@@ -58,32 +46,11 @@ class _CashLedgerScreenState extends ConsumerState<CashLedgerScreen> {
   }
 
   void _onDateFilterChanged(ReportFilterModel filter) {
-    final range = filter.resolveRange();
-    final sqlStart =
-        DateTime(range.start.year, range.start.month, range.start.day);
-    final sqlEnd = DateTime(range.end.year, range.end.month, range.end.day)
-        .add(const Duration(days: 1));
-    debugPrint(
-      '[CashLedger] preset=${filter.preset.labelAr} '
-      'rangeStart=${range.start.toIso8601String().split('T').first} '
-      'rangeEnd=${range.end.toIso8601String().split('T').first} '
-      'sqlStart=$sqlStart sqlEndExclusive=$sqlEnd',
-    );
     ref.read(cashLedgerFilterProvider.notifier).setDateFilter(filter);
   }
 
   @override
   Widget build(BuildContext context) {
-    ref.listen(cashLedgerSummaryProvider, (previous, next) {
-      next.whenData((summary) {
-        debugPrint(
-          '[CashLedger] preset=${ref.read(cashLedgerFilterProvider).dateFilter.preset.labelAr} '
-          'matchingRows=${summary.transactionCount} '
-          'inflow=${summary.totalInflow} outflow=${summary.totalOutflow}',
-        );
-      });
-    });
-
     return AnalyticsPermissionGate(
       requiresFinancial: true,
       requiresInventory: false,
@@ -138,7 +105,7 @@ class _CashLedgerScreenState extends ConsumerState<CashLedgerScreen> {
           ),
         ),
         Chip(
-          avatar: Icon(Icons.lock_outline, size: 16, color: AppColors.info),
+          avatar: const Icon(Icons.lock_outline, size: 16, color: AppColors.info),
           label: const Text('قراءة فقط'),
           backgroundColor: AppColors.info.withValues(alpha: 0.08),
         ),
@@ -294,7 +261,7 @@ class _CashLedgerScreenState extends ConsumerState<CashLedgerScreen> {
           onRetry: _refresh,
           loadingStyle: ReportLoadingStyle.spinner,
           dataBuilder: (_, page) {
-            final columns = const [
+            const columns = [
               DataColumn(label: Text('التاريخ')),
               DataColumn(label: Text('النوع')),
               DataColumn(label: Text('المرجع')),
@@ -306,18 +273,6 @@ class _CashLedgerScreenState extends ConsumerState<CashLedgerScreen> {
 
             final rows =
                 page.entries.map((e) => _buildRow(context, ref, e)).toList();
-
-            // FORENSIC TEMP
-            debugPrint(
-              '[CashLedger FORENSIC] page.totalCount=${page.totalCount} '
-              'page.entries.length=${page.entries.length} rows.length=${rows.length}',
-            );
-            for (var i = 0; i < page.entries.length && i < 10; i++) {
-              final e = page.entries[i];
-              debugPrint(
-                '[CashLedger FORENSIC] row[$i] ledger_id=${e.id} eventType=${e.eventType.code}',
-              );
-            }
 
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -339,25 +294,6 @@ class _CashLedgerScreenState extends ConsumerState<CashLedgerScreen> {
                         )
                       : LayoutBuilder(
                           builder: (context, constraints) {
-                            // FORENSIC TEMP
-                            debugPrint(
-                              '[CashLedger FORENSIC] constraints.maxWidth=${constraints.maxWidth} '
-                              'constraints.maxHeight=${constraints.maxHeight}',
-                            );
-                            WidgetsBinding.instance.addPostFrameCallback((_) {
-                              if (_ledgerVScrollCtrl.hasClients) {
-                                final p = _ledgerVScrollCtrl.position;
-                                debugPrint(
-                                  '[CashLedger FORENSIC] scroll.pixels=${p.pixels} '
-                                  'scroll.maxScrollExtent=${p.maxScrollExtent} '
-                                  'scroll.viewportDimension=${p.viewportDimension}',
-                                );
-                              } else {
-                                debugPrint(
-                                  '[CashLedger FORENSIC] scroll controller has no clients',
-                                );
-                              }
-                            });
                             return Scrollbar(
                               thumbVisibility: true,
                               controller: _ledgerVScrollCtrl,
@@ -463,6 +399,9 @@ class _CashLedgerScreenState extends ConsumerState<CashLedgerScreen> {
             ),
           );
         }
+      case CashLedgerEventType.expense:
+        // Phase 3.3: expense rows in ledger are read-only; no drill-down yet.
+        break;
     }
   }
 }

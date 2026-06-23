@@ -34,4 +34,10 @@ class ActivityTypes {
   static const expenseVoided = 'expense.voided';
   static const expenseCategoryCreated = 'expense.category.created';
   static const expenseCategoryUpdated = 'expense.category.updated';
+
+  static const incomeCreated = 'income.created';
+  static const incomeUpdated = 'income.updated';
+  static const incomeVoided = 'income.voided';
+  static const incomeCategoryCreated = 'income.category.created';
+  static const incomeCategoryUpdated = 'income.category.updated';
 }

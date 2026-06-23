@@ -39,11 +39,14 @@ import 'tables/return_audit_logs_table.dart';
 import 'tables/activity_logs_table.dart';
 import 'tables/expense_categories_table.dart';
 import 'tables/expense_records_table.dart';
+import 'tables/other_income_categories_table.dart';
+import 'tables/other_income_records_table.dart';
 import 'daos/stock_movements_dao.dart';
 import 'daos/sale_item_returns_dao.dart';
 import 'daos/return_audit_logs_dao.dart';
 import 'daos/activity_logs_dao.dart';
 import 'daos/expenses_dao.dart';
+import 'daos/other_income_dao.dart';
 import 'daos/users_dao.dart';
 import 'daos/categories_dao.dart';
 import 'daos/suppliers_dao.dart';
@@ -98,6 +101,8 @@ part 'app_database.g.dart';
     ActivityLogs,
     ExpenseCategories,
     ExpenseRecords,
+    OtherIncomeCategories,
+    OtherIncomeRecords,
   ],
   daos: [
     UsersDao,
@@ -118,6 +123,7 @@ part 'app_database.g.dart';
     ReturnAuditLogsDao,
     ActivityLogsDao,
     ExpensesDao,
+    OtherIncomeDao,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -134,7 +140,7 @@ class AppDatabase extends _$AppDatabase {
   late final pricingDao = PricingDao(this);
 
   @override
-  int get schemaVersion => 29;
+  int get schemaVersion => 30;
 
   @override
   MigrationStrategy get migration {
@@ -749,6 +755,20 @@ class AppDatabase extends _$AppDatabase {
             debugPrint('[Migration v29] create expense_records error: $e');
           }
           debugPrint('[Migration v29] expense management tables ready');
+        }
+        if (from < 30) {
+          try {
+            await m.createTable(otherIncomeCategories);
+            debugPrint('[Migration v30] other_income_categories ready');
+          } catch (e) {
+            debugPrint('[Migration v30] create other_income_categories error: $e');
+          }
+          try {
+            await m.createTable(otherIncomeRecords);
+            debugPrint('[Migration v30] other_income_records ready');
+          } catch (e) {
+            debugPrint('[Migration v30] create other_income_records error: $e');
+          }
         }
       },
       beforeOpen: (details) async {

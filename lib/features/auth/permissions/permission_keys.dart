@@ -42,6 +42,11 @@ class PermissionKeys {
   static const financialExpensesEdit = 'financial.expenses.edit';
   static const financialExpensesDelete = 'financial.expenses.delete';
 
+  static const financialIncomeView = 'financial.income.view';
+  static const financialIncomeCreate = 'financial.income.create';
+  static const financialIncomeEdit = 'financial.income.edit';
+  static const financialIncomeDelete = 'financial.income.delete';
+
   static const all = [
     posSell,
     posDiscount,
@@ -73,6 +78,10 @@ class PermissionKeys {
     financialExpensesCreate,
     financialExpensesEdit,
     financialExpensesDelete,
+    financialIncomeView,
+    financialIncomeCreate,
+    financialIncomeEdit,
+    financialIncomeDelete,
   ];
 
   static const descriptions = <String, String>{
@@ -106,6 +115,10 @@ class PermissionKeys {
     financialExpensesCreate: 'تسجيل مصروفات جديدة',
     financialExpensesEdit: 'تعديل المصروفات وفئاتها',
     financialExpensesDelete: 'إلغاء المصروفات',
+    financialIncomeView: 'عرض الإيرادات الأخرى وفئاتها',
+    financialIncomeCreate: 'تسجيل إيرادات جديدة',
+    financialIncomeEdit: 'تعديل الإيرادات وفئاتها',
+    financialIncomeDelete: 'إلغاء الإيرادات',
   };
 
   static String descriptionFor(String key) => descriptions[key] ?? key;

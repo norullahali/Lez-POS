@@ -68,6 +68,7 @@ class _TopBar extends StatelessWidget {
       '/reports': 'التقارير',
       '/financial': 'الماليات — دفتر النقدية',
       '/expenses': 'إدارة المصروفات',
+      '/other-income': 'الإيرادات الأخرى',
       '/invoice-history': 'سجل الفواتير',
       '/users': 'إدارة المستخدمين',
       '/roles': 'الأدوار والصلاحيات',

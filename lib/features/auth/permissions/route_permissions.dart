@@ -42,6 +42,7 @@ const _routePermissionEntries = [
   _RoutePermission('/reports', PermissionKeys.reportsView),
   _RoutePermission('/financial', PermissionKeys.analyticsFinancial),
   _RoutePermission('/expenses', PermissionKeys.financialExpensesView),
+  _RoutePermission('/other-income', PermissionKeys.financialIncomeView),
   _RoutePermission('/operations/notifications', PermissionKeys.alertsView),
   _RoutePermission('/automation/actions', PermissionKeys.automationView),
   _RoutePermission('/return-analytics', PermissionKeys.reportsView),

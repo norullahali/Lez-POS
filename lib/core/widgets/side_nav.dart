@@ -99,6 +99,11 @@ const kNavItems = [
       label: 'المصروفات',
       permissionKey: PermissionKeys.financialExpensesView),
   NavItem(
+      route: '/other-income',
+      icon: Icons.trending_up_rounded,
+      label: 'الإيرادات الأخرى',
+      permissionKey: PermissionKeys.financialIncomeView),
+  NavItem(
       route: '/automation/actions',
       icon: Icons.auto_awesome_rounded,
       label: 'مركز الإجراءات',

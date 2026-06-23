@@ -108,3 +108,9 @@ final otherIncomeSummaryProvider =
   Future.delayed(const Duration(seconds: 45), keepAlive.close);
   return ref.read(otherIncomeRepositoryProvider).getSummary();
 });
+
+final usersMapForIncomeProvider =
+    FutureProvider.autoDispose<Map<int, String>>((ref) async {
+  final users = await appdb.AppDatabase.instance.usersDao.getAllUsers();
+  return {for (final u in users) u.id: u.fullName};
+});

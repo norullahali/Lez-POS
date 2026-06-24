@@ -19,6 +19,9 @@ import '../models/cash_ledger_summary.dart';
 import '../providers/cash_ledger_filter_provider.dart';
 import '../providers/cash_ledger_providers.dart';
 import '../widgets/cash_ledger_export_helper.dart';
+import '../widgets/other_income_details_dialog.dart';
+import '../../auth/permissions/permission_keys.dart';
+import '../../auth/providers/permission_provider.dart';
 
 /// Financial Management Center — Cash Ledger v1 (read-only derived ledger).
 class CashLedgerScreen extends ConsumerStatefulWidget {
@@ -403,9 +406,15 @@ class _CashLedgerScreenState extends ConsumerState<CashLedgerScreen> {
         // Phase 3.3: expense rows in ledger are read-only; no drill-down yet.
         break;
       case CashLedgerEventType.otherIncome:
-        // Phase 4.3: other income rows are read-only; no drill-down yet.
-        // Full navigation deferred to Phase 4.4+.
-        break;
+        final canView = ref.read(
+            permissionProvider(PermissionKeys.financialIncomeView));
+        if (!canView) break;
+        if (!context.mounted) break;
+        await showDialog<void>(
+          context: context,
+          builder: (_) =>
+              OtherIncomeDetailsDialog(incomeId: e.referenceId),
+        );
     }
   }
 }

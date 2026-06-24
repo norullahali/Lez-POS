@@ -165,6 +165,16 @@ class OtherIncomeRepository {
     );
   }
 
+  // ── Single record ─────────────────────────────────────────────────────────
+
+  /// Returns a single income record by ID, or null if not found.
+  /// Read-only — no writes, no activity logging.
+  Future<OtherIncomeRecord?> getIncomeById(int id) async {
+    final row = await _db.otherIncomeDao.getIncomeById(id);
+    if (row == null) return null;
+    return OtherIncomeRecord.fromDrift(row);
+  }
+
   // ── Paged query ───────────────────────────────────────────────────────────
 
   Future<OtherIncomePage> getIncomePaged({

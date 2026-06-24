@@ -8,7 +8,11 @@ enum CashLedgerEventType {
 
   /// Operational expense — outflow from expense_records (Phase 3.3).
   /// Color hint: warning/orange. Source of truth: expense_records.is_voided = 0.
-  expense('EXPENSE', '\u0645\u0635\u0631\u0648\u0641', false);
+  expense('EXPENSE', '\u0645\u0635\u0631\u0648\u0641', false),
+
+  /// Other income — inflow from other_income_records (Phase 4.3).
+  /// Color hint: success/green. Source of truth: other_income_records.is_voided = 0.
+  otherIncome('OTHER_INCOME', '\u0625\u064a\u0631\u0627\u062f \u0622\u062e\u0631', true);
 
   const CashLedgerEventType(this.code, this.labelAr, this.isInflow);
 

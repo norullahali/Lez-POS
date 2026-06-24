@@ -402,6 +402,10 @@ class _CashLedgerScreenState extends ConsumerState<CashLedgerScreen> {
       case CashLedgerEventType.expense:
         // Phase 3.3: expense rows in ledger are read-only; no drill-down yet.
         break;
+      case CashLedgerEventType.otherIncome:
+        // Phase 4.3: other income rows are read-only; no drill-down yet.
+        // Full navigation deferred to Phase 4.4+.
+        break;
     }
   }
 }

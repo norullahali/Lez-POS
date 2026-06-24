@@ -150,6 +150,39 @@ SELECT
 FROM expense_records er
 WHERE er.is_voided = 0
   AND er.amount > 0
+
+UNION ALL
+
+-- Phase 4.3: Other income — derived from other_income_records.
+-- other_income_records is the sole source of truth; no ledger table created.
+-- is_voided = 0 — voided records are fully excluded (no reversal rows).
+-- No double-count guard required.
+--   other_income_records represent non-sales cash inflows (commissions, rent, etc.)
+--   They are INDEPENDENT of sales_invoices and customer_transactions.
+--   One other_income_record → exactly one OTHER_INCOME ledger entry.
+SELECT
+  'OTHER_INCOME:' || oir.id,
+  oir.received_at,
+  'OTHER_INCOME',
+  oir.amount,
+  'inflow',
+  'other_income_record',
+  oir.id,
+  oir.created_by,
+  NULL,
+  NULL,
+  NULL,
+  COALESCE(
+    (SELECT oic.name FROM other_income_categories oic WHERE oic.id = oir.category_id)
+      || CASE WHEN NULLIF(TRIM(oir.notes), '') IS NOT NULL
+              THEN ' \u2014 ' || oir.notes
+              ELSE '' END,
+    NULLIF(TRIM(oir.notes), ''),
+    '\u0625\u064a\u0631\u0627\u062f \u0622\u062e\u0631'
+  )
+FROM other_income_records oir
+WHERE oir.is_voided = 0
+  AND oir.amount > 0
 ''';
 
   Future<CashLedgerSummary> getSummary(CashLedgerFilter filter) async {
@@ -325,8 +358,10 @@ LIMIT ${filter.pageSize} OFFSET $offset
         _db.supplierTransactions,
         _db.returnAuditLogs,
         _db.customerReturns,
-        _db.expenseRecords,    // Phase 3.3
-        _db.expenseCategories, // Phase 3.3 — category name in description
+        _db.expenseRecords,         // Phase 3.3
+        _db.expenseCategories,      // Phase 3.3 — category name in description
+        _db.otherIncomeRecords,     // Phase 4.3
+        _db.otherIncomeCategories,  // Phase 4.3 — category name in description
       };
 }
 

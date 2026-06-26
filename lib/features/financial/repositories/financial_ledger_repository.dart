@@ -185,6 +185,35 @@ WHERE oir.is_voided = 0
   AND oir.amount > 0
 ''';
 
+  /// All-time Cash Ledger net — no date filter, no event-type filter.
+  /// Returns the accumulated cash balance since the first recorded ledger entry.
+  /// Used by [dashboardCashBalanceProvider] (cached 45 s via keepAlive).
+  /// Result label in UI: "الرصيد النقدي المحسوب".
+  Future<CashLedgerSummary> getSummaryAllTime() async {
+    try {
+      const sql = '''
+SELECT
+  COALESCE(SUM(CASE WHEN q.direction = 'inflow' THEN q.amount ELSE 0 END), 0) AS total_in,
+  COALESCE(SUM(CASE WHEN q.direction = 'outflow' THEN q.amount ELSE 0 END), 0) AS total_out,
+  COUNT(*) AS cnt
+FROM ($_unionSql) q
+''';
+      final row = await _db
+          .customSelect(sql, readsFrom: _readSet())
+          .getSingle();
+      final totalIn = (row.data['total_in'] as num?)?.toDouble() ?? 0;
+      final totalOut = (row.data['total_out'] as num?)?.toDouble() ?? 0;
+      return CashLedgerSummary(
+        totalInflow: totalIn,
+        totalOutflow: totalOut,
+        netCashFlow: totalIn - totalOut,
+        transactionCount: (row.data['cnt'] as int?) ?? 0,
+      );
+    } catch (e) {
+      return CashLedgerSummary.empty;
+    }
+  }
+
   Future<CashLedgerSummary> getSummary(CashLedgerFilter filter) async {
     try {
       final range = filter.resolvedRange;

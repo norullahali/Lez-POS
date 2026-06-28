@@ -89,6 +89,11 @@ const kNavItems = [
       label: 'التقارير',
       permissionKey: PermissionKeys.reportsView),
   NavItem(
+      route: '/financial-dashboard',
+      icon: Icons.insights_rounded,
+      label: 'لوحة المؤشرات',
+      permissionKey: PermissionKeys.analyticsFinancial),
+  NavItem(
       route: '/financial',
       icon: Icons.account_balance_wallet_rounded,
       label: 'الماليات',

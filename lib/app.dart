@@ -27,6 +27,7 @@ import 'features/returns/screens/customer_returns_screen.dart';
 import 'features/returns/screens/supplier_returns_screen.dart';
 import 'features/reports/screens/reports_screen.dart';
 import 'features/financial/screens/cash_ledger_screen.dart';
+import 'features/financial/screens/financial_dashboard_screen.dart';
 import 'features/expenses/screens/expense_screen.dart';
 import 'features/other_income/screens/other_income_screen.dart';
 import 'features/users/screens/users_screen.dart';
@@ -205,6 +206,12 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
               path: '/reports',
               builder: (_, __) => _guardRoute('/reports', const ReportsScreen())),
+          GoRoute(
+              path: '/financial-dashboard',
+              builder: (_, __) => _guardRoute(
+                    '/financial-dashboard',
+                    const FinancialDashboardScreen(),
+                  )),
           GoRoute(
               path: '/financial',
               builder: (_, __) =>

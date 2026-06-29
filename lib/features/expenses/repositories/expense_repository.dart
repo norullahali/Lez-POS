@@ -7,6 +7,7 @@ import '../../../core/services/activity_logger_service.dart';
 import '../models/expense_category.dart';
 import '../models/expense_page.dart';
 import '../models/expense_record.dart';
+import '../models/expense_summary.dart';
 
 class ExpenseRepository {
   ExpenseRepository(this._db) {
@@ -18,23 +19,20 @@ class ExpenseRepository {
 
   Future<int> createCategory(ExpenseCategory category) async {
     final id = await _db.expensesDao.createCategory(
-      db.ExpenseCategoriesCompanion.insert(
-        name: category.name,
+      db.ExpenseCategoriesCompanion(
+        name: Value(category.name),
         description: Value(category.description),
         isActive: Value(category.isActive),
       ),
     );
-
     await _activityLogger.logEntityCreate(
       activityType: ActivityTypes.expenseCategoryCreated,
       category: ActivityCategories.financial,
       entityType: 'expense_category',
       entityId: id,
-      title: 'إضافة فئة مصروف',
+      title: '\u0625\u0636\u0627\u0641\u0629 \u0641\u0626\u0629 \u0645\u0635\u0631\u0648\u0641',
       description: category.name,
-      after: {'name': category.name, 'isActive': category.isActive},
     );
-
     return id;
   }
 
@@ -42,39 +40,22 @@ class ExpenseRepository {
     if (category.id == null) {
       throw ArgumentError('ExpenseCategory.id is required for update');
     }
-
-    final before = await _db.expensesDao.getCategoryById(category.id!);
-    final now = DateTime.now();
-
     await _db.expensesDao.updateCategory(
       db.ExpenseCategoriesCompanion(
         id: Value(category.id!),
         name: Value(category.name),
         description: Value(category.description),
         isActive: Value(category.isActive),
-        updatedAt: Value(now),
+        updatedAt: Value(DateTime.now()),
       ),
     );
-
     await _activityLogger.logEntityUpdate(
       activityType: ActivityTypes.expenseCategoryUpdated,
       category: ActivityCategories.financial,
       entityType: 'expense_category',
       entityId: category.id!,
-      title: 'تعديل فئة مصروف',
+      title: '\u062a\u0639\u062f\u064a\u0644 \u0641\u0626\u0629 \u0645\u0635\u0631\u0648\u0641',
       description: category.name,
-      before: before == null
-          ? null
-          : {
-              'name': before.name,
-              'description': before.description,
-              'isActive': before.isActive,
-            },
-      after: {
-        'name': category.name,
-        'description': category.description,
-        'isActive': category.isActive,
-      },
     );
   }
 
@@ -85,31 +66,24 @@ class ExpenseRepository {
 
   Future<int> createExpense(ExpenseRecord record) async {
     final id = await _db.expensesDao.createExpense(
-      db.ExpenseRecordsCompanion.insert(
-        categoryId: record.categoryId,
-        amount: record.amount,
-        expenseDate: record.expenseDate,
-        paidAt: record.paidAt,
+      db.ExpenseRecordsCompanion(
+        categoryId: Value(record.categoryId),
+        amount: Value(record.amount),
+        expenseDate: Value(record.expenseDate),
+        paidAt: Value(record.paidAt),
         notes: Value(record.notes),
         sessionId: Value(record.sessionId),
-        createdBy: record.createdBy,
+        createdBy: Value(record.createdBy),
       ),
     );
-
     await _activityLogger.logEntityCreate(
       activityType: ActivityTypes.expenseCreated,
       category: ActivityCategories.financial,
-      entityType: 'expense',
+      entityType: 'expense_record',
       entityId: id,
-      title: 'تسجيل مصروف',
-      description: record.notes.isEmpty ? null : record.notes,
-      after: {
-        'categoryId': record.categoryId,
-        'amount': record.amount,
-        'paidAt': record.paidAt.toIso8601String(),
-      },
+      title: '\u062a\u0633\u062c\u064a\u0644 \u0645\u0635\u0631\u0648\u0641',
+      description: record.amount.toStringAsFixed(2),
     );
-
     return id;
   }
 
@@ -117,19 +91,12 @@ class ExpenseRepository {
     if (record.id == null) {
       throw ArgumentError('ExpenseRecord.id is required for update');
     }
-
     late db.ExpenseRecord before;
-
     await _db.transaction(() async {
       final fetched = await _db.expensesDao.getExpenseById(record.id!);
-      if (fetched == null) {
-        throw StateError('Expense record not found');
-      }
-      if (fetched.isVoided) {
-        throw StateError('Cannot update voided expense');
-      }
+      if (fetched == null) throw StateError('Expense record not found');
+      if (fetched.isVoided) throw StateError('Cannot update voided expense');
       before = fetched;
-
       await _db.expensesDao.updateExpense(
         db.ExpenseRecordsCompanion(
           id: Value(record.id!),
@@ -145,87 +112,69 @@ class ExpenseRepository {
         ),
       );
     });
-
     await _activityLogger.logEntityUpdate(
       activityType: ActivityTypes.expenseUpdated,
       category: ActivityCategories.financial,
-      entityType: 'expense',
+      entityType: 'expense_record',
       entityId: record.id!,
-      title: 'تعديل مصروف',
-      description: record.notes.isEmpty ? null : record.notes,
-      before: {
-        'categoryId': before.categoryId,
-        'amount': before.amount,
-        'paidAt': before.paidAt.toIso8601String(),
-      },
-      after: {
-        'categoryId': record.categoryId,
-        'amount': record.amount,
-        'paidAt': record.paidAt.toIso8601String(),
-      },
+      title: '\u062a\u0639\u062f\u064a\u0644 \u0645\u0635\u0631\u0648\u0641',
+      description: '${before.amount} -> ${record.amount}',
     );
   }
 
   Future<void> voidExpense(int id) async {
     db.ExpenseRecord? before;
-
     await _db.transaction(() async {
       final fetched = await _db.expensesDao.getExpenseById(id);
-      if (fetched == null) {
-        throw StateError('Expense record not found');
-      }
-      if (fetched.isVoided) {
-        return;
-      }
+      if (fetched == null) throw StateError('Expense record not found');
+      if (fetched.isVoided) return;
       before = fetched;
-
       final voided = await _db.expensesDao.voidExpense(id);
-      if (!voided) {
-        throw StateError('Failed to void expense');
-      }
+      if (!voided) throw StateError('Failed to void expense');
     });
-
     if (before == null) return;
-
     await _activityLogger.logInfo(
       activityType: ActivityTypes.expenseVoided,
       category: ActivityCategories.financial,
       action: 'void',
-      title: 'إلغاء مصروف',
-      description: before!.notes.isEmpty ? null : before!.notes,
-      entityType: 'expense',
+      title: '\u0625\u0644\u063a\u0627\u0621 \u0645\u0635\u0631\u0648\u0641',
+      description: before!.notes,
       entityId: id,
-      metadata: {
-        'amount': before!.amount,
-        'categoryId': before!.categoryId,
-        'paidAt': before!.paidAt.toIso8601String(),
-      },
     );
-  }
-
-  Future<ExpenseRecord?> getExpenseById(int id) async {
-    final row = await _db.expensesDao.getExpenseById(id);
-    return row == null ? null : ExpenseRecord.fromDrift(row);
   }
 
   Future<ExpensePage> getExpensesPaged({
     required int page,
     required int pageSize,
     bool includeVoided = false,
+    int? categoryId,
+    DateTime? dateFrom,
+    DateTime? dateTo,
   }) async {
     final result = await _db.expensesDao.getExpensesPaged(
       page: page,
       pageSize: pageSize,
       includeVoided: includeVoided,
+      categoryId: categoryId,
+      dateFrom: dateFrom,
+      dateTo: dateTo,
     );
-
     return ExpensePage(
-      items: result.items
-          .map((r) => ExpenseRecord.fromDrift(r))
-          .toList(),
+      items: result.items.map(ExpenseRecord.fromDrift).toList(),
       totalCount: result.totalCount,
       page: result.page,
       pageSize: result.pageSize,
+    );
+  }
+
+  Future<ExpenseSummary> getSummary({required int categoryCount}) async {
+    final (activeCount, totalAmount, voidedCount) =
+        await _db.expensesDao.getExpenseSummary();
+    return ExpenseSummary(
+      activeCount: activeCount,
+      totalAmount: totalAmount,
+      voidedCount: voidedCount,
+      categoryCount: categoryCount,
     );
   }
 }

@@ -7,8 +7,9 @@ import '../providers/dashboard_filter_provider.dart';
 import '../providers/dashboard_providers.dart';
 import 'widgets/dashboard_cash_flow_section.dart';
 import 'widgets/dashboard_filter_section.dart';
+import 'widgets/dashboard_recent_activity_section.dart';
 
-/// Financial Dashboard -- Phase 5.2.2 filter bar + Cash Flow KPI cards.
+/// Financial Dashboard -- Phase 5.2.3.1 recent activity + prior sections.
 class FinancialDashboardScreen extends ConsumerStatefulWidget {
   const FinancialDashboardScreen({super.key});
 
@@ -70,10 +71,7 @@ class _FinancialDashboardScreenState
                 phaseLabel: 'Phase 5.2.2',
               ),
               _sectionSpacing,
-              const _DashboardSectionPlaceholder(
-                sectionTitle: '\u0627\u0644\u062d\u0631\u0643\u0627\u062a \u0627\u0644\u0623\u062e\u0631\u0649',
-                phaseLabel: 'Phase 5.2.3',
-              ),
+              DashboardRecentActivitySection(onRefresh: _refresh),
             ],
           ),
         ),

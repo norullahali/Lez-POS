@@ -71,12 +71,25 @@ class ExpensesDao extends DatabaseAccessor<AppDatabase>
     required int page,
     required int pageSize,
     bool includeVoided = false,
+    int? categoryId,
+    DateTime? dateFrom,
+    DateTime? dateTo,
   }) async {
     final countExpr = expenseRecords.id.count();
     final countQuery = selectOnly(expenseRecords)..addColumns([countExpr]);
     if (!includeVoided) {
       countQuery.where(expenseRecords.isVoided.equals(false));
     }
+    if (categoryId != null) {
+      countQuery.where(expenseRecords.categoryId.equals(categoryId));
+    }
+    if (dateFrom != null) {
+      countQuery.where(expenseRecords.paidAt.isBiggerOrEqualValue(dateFrom));
+    }
+    if (dateTo != null) {
+      countQuery.where(expenseRecords.paidAt.isSmallerOrEqualValue(dateTo));
+    }
+
     final countRow = await countQuery.getSingle();
     final totalCount = countRow.read(countExpr) ?? 0;
 
@@ -96,8 +109,15 @@ class ExpensesDao extends DatabaseAccessor<AppDatabase>
         (e) => OrderingTerm.desc(e.id),
       ])
       ..limit(pageSize, offset: offset);
-    if (!includeVoided) {
-      query.where((e) => e.isVoided.equals(false));
+    if (!includeVoided) query.where((e) => e.isVoided.equals(false));
+    if (categoryId != null) {
+      query.where((e) => e.categoryId.equals(categoryId));
+    }
+    if (dateFrom != null) {
+      query.where((e) => e.paidAt.isBiggerOrEqualValue(dateFrom));
+    }
+    if (dateTo != null) {
+      query.where((e) => e.paidAt.isSmallerOrEqualValue(dateTo));
     }
 
     final items = await query.get();
@@ -106,6 +126,23 @@ class ExpensesDao extends DatabaseAccessor<AppDatabase>
       totalCount: totalCount,
       page: page,
       pageSize: pageSize,
+    );
+  }
+
+  Future<(int activeCount, double totalAmount, int voidedCount)>
+      getExpenseSummary() async {
+    final row = await customSelect(
+      'SELECT '
+      'COUNT(CASE WHEN is_voided = 0 THEN 1 END) AS active_count, '
+      'COALESCE(SUM(CASE WHEN is_voided = 0 THEN amount END), 0.0) AS total_amount, '
+      'COUNT(CASE WHEN is_voided = 1 THEN 1 END) AS voided_count '
+      'FROM expense_records',
+      readsFrom: {expenseRecords},
+    ).getSingle();
+    return (
+      (row.data['active_count'] as int?) ?? 0,
+      (row.data['total_amount'] as num?)?.toDouble() ?? 0.0,
+      (row.data['voided_count'] as int?) ?? 0,
     );
   }
 }

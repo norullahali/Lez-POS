@@ -8,8 +8,9 @@ import '../providers/dashboard_providers.dart';
 import 'widgets/dashboard_cash_flow_section.dart';
 import 'widgets/dashboard_filter_section.dart';
 import 'widgets/dashboard_recent_activity_section.dart';
+import 'widgets/dashboard_supplementary_kpi_section.dart';
 
-/// Financial Dashboard -- Phase 5.2.3.1 recent activity + prior sections.
+/// Financial Dashboard -- read-only KPIs, filter, cash flow, and recent activity.
 class FinancialDashboardScreen extends ConsumerStatefulWidget {
   const FinancialDashboardScreen({super.key});
 
@@ -21,15 +22,6 @@ class FinancialDashboardScreen extends ConsumerStatefulWidget {
 class _FinancialDashboardScreenState
     extends ConsumerState<FinancialDashboardScreen> {
   static const _sectionSpacing = SizedBox(height: 16);
-  static const _sectionTitleStyle = TextStyle(
-    color: AppColors.textPrimary,
-    fontWeight: FontWeight.w700,
-    fontSize: 15,
-  );
-  static const _placeholderBodyStyle = TextStyle(
-    color: AppColors.textSecondary,
-    fontSize: 13,
-  );
 
   Future<void> _refresh() async {
     ref.invalidate(dashboardCashFlowProvider);
@@ -66,10 +58,7 @@ class _FinancialDashboardScreenState
               _sectionSpacing,
               DashboardCashFlowSection(onRefresh: _refresh),
               _sectionSpacing,
-              const _DashboardSectionPlaceholder(
-                sectionTitle: '\u0627\u0644\u0645\u0624\u0634\u0631\u0627\u062a \u0627\u0644\u062a\u0643\u0645\u064a\u0644\u064a\u0629',
-                phaseLabel: 'Phase 5.2.2',
-              ),
+              DashboardSupplementaryKpiSection(onRefresh: _refresh),
               _sectionSpacing,
               DashboardRecentActivitySection(onRefresh: _refresh),
             ],
@@ -147,44 +136,6 @@ class _ReadOnlyBadge extends StatelessWidget {
       ),
       label: const Text('READ ONLY'),
       backgroundColor: AppColors.info.withValues(alpha: 0.08),
-    );
-  }
-}
-
-class _DashboardSectionPlaceholder extends StatelessWidget {
-  const _DashboardSectionPlaceholder({
-    required this.sectionTitle,
-    required this.phaseLabel,
-  });
-
-  final String sectionTitle;
-  final String phaseLabel;
-
-  static const _cardPadding = EdgeInsets.all(20);
-  static const _titleBodySpacing = SizedBox(height: 12);
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      margin: EdgeInsets.zero,
-      clipBehavior: Clip.antiAlias,
-      child: Padding(
-        padding: _cardPadding,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              sectionTitle,
-              style: _FinancialDashboardScreenState._sectionTitleStyle,
-            ),
-            _titleBodySpacing,
-            Text(
-              '\u0633\u064a\u062a\u0645 \u062a\u0646\u0641\u064a\u0630 \u0647\u0630\u0627 \u0627\u0644\u0642\u0633\u0645 \u0641\u064a $phaseLabel',
-              style: _FinancialDashboardScreenState._placeholderBodyStyle,
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

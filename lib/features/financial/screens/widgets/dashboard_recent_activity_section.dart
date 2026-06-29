@@ -5,6 +5,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../reports/core/widgets/report_async_body.dart';
 import '../../models/cash_ledger_event.dart';
 import '../../providers/dashboard_providers.dart';
+import '../../widgets/cash_ledger_event_drill_down.dart';
 import 'dashboard_recent_activity_row.dart';
 
 /// Recent Activity section -- watches [dashboardRecentActivityProvider] only.
@@ -51,7 +52,11 @@ class DashboardRecentActivitySection extends ConsumerWidget {
             emptyMessage:
                 '\u0644\u0627 \u062a\u0648\u062c\u062f \u062d\u0631\u0643\u0627\u062a \u0641\u064a \u0627\u0644\u0641\u062a\u0631\u0629 \u0627\u0644\u0645\u062d\u062f\u062f\u0629',
             isEmpty: (entries) => entries.isEmpty,
-            dataBuilder: (_, entries) => _RecentActivityList(entries: entries),
+            dataBuilder: (_, entries) => _RecentActivityList(
+              entries: entries,
+              onEventTap: (event) =>
+                  CashLedgerEventDrillDown.open(context, ref, event),
+            ),
           ),
         ),
       ],
@@ -60,9 +65,13 @@ class DashboardRecentActivitySection extends ConsumerWidget {
 }
 
 class _RecentActivityList extends StatelessWidget {
-  const _RecentActivityList({required this.entries});
+  const _RecentActivityList({
+    required this.entries,
+    required this.onEventTap,
+  });
 
   final List<CashLedgerEvent> entries;
+  final void Function(CashLedgerEvent event) onEventTap;
 
   @override
   Widget build(BuildContext context) {
@@ -72,7 +81,10 @@ class _RecentActivityList extends StatelessWidget {
       children: [
         for (var i = 0; i < entries.length; i++) ...[
           if (i > 0) const Divider(height: 1),
-          DashboardRecentActivityRow(event: entries[i]),
+          DashboardRecentActivityRow(
+            event: entries[i],
+            onTap: () => onEventTap(entries[i]),
+          ),
         ],
       ],
     );

@@ -7,9 +7,14 @@ import '../../models/cash_ledger_event_type.dart';
 
 /// Read-only recent-activity row -- matches Cash Ledger color semantics.
 class DashboardRecentActivityRow extends StatelessWidget {
-  const DashboardRecentActivityRow({super.key, required this.event});
+  const DashboardRecentActivityRow({
+    super.key,
+    required this.event,
+    required this.onTap,
+  });
 
   final CashLedgerEvent event;
+  final VoidCallback onTap;
 
   static IconData _iconFor(CashLedgerEventType type) {
     return switch (type) {
@@ -43,89 +48,96 @@ class DashboardRecentActivityRow extends StatelessWidget {
         ? Icons.arrow_circle_down_rounded
         : Icons.arrow_circle_up_rounded;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: accent.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(_iconFor(event.eventType), color: accent, size: 20),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  event.eventType.labelAr,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textPrimary,
-                      ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  event.description,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppColors.textSecondary,
-                        fontSize: 12,
-                      ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        mouseCursor: SystemMouseCursors.click,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                AnalyticsFormatters.money(event.amount),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: amountColor,
-                    ),
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: accent.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(_iconFor(event.eventType), color: accent, size: 20),
               ),
-              const SizedBox(height: 4),
-              Row(
-                mainAxisSize: MainAxisSize.min,
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      event.eventType.labelAr,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textPrimary,
+                          ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      event.description,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: AppColors.textSecondary,
+                            fontSize: 12,
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Icon(directionIcon, size: 14, color: amountColor),
-                  const SizedBox(width: 4),
                   Text(
-                    directionLabel,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    AnalyticsFormatters.money(event.amount),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
                           color: amountColor,
+                        ),
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(directionIcon, size: 14, color: amountColor),
+                      const SizedBox(width: 4),
+                      Text(
+                        directionLabel,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: amountColor,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    AnalyticsFormatters.exportTimestamp.format(event.timestamp),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppColors.textHint,
                           fontSize: 11,
-                          fontWeight: FontWeight.w600,
                         ),
                   ),
                 ],
               ),
-              const SizedBox(height: 4),
-              Text(
-                AnalyticsFormatters.exportTimestamp.format(event.timestamp),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppColors.textHint,
-                      fontSize: 11,
-                    ),
-              ),
             ],
           ),
-        ],
+        ),
       ),
     );
   }

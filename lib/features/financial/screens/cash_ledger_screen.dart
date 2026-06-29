@@ -5,8 +5,6 @@ import 'package:intl/intl.dart' hide TextDirection;
 import '../../../core/theme/app_colors.dart';
 import '../../reports/core/models/report_filter_model.dart';
 import '../../reports/core/providers/report_permissions.dart';
-import '../../reports/core/services/report_drill_down_service.dart';
-import '../../reports/core/models/report_drill_down.dart';
 import '../../reports/core/models/report_metric_model.dart';
 import '../../reports/core/widgets/report_async_body.dart';
 import '../../reports/core/widgets/report_filter_bar.dart';
@@ -19,9 +17,7 @@ import '../models/cash_ledger_summary.dart';
 import '../providers/cash_ledger_filter_provider.dart';
 import '../providers/cash_ledger_providers.dart';
 import '../widgets/cash_ledger_export_helper.dart';
-import '../widgets/other_income_details_dialog.dart';
-import '../../auth/permissions/permission_keys.dart';
-import '../../auth/providers/permission_provider.dart';
+import '../widgets/cash_ledger_event_drill_down.dart';
 
 /// Financial Management Center — Cash Ledger v1 (read-only derived ledger).
 class CashLedgerScreen extends ConsumerStatefulWidget {
@@ -341,7 +337,7 @@ class _CashLedgerScreenState extends ConsumerState<CashLedgerScreen> {
   DataRow _buildRow(BuildContext context, WidgetRef ref, CashLedgerEvent e) {
     final refLabel = '${e.referenceType} #${e.referenceId}';
     return DataRow(
-      onSelectChanged: (_) => _openDrillDown(context, ref, e),
+      onSelectChanged: (_) => CashLedgerEventDrillDown.open(context, ref, e),
       cells: [
         DataCell(Text(_df.format(e.timestamp))),
         DataCell(Text(e.eventType.labelAr)),
@@ -365,58 +361,6 @@ class _CashLedgerScreenState extends ConsumerState<CashLedgerScreen> {
     );
   }
 
-  Future<void> _openDrillDown(
-    BuildContext context,
-    WidgetRef ref,
-    CashLedgerEvent e,
-  ) async {
-    switch (e.eventType) {
-      case CashLedgerEventType.saleCash:
-      case CashLedgerEventType.returnRefund:
-        final invId = e.invoiceId ?? e.referenceId;
-        await ReportDrillDownService.open(
-          context,
-          ref,
-          ReportDrillDownTarget(type: ReportDrillDownEntityType.invoice, id: invId),
-        );
-      case CashLedgerEventType.customerPayment:
-        if (e.customerId != null && e.customerId! > 1) {
-          await ReportDrillDownService.open(
-            context,
-            ref,
-            ReportDrillDownTarget(
-              type: ReportDrillDownEntityType.customer,
-              id: e.customerId!,
-            ),
-          );
-        }
-      case CashLedgerEventType.purchaseCash:
-      case CashLedgerEventType.supplierPayment:
-        if (e.supplierId != null) {
-          ReportDrillDownService.open(
-            context,
-            ref,
-            ReportDrillDownTarget(
-              type: ReportDrillDownEntityType.supplier,
-              id: e.supplierId!,
-            ),
-          );
-        }
-      case CashLedgerEventType.expense:
-        // Phase 3.3: expense rows in ledger are read-only; no drill-down yet.
-        break;
-      case CashLedgerEventType.otherIncome:
-        final canView = ref.read(
-            permissionProvider(PermissionKeys.financialIncomeView));
-        if (!canView) break;
-        if (!context.mounted) break;
-        await showDialog<void>(
-          context: context,
-          builder: (_) =>
-              OtherIncomeDetailsDialog(incomeId: e.referenceId),
-        );
-    }
-  }
 }
 
 class _CashLedgerKpiTile extends StatelessWidget {

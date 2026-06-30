@@ -9,13 +9,17 @@ import '../../providers/dashboard_providers.dart';
 import '../../widgets/financial_dashboard_chart_mapper.dart';
 
 const _kChartHeight = 320.0;
-const _kChartSpacing = 12.0;
+const _kTrendChartHeightDense = 360.0;
+const _kChartSpacing = 16.0;
+const _kTitleGap = 8.0;
+const _kDenseBucketThreshold = 20;
 
-/// Analytics chart section -- watches [dashboardCashAnalyticsProvider] only.
+/// Analytics chart section — watches [dashboardCashAnalyticsProvider] only.
 ///
 /// Presentation only: mapping via [FinancialDashboardChartMapper], rendering via
-/// [ReportChartCard]. Read-only -- no onPointTap / drill-down (Phase 5.3).
-/// [_AnalyticsChartCards] is [StatelessWidget] with no [WidgetRef] access.
+/// [ReportChartCard]. Read-only — no onPointTap / drill-down (Phase 5.3).
+/// [_AnalyticsChartCards] is [StatelessWidget] with no [WidgetRef] access so
+/// mapper/chart rebuilds stay scoped to resolved analytics data.
 class DashboardAnalyticsSection extends ConsumerWidget {
   const DashboardAnalyticsSection({super.key, required this.onRefresh});
 
@@ -38,7 +42,7 @@ class DashboardAnalyticsSection extends ConsumerWidget {
           '\u0627\u0644\u062a\u062d\u0644\u064a\u0644\u0627\u062a \u0627\u0644\u0645\u0627\u0644\u064a\u0629',
           style: _sectionTitleStyle,
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: _kTitleGap),
         ReportAsyncBody<FinancialDashboardCashAnalytics>(
           asyncValue: analyticsAsync,
           onRetry: onRefresh,
@@ -50,10 +54,17 @@ class DashboardAnalyticsSection extends ConsumerWidget {
   }
 }
 
+/// Renders trend + composition cards from resolved [FinancialDashboardCashAnalytics].
 class _AnalyticsChartCards extends StatelessWidget {
   const _AnalyticsChartCards({required this.analytics});
 
   final FinancialDashboardCashAnalytics analytics;
+
+  /// Extra height when many buckets improve X-axis label readability.
+  static double _trendChartHeight(FinancialDashboardCashFlowTimeSeries series) =>
+      series.buckets.length > _kDenseBucketThreshold
+          ? _kTrendChartHeightDense
+          : _kChartHeight;
 
   @override
   Widget build(BuildContext context) {
@@ -66,13 +77,17 @@ class _AnalyticsChartCards extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         SizedBox(
-          height: _kChartHeight,
+          height: _trendChartHeight(analytics.timeSeries),
           child: ReportChartCard(config: trendConfig),
         ),
         const SizedBox(height: _kChartSpacing),
         SizedBox(
           height: _kChartHeight,
-          child: ReportChartCard(config: compositionConfig),
+          // Composition: slice % on chart; event name on touch — legend duplicated title.
+          child: ReportChartCard(
+            config: compositionConfig,
+            showLegend: false,
+          ),
         ),
       ],
     );

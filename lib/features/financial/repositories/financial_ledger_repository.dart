@@ -5,6 +5,8 @@ import '../models/cash_ledger_event.dart';
 import '../models/cash_ledger_event_type.dart';
 import '../models/cash_ledger_filter.dart';
 import '../models/cash_ledger_summary.dart';
+import '../models/dashboard_filter.dart';
+import '../models/financial_dashboard_cash_analytics.dart';
 import '../utils/cash_ledger_date_utils.dart';
 
 /// Read-only derived cash ledger — UNION over operational tables (Hybrid Model).
@@ -310,6 +312,167 @@ LIMIT ${filter.pageSize} OFFSET $offset
     }
   }
 
+  static const _maxDailyBuckets = 31;
+  static const _maxWeeklyBuckets = 26;
+  static const _maxMonthlyBuckets = 12;
+
+  /// Absolute tolerance when comparing bucket sums to [getSummary] scalars.
+  ///
+  /// Matches [CashLedgerSummary.isNetConsistent] (0.01) for floating-point safety.
+  static const _totalsInvariantTolerance = 0.01;
+
+  /// Bucketed inflow/outflow trend for dashboard charts.
+  ///
+  /// Wraps [_unionSql] and reuses [_buildWhereClause] — no duplicated UNION or
+  /// filter logic.
+  ///
+  /// **Totals invariant:** for the same [filter], `SUM(buckets.inflow)` must
+  /// equal [CashLedgerSummary.totalInflow] from [getSummary], and
+  /// `SUM(buckets.outflow)` must equal [CashLedgerSummary.totalOutflow].
+  /// Gap-filled zero buckets and bucket-cap merging preserve this invariant.
+  /// See [verifyTimeSeriesTotalsInvariant].
+  ///
+  /// Direction CASE expressions must stay aligned with [getSummary].
+  Future<FinancialDashboardCashFlowTimeSeries> getCashFlowTimeSeries(
+    CashLedgerFilter filter,
+    DashboardGranularity granularity,
+  ) async {
+    try {
+      final range = filter.resolvedRange;
+      final start = _startOfDay(range.start);
+      final end = _endExclusive(range.end);
+      final where = _buildWhereClause(filter, start, end);
+
+      final (bucketSelect, bucketGroup, extraVariables) =
+          _timeSeriesBucketSql(granularity, start);
+
+      final variables = [...extraVariables, ...where.variables];
+      final sql = '''
+SELECT
+  $bucketSelect AS bucket_key,
+  COALESCE(SUM(CASE WHEN q.direction = 'inflow' THEN q.amount ELSE 0 END), 0) AS total_in,
+  COALESCE(SUM(CASE WHEN q.direction = 'outflow' THEN q.amount ELSE 0 END), 0) AS total_out
+FROM ($_unionSql) q
+${where.clause}
+GROUP BY $bucketGroup
+ORDER BY bucket_key ASC
+''';
+
+      final rows = await _db.customSelect(
+        sql,
+        variables: variables,
+        readsFrom: _readSet(),
+      ).get();
+
+      final totalsByKey = <String, (double inflow, double outflow)>{};
+      for (final row in rows) {
+        final key = _bucketKeyFromRow(row.data['bucket_key'], granularity);
+        if (key == null) continue;
+        totalsByKey[key] = (
+          (row.data['total_in'] as num?)?.toDouble() ?? 0,
+          (row.data['total_out'] as num?)?.toDouble() ?? 0,
+        );
+      }
+
+      final labels = _generateBucketLabels(start, end, granularity);
+      final buckets = _buildTimeSeriesBuckets(
+        labels: labels,
+        totalsByKey: totalsByKey,
+        granularity: granularity,
+      );
+
+      return FinancialDashboardCashFlowTimeSeries(
+        granularity: granularity,
+        buckets: buckets,
+      );
+    } catch (_) {
+      // Same silent .empty fallback as [getSummary] — callers receive empty series.
+      return FinancialDashboardCashFlowTimeSeries.empty;
+    }
+  }
+
+  /// Cash-flow composition grouped by [CashLedgerEventType].
+  ///
+  /// Wraps [_unionSql] and reuses [_buildWhereClause].
+  Future<FinancialDashboardCashFlowBreakdown> getCashFlowBreakdownByEventType(
+    CashLedgerFilter filter,
+  ) async {
+    try {
+      final range = filter.resolvedRange;
+      final start = _startOfDay(range.start);
+      final end = _endExclusive(range.end);
+      final where = _buildWhereClause(filter, start, end);
+      final sql = '''
+SELECT
+  q.event_type AS event_type,
+  q.direction AS direction,
+  COALESCE(SUM(q.amount), 0) AS total_amount
+FROM ($_unionSql) q
+${where.clause}
+GROUP BY q.event_type, q.direction
+ORDER BY total_amount DESC
+''';
+      final rows = await _db.customSelect(
+        sql,
+        variables: where.variables,
+        readsFrom: _readSet(),
+      ).get();
+
+      final slices = rows
+          .map((row) {
+            final type = CashLedgerEventType.fromCode(
+                  row.data['event_type'] as String?,
+                ) ??
+                CashLedgerEventType.saleCash;
+            return FinancialDashboardBreakdownSlice(
+              eventType: type,
+              amount: (row.data['total_amount'] as num?)?.toDouble() ?? 0,
+              direction: CashLedgerDirection.fromCode(
+                row.data['direction'] as String? ??
+                    (type.isInflow
+                        ? CashLedgerDirection.inflow.code
+                        : CashLedgerDirection.outflow.code),
+              ),
+            );
+          })
+          .toList(growable: false);
+
+      return FinancialDashboardCashFlowBreakdown(slices: slices);
+    } catch (_) {
+      // Same silent .empty fallback as [getSummary].
+      return FinancialDashboardCashFlowBreakdown.empty;
+    }
+  }
+
+  /// Validates the time-series totals invariant for [filter] and [granularity].
+  ///
+  /// Returns `true` when, within [_totalsInvariantTolerance]:
+  /// - `SUM(bucket.inflow) == getSummary(filter).totalInflow`
+  /// - `SUM(bucket.outflow) == getSummary(filter).totalOutflow`
+  ///
+  /// **Edge cases:**
+  /// - Empty period / no rows: gap-filled zero buckets; both sides are 0 → `true`.
+  /// - Single-day filter: one bucket carries the full period totals → `true`.
+  /// - Long range with bucket-cap merge: merge sums adjacent keys without drop → `true`.
+  /// - SQL failure: [getCashFlowTimeSeries] returns `.empty` (zero buckets);
+  ///   if [getSummary] is non-zero, returns `false`.
+  ///
+  /// Intended for manual QA and future DB integration tests — not called in production UI.
+  Future<bool> verifyTimeSeriesTotalsInvariant(
+    CashLedgerFilter filter,
+    DashboardGranularity granularity,
+  ) async {
+    final summary = await getSummary(filter);
+    final series = await getCashFlowTimeSeries(filter, granularity);
+    final sumInflow =
+        series.buckets.fold<double>(0, (sum, b) => sum + b.inflow);
+    final sumOutflow =
+        series.buckets.fold<double>(0, (sum, b) => sum + b.outflow);
+    return (sumInflow - summary.totalInflow).abs() <
+            _totalsInvariantTolerance &&
+        (sumOutflow - summary.totalOutflow).abs() < _totalsInvariantTolerance;
+  }
+
   /// All entries in range for CSV export (capped).
   Future<List<CashLedgerEvent>> getEntriesForExport(
     CashLedgerFilter filter, {
@@ -374,6 +537,147 @@ LIMIT ${filter.pageSize} OFFSET $offset
 
   static String _escapeLike(String input) =>
       input.replaceAll('\\', '\\\\').replaceAll('%', '\\%').replaceAll('_', '\\_');
+
+  static int _maxBucketsFor(DashboardGranularity granularity) => switch (granularity) {
+        DashboardGranularity.day => _maxDailyBuckets,
+        DashboardGranularity.week => _maxWeeklyBuckets,
+        DashboardGranularity.month => _maxMonthlyBuckets,
+      };
+
+  static (String selectExpr, String groupExpr, List<Variable> extraVariables)
+      _timeSeriesBucketSql(DashboardGranularity granularity, DateTime rangeStart) {
+    return switch (granularity) {
+      DashboardGranularity.day => (
+          "strftime('%Y-%m-%d', q.event_ts)",
+          "bucket_key",
+          const <Variable>[],
+        ),
+      DashboardGranularity.week => (
+          "CAST((julianday(date(q.event_ts)) - julianday(?)) / 7 AS INTEGER)",
+          "bucket_key",
+          [Variable(rangeStart)],
+        ),
+      DashboardGranularity.month => (
+          "strftime('%Y-%m', q.event_ts)",
+          "bucket_key",
+          const <Variable>[],
+        ),
+    };
+  }
+
+  static String? _bucketKeyFromRow(Object? raw, DashboardGranularity granularity) {
+    if (raw == null) return null;
+    return switch (granularity) {
+      DashboardGranularity.day => raw.toString(),
+      DashboardGranularity.week =>
+        _weekLabelFromIndex((raw as num).toInt()),
+      DashboardGranularity.month => raw.toString(),
+    };
+  }
+
+  static String _weekLabelFromIndex(int bucketIndex) => 'week:$bucketIndex';
+
+  /// Builds display buckets from pre-generated [labels] and SQL [totalsByKey].
+  ///
+  /// O(n) over label count; cap merge is a single linear pass (no nested scan).
+  static List<FinancialDashboardTimeSeriesBucket> _buildTimeSeriesBuckets({
+    required List<String> labels,
+    required Map<String, (double inflow, double outflow)> totalsByKey,
+    required DashboardGranularity granularity,
+  }) {
+    final maxBuckets = _maxBucketsFor(granularity);
+    if (labels.length <= maxBuckets) {
+      return labels
+          .map((label) {
+            final totals = totalsByKey[label];
+            return FinancialDashboardTimeSeriesBucket(
+              label: label,
+              inflow: totals?.$1 ?? 0,
+              outflow: totals?.$2 ?? 0,
+            );
+          })
+          .toList(growable: false);
+    }
+
+    final chunkSize = (labels.length + maxBuckets - 1) ~/ maxBuckets;
+    final buckets = <FinancialDashboardTimeSeriesBucket>[];
+    for (var i = 0; i < labels.length; i += chunkSize) {
+      final chunkEnd = (i + chunkSize).clamp(0, labels.length);
+      final chunk = labels.sublist(i, chunkEnd);
+      var inflow = 0.0;
+      var outflow = 0.0;
+      for (final label in chunk) {
+        final totals = totalsByKey[label];
+        if (totals != null) {
+          inflow += totals.$1;
+          outflow += totals.$2;
+        }
+      }
+      buckets.add(
+        FinancialDashboardTimeSeriesBucket(
+          label: chunk.first,
+          inflow: inflow,
+          outflow: outflow,
+        ),
+      );
+    }
+    return buckets;
+  }
+
+  static List<String> _generateBucketLabels(
+    DateTime start,
+    DateTime endExclusive,
+    DashboardGranularity granularity,
+  ) {
+    return switch (granularity) {
+      DashboardGranularity.day => _generateDayLabels(start, endExclusive),
+      DashboardGranularity.week => _generateWeekLabels(start, endExclusive),
+      DashboardGranularity.month => _generateMonthLabels(start, endExclusive),
+    };
+  }
+
+  static List<String> _generateDayLabels(DateTime start, DateTime endExclusive) {
+    final labels = <String>[];
+    var cursor = start;
+    while (cursor.isBefore(endExclusive)) {
+      labels.add(_formatDay(cursor));
+      cursor = cursor.add(const Duration(days: 1));
+    }
+    return labels;
+  }
+
+  static List<String> _generateWeekLabels(DateTime start, DateTime endExclusive) {
+    final labels = <String>[];
+    final totalDays = endExclusive.difference(start).inDays;
+    if (totalDays <= 0) return labels;
+    final weekCount = (totalDays + 6) ~/ 7;
+    for (var i = 0; i < weekCount; i++) {
+      labels.add(_weekLabelFromIndex(i));
+    }
+    return labels;
+  }
+
+  static List<String> _generateMonthLabels(
+    DateTime start,
+    DateTime endExclusive,
+  ) {
+    final labels = <String>[];
+    var cursor = DateTime(start.year, start.month);
+    while (cursor.isBefore(endExclusive)) {
+      labels.add(_formatMonth(cursor));
+      cursor = DateTime(cursor.year, cursor.month + 1);
+    }
+    return labels;
+  }
+
+  static String _formatDay(DateTime date) =>
+      '${date.year.toString().padLeft(4, '0')}-'
+      '${date.month.toString().padLeft(2, '0')}-'
+      '${date.day.toString().padLeft(2, '0')}';
+
+  static String _formatMonth(DateTime date) =>
+      '${date.year.toString().padLeft(4, '0')}-'
+      '${date.month.toString().padLeft(2, '0')}';
 
   static DateTime _startOfDay(DateTime d) => DateTime(d.year, d.month, d.day);
 

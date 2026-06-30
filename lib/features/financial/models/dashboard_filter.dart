@@ -1,4 +1,4 @@
-﻿import "package:flutter/material.dart";
+import "package:flutter/material.dart";
 
 import "../../reports/core/models/report_date_preset.dart";
 import "../../reports/core/models/report_filter_model.dart";
@@ -13,7 +13,11 @@ class DashboardFilter {
 
   final ReportFilterModel dateFilter;
 
-  /// Reserved for Phase 8 time-series charts. No-op in Phase 5.
+  /// Reserved for Phase 5.3.3 manual chart bucket control.
+  ///
+  /// **Not read at runtime in Phase 5.3.1.** [dashboardCashAnalyticsProvider]
+  /// always auto-resolves granularity from [resolvedRange] duration. This field
+  /// exists so future UI can persist a user override without a filter-model migration.
   final DashboardGranularity granularity;
 
   DateTimeRange get resolvedRange => dateFilter.resolveRange();
@@ -40,5 +44,8 @@ class DashboardFilter {
   int get hashCode => Object.hash(dateFilter, granularity);
 }
 
-/// Time-series granularity reserved for Phase 8. No-op in Phase 5.
+/// Time-series bucket granularity for Financial Dashboard cash-flow charts.
+///
+/// Phase 5.3.1: auto-selected in [dashboardCashAnalyticsProvider] from range
+/// duration only. [DashboardFilter.granularity] is reserved, not consumed.
 enum DashboardGranularity { day, week, month }

@@ -5,12 +5,13 @@ import '../../../core/theme/app_colors.dart';
 import '../../reports/modules/shared/analytics_permission_gate.dart';
 import '../providers/dashboard_filter_provider.dart';
 import '../providers/dashboard_providers.dart';
+import 'widgets/dashboard_analytics_section.dart';
 import 'widgets/dashboard_cash_flow_section.dart';
 import 'widgets/dashboard_filter_section.dart';
 import 'widgets/dashboard_recent_activity_section.dart';
 import 'widgets/dashboard_supplementary_kpi_section.dart';
 
-/// Financial Dashboard -- read-only KPIs, filter, cash flow, and recent activity.
+/// Financial Dashboard -- read-only KPIs, filter, cash flow, analytics, and recent activity.
 class FinancialDashboardScreen extends ConsumerStatefulWidget {
   const FinancialDashboardScreen({super.key});
 
@@ -25,6 +26,7 @@ class _FinancialDashboardScreenState
 
   Future<void> _refresh() async {
     ref.invalidate(dashboardCashFlowProvider);
+    ref.invalidate(dashboardCashAnalyticsProvider);
     ref.invalidate(dashboardCurrentStateProvider);
     ref.invalidate(dashboardRecentActivityProvider);
   }
@@ -57,6 +59,8 @@ class _FinancialDashboardScreenState
               ),
               _sectionSpacing,
               DashboardCashFlowSection(onRefresh: _refresh),
+              _sectionSpacing,
+              DashboardAnalyticsSection(onRefresh: _refresh),
               _sectionSpacing,
               DashboardSupplementaryKpiSection(onRefresh: _refresh),
               _sectionSpacing,

@@ -17,11 +17,14 @@
 // true streaming reactivity. No provider graph changes are required for that migration.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import "package:flutter/material.dart";
 import "package:flutter_riverpod/flutter_riverpod.dart";
 
 import "../../../core/database/app_database.dart";
 import "../models/cash_ledger_event.dart";
 import "../models/cash_ledger_filter.dart";
+import "../models/dashboard_filter.dart";
+import "../models/financial_dashboard_cash_analytics.dart";
 import "../models/financial_dashboard_cash_flow.dart";
 import "../models/financial_dashboard_current_state.dart";
 import "../models/financial_dashboard_summary.dart";
@@ -141,9 +144,61 @@ final dashboardRecentActivityProvider =
   return page.entries;
 });
 
+// ── Cash Analytics (no cache) ───────────────────────────────────────────────
+//
+// Ownership: one section -> one provider (Phase 5.3.2 UI will watch this only).
+//
+// Fetch strategy: two independent repository reads in parallel via Future.wait
+// (cash flow trend + composition). No watch on dashboardCashFlowProvider or other
+// dashboard data providers — avoids cascade rebuilds when KPI sections refresh.
+//
+// Granularity: [_resolveAnalyticsGranularity] derives bucket size from filter
+// range duration. [DashboardFilter.granularity] is not read (reserved for 5.3.3).
+
+/// Chart-ready cash analytics (cash flow trend + composition).
+/// Watches [dashboardFilterProvider] only.
+///
+/// Assembles [FinancialDashboardCashAnalytics] from two repository results.
+/// Each call may independently fall back to its `.empty` value on SQL error
+/// (same convention as [FinancialLedgerRepository.getSummary]).
+final dashboardCashAnalyticsProvider =
+    FutureProvider.autoDispose<FinancialDashboardCashAnalytics>((ref) async {
+  final filter = ref.watch(dashboardFilterProvider);
+  final ledger = ref.read(financialLedgerRepositoryProvider);
+
+  final cashLedgerFilter = CashLedgerFilter(dateFilter: filter.dateFilter);
+  final granularity = _resolveAnalyticsGranularity(filter.resolvedRange);
+
+  final trendFuture =
+      ledger.getCashFlowTimeSeries(cashLedgerFilter, granularity);
+  final breakdownFuture =
+      ledger.getCashFlowBreakdownByEventType(cashLedgerFilter);
+
+  final results = await Future.wait([trendFuture, breakdownFuture]);
+
+  return FinancialDashboardCashAnalytics(
+    timeSeries: results[0] as FinancialDashboardCashFlowTimeSeries,
+    breakdown: results[1] as FinancialDashboardCashFlowBreakdown,
+  );
+});
+
 // ── Private date helpers ──────────────────────────────────────────────────
 
 DateTime _startOfDay(DateTime d) => DateTime(d.year, d.month, d.day);
 
 DateTime _endExclusive(DateTime d) =>
     _startOfDay(d).add(const Duration(days: 1));
+
+/// Auto-resolves chart bucket granularity from the selected filter range.
+///
+/// Thresholds (inclusive day count): <=31 → day, <=120 → week, >120 → month.
+/// Matches approved Phase 5.3 architecture; not overridable until Phase 5.3.3.
+DashboardGranularity _resolveAnalyticsGranularity(DateTimeRange range) {
+  final start = _startOfDay(range.start);
+  final end = _startOfDay(range.end);
+  final dayCount = end.difference(start).inDays + 1;
+
+  if (dayCount <= 31) return DashboardGranularity.day;
+  if (dayCount <= 120) return DashboardGranularity.week;
+  return DashboardGranularity.month;
+}

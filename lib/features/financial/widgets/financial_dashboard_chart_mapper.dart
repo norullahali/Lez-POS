@@ -1,15 +1,18 @@
+import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../reports/core/models/report_chart_models.dart';
 import '../../reports/modules/shared/analytics_formatters.dart';
 import '../models/dashboard_filter.dart';
 import '../models/financial_dashboard_cash_analytics.dart';
+import 'dashboard_analytics_trend_bucket_presentation.dart';
 
 /// Maps certified Phase 5.3.1 analytics models to shared [ReportChartConfig].
 ///
 /// All chart display formatting lives here -- not in provider or repository.
 /// Phase 5.3.2.2 refined labels, legends, and empty states; Phase 5.3.3.1
 /// adds optional read-only interactivity passthrough ([onPointTap],
-/// [selectedPointIndex]). Financial values are passed through unchanged.
+/// [selectedPointIndex]). Phase 5.3.3.3 exposes trend bucket presentation
+/// metadata for drill-down. Financial values are passed through unchanged.
 class FinancialDashboardChartMapper {
   FinancialDashboardChartMapper._();
 
@@ -21,6 +24,20 @@ class FinancialDashboardChartMapper {
   static const _kDenseDayLabelThreshold = 14;
   static const _kTrendLegendInflow = '\u0625\u064a\u0631\u0627\u062f \u0646\u0642\u062f\u064a';
   static const _kTrendLegendOutflow = '\u0635\u0631\u0641 \u0646\u0642\u062f\u064a';
+
+  /// Presentation metadata delegate for trend drill-down (Phase 5.3.3.3).
+  ///
+  /// One entry per chart bucket index. No provider or repository access —
+  /// delegates to [DashboardAnalyticsTrendBucketPresentation.forTimeSeries].
+  /// Generate once when analytics payload changes (see `_syncBaseConfigs`).
+  static List<DashboardTrendBucketPresentationMeta> buildTrendBucketPresentationMetas({
+    required FinancialDashboardCashFlowTimeSeries timeSeries,
+    required DateTimeRange dashboardRange,
+  }) =>
+      DashboardAnalyticsTrendBucketPresentation.forTimeSeries(
+        timeSeries: timeSeries,
+        dashboardRange: dashboardRange,
+      );
 
   static String _yAxisLabel(double value) =>
       AnalyticsFormatters.currency.format(value);

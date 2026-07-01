@@ -9,6 +9,7 @@ import '../models/dashboard_filter.dart';
 import '../models/financial_dashboard_cash_analytics.dart';
 import '../providers/cash_ledger_filter_provider.dart';
 import 'dashboard_analytics_chart_selection.dart';
+import 'dashboard_analytics_trend_bucket_presentation.dart';
 
 /// Presentation-only bridge from analytics chart selection to Cash Ledger filters.
 ///
@@ -23,9 +24,9 @@ import 'dashboard_analytics_chart_selection.dart';
 /// permissions. Aggregate charts lack per-event IDs, so entity drill-down services
 /// are not used — filters + [cashLedgerRoute] only.
 ///
-/// **Known limitation (merged buckets):** when the repository merges buckets for
-/// chart cap, bucket labels store `chunk.first` only. Trend drill-down therefore
-/// opens the first sub-period of a merged bucket, not the full merged span.
+/// **Trend drill-down (Phase 5.3.3.3):** uses cached
+/// [DashboardTrendBucketPresentationMeta] from the UI layer — not label parsing.
+/// Empty presentation list fail-closed: trend drill-down is disabled.
 class DashboardAnalyticsDrillDown {
   DashboardAnalyticsDrillDown._();
 
@@ -40,25 +41,27 @@ class DashboardAnalyticsDrillDown {
     required DashboardFilter dashboardFilter,
     required FinancialDashboardCashAnalytics analytics,
     required DashboardAnalyticsChartSelection selection,
+    required List<DashboardTrendBucketPresentationMeta> trendBucketPresentation,
   }) =>
       mapSelection(
-            dashboardFilter: dashboardFilter,
-            analytics: analytics,
-            selection: selection,
-          ) !=
-          null;
+        dashboardFilter: dashboardFilter,
+        analytics: analytics,
+        selection: selection,
+        trendBucketPresentation: trendBucketPresentation,
+      ) !=
+      null;
 
   /// Maps chart selection to Cash Ledger filter fields (presentation only).
   static DashboardAnalyticsCashLedgerMapping? mapSelection({
     required DashboardFilter dashboardFilter,
     required FinancialDashboardCashAnalytics analytics,
     required DashboardAnalyticsChartSelection selection,
+    required List<DashboardTrendBucketPresentationMeta> trendBucketPresentation,
   }) {
     return switch (selection) {
       DashboardTrendBucketSelection(:final bucketIndex) => _mapTrendBucket(
-          dashboardFilter: dashboardFilter,
-          timeSeries: analytics.timeSeries,
           bucketIndex: bucketIndex,
+          trendBucketPresentation: trendBucketPresentation,
         ),
       DashboardCompositionSliceSelection(:final sliceIndex) =>
         _mapCompositionSlice(
@@ -78,11 +81,13 @@ class DashboardAnalyticsDrillDown {
     required DashboardFilter dashboardFilter,
     required FinancialDashboardCashAnalytics analytics,
     required DashboardAnalyticsChartSelection selection,
+    required List<DashboardTrendBucketPresentationMeta> trendBucketPresentation,
   }) {
     final mapping = mapSelection(
       dashboardFilter: dashboardFilter,
       analytics: analytics,
       selection: selection,
+      trendBucketPresentation: trendBucketPresentation,
     );
     if (mapping == null) return;
 
@@ -103,26 +108,23 @@ class DashboardAnalyticsDrillDown {
     }
   }
 
-  /// Trend drill-down: selected bucket → custom date range; event type cleared by reset.
+  /// Trend drill-down: presentation metadata → custom date range.
+  ///
+  /// Fail-closed when [trendBucketPresentation] is empty or [bucketIndex] is
+  /// out of range — returns null so the feedback button stays hidden.
   static DashboardAnalyticsCashLedgerMapping? _mapTrendBucket({
-    required DashboardFilter dashboardFilter,
-    required FinancialDashboardCashFlowTimeSeries timeSeries,
     required int bucketIndex,
+    required List<DashboardTrendBucketPresentationMeta> trendBucketPresentation,
   }) {
-    final buckets = timeSeries.buckets;
-    if (bucketIndex < 0 || bucketIndex >= buckets.length) return null;
+    if (bucketIndex < 0 || bucketIndex >= trendBucketPresentation.length) {
+      return null;
+    }
 
-    final bucketRange = _bucketDateRange(
-      label: buckets[bucketIndex].label,
-      granularity: timeSeries.granularity,
-      dashboardRange: dashboardFilter.resolvedRange,
-    );
-    if (bucketRange == null) return null;
-
+    final meta = trendBucketPresentation[bucketIndex];
     return DashboardAnalyticsCashLedgerMapping(
       dateFilter: ReportFilterModel(
         preset: ReportDatePreset.custom,
-        range: bucketRange,
+        range: meta.drillDownRange,
       ),
     );
   }
@@ -149,59 +151,6 @@ class DashboardAnalyticsDrillDown {
     FinancialDashboardCashFlowBreakdown breakdown,
   ) =>
       breakdown.slices.where((s) => s.amount > 0).toList(growable: false);
-
-  /// Translates a trend bucket label into a [DateTimeRange] within the dashboard period.
-  ///
-  /// Label formats match repository bucket keys: day `YYYY-MM-DD`, week `week:N`,
-  /// month `YYYY-MM`. All results are clamped to [dashboardRange] (inclusive end).
-  ///
-  /// **Merged-bucket caveat:** under chart cap merge, [label] is the first key in
-  /// the merged chunk — drill-down resolves that sub-period only (day/week/month).
-  static DateTimeRange? _bucketDateRange({
-    required String label,
-    required DashboardGranularity granularity,
-    required DateTimeRange dashboardRange,
-  }) {
-    final rangeStart = _startOfDay(dashboardRange.start);
-    final rangeEnd = _startOfDay(dashboardRange.end);
-
-    switch (granularity) {
-      // Single calendar day; rejects labels outside dashboard range.
-      case DashboardGranularity.day:
-        final parsed = DateTime.tryParse(label);
-        if (parsed == null) return null;
-        final day = DateTime(parsed.year, parsed.month, parsed.day);
-        if (day.isBefore(rangeStart) || day.isAfter(rangeEnd)) return null;
-        return DateTimeRange(start: day, end: day);
-
-      // Week index N from dashboard range start: days [N×7 .. N×7+6], clamped.
-      case DashboardGranularity.week:
-        if (!label.startsWith('week:')) return null;
-        final weekIndex = int.tryParse(label.substring(5));
-        if (weekIndex == null || weekIndex < 0) return null;
-        final weekStart = rangeStart.add(Duration(days: weekIndex * 7));
-        if (weekStart.isAfter(rangeEnd)) return null;
-        var weekEnd = weekStart.add(const Duration(days: 6));
-        if (weekEnd.isAfter(rangeEnd)) weekEnd = rangeEnd;
-        return DateTimeRange(start: weekStart, end: weekEnd);
-
-      // Calendar month clamped to dashboard range boundaries.
-      case DashboardGranularity.month:
-        final parts = label.split('-');
-        if (parts.length != 2) return null;
-        final year = int.tryParse(parts[0]);
-        final month = int.tryParse(parts[1]);
-        if (year == null || month == null || month < 1 || month > 12) return null;
-        final monthStart = DateTime(year, month, 1);
-        final monthEnd = DateTime(year, month + 1, 0);
-        final start = monthStart.isBefore(rangeStart) ? rangeStart : monthStart;
-        final end = monthEnd.isAfter(rangeEnd) ? rangeEnd : monthEnd;
-        if (start.isAfter(end)) return null;
-        return DateTimeRange(start: start, end: end);
-    }
-  }
-
-  static DateTime _startOfDay(DateTime d) => DateTime(d.year, d.month, d.day);
 }
 
 /// Cash Ledger filter fields derived from an analytics chart selection.

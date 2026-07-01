@@ -8,20 +8,28 @@ import 'financial_dashboard_chart_mapper.dart';
 
 /// Read-only UX feedback for the active analytics chart selection.
 ///
-/// Displays values from resolved [FinancialDashboardCashAnalytics] at the
-/// selected index. No navigation, provider invalidation, or drill-down
-/// (aggregate charts lack per-event IDs — Phase 5.3.3.2+).
+/// Displays resolved [FinancialDashboardCashAnalytics] values at the selected
+/// index. Does not invalidate providers or perform navigation itself.
+///
+/// **Drill-down (Phase 5.3.3.2):** when [onDrillDown] is non-null, renders a
+/// button that delegates to the parent. Navigation and filter mapping live in
+/// [DashboardAnalyticsDrillDown] — this widget does not duplicate Cash Ledger
+/// UI, routes, or repository queries.
 class DashboardAnalyticsSelectionFeedback extends StatelessWidget {
   const DashboardAnalyticsSelectionFeedback({
     super.key,
     required this.analytics,
     required this.selection,
     required this.onClear,
+    this.onDrillDown,
   });
 
   final FinancialDashboardCashAnalytics analytics;
   final DashboardAnalyticsChartSelection selection;
   final VoidCallback onClear;
+
+  /// Parent-owned navigation callback. Null hides the Cash Ledger drill-down button.
+  final VoidCallback? onDrillDown;
 
   static const _labelStyle = TextStyle(
     color: AppColors.textSecondary,
@@ -59,6 +67,7 @@ class DashboardAnalyticsSelectionFeedback extends StatelessWidget {
     return _SelectionCard(
       title: '\u0627\u0644\u0641\u062a\u0631\u0629 \u0627\u0644\u0645\u062d\u062f\u062f\u0629: $label',
       onClear: onClear,
+      onDrillDown: onDrillDown,
       children: [
         _FeedbackRow(
           label: '\u0625\u064a\u0631\u0627\u062f \u0646\u0642\u062f\u064a',
@@ -86,6 +95,7 @@ class DashboardAnalyticsSelectionFeedback extends StatelessWidget {
     return _SelectionCard(
       title: '\u0628\u0646\u062f \u0645\u062d\u062f\u062f: ${slice.eventType.labelAr}',
       onClear: onClear,
+      onDrillDown: onDrillDown,
       children: [
         _FeedbackRow(
           label: '\u0627\u0644\u0645\u0628\u0644\u063a',
@@ -102,10 +112,12 @@ class _SelectionCard extends StatelessWidget {
     required this.title,
     required this.onClear,
     required this.children,
+    this.onDrillDown,
   });
 
   final String title;
   final VoidCallback onClear;
+  final VoidCallback? onDrillDown;
   final List<Widget> children;
 
   @override
@@ -135,6 +147,18 @@ class _SelectionCard extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             ...children,
+            // Opens existing CashLedgerScreen via parent callback — no inline ledger.
+            if (onDrillDown != null) ...[
+              const SizedBox(height: 8),
+              Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: OutlinedButton.icon(
+                  onPressed: onDrillDown,
+                  icon: const Icon(Icons.open_in_new_rounded, size: 16),
+                  label: const Text('\u0639\u0631\u0636 \u0641\u064a \u062f\u0641\u062a\u0631 \u0627\u0644\u0646\u0642\u062f\u064a\u0629'),
+                ),
+              ),
+            ],
           ],
         ),
       ),

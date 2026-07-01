@@ -6,8 +6,10 @@ import '../../../reports/core/charts/report_chart_card.dart';
 import '../../../reports/core/models/report_chart_models.dart';
 import '../../../reports/core/widgets/report_async_body.dart';
 import '../../models/financial_dashboard_cash_analytics.dart';
+import '../../providers/dashboard_filter_provider.dart';
 import '../../providers/dashboard_providers.dart';
 import '../../widgets/dashboard_analytics_chart_selection.dart';
+import '../../widgets/dashboard_analytics_drill_down.dart';
 import '../../widgets/dashboard_analytics_selection_feedback.dart';
 import '../../widgets/financial_dashboard_chart_mapper.dart';
 
@@ -20,10 +22,14 @@ const _kFeedbackSpacing = 12.0;
 
 /// Analytics chart section -- watches [dashboardCashAnalyticsProvider] only.
 ///
-/// Presentation only: mapping via [FinancialDashboardChartMapper], rendering via
-/// [ReportChartCard]. Phase 5.3.3.1 adds read-only chart selection feedback
-/// without provider invalidation or drill-down navigation.
-/// [_AnalyticsChartCards] holds local presentation selection state only.
+/// **Presentation:** mapping via [FinancialDashboardChartMapper], rendering via
+/// [ReportChartCard]. Phase 5.3.3.1: local selection + feedback. Phase 5.3.3.2:
+/// drill-down callbacks only -- no navigation state in providers.
+///
+/// **Navigation boundary:** [_AnalyticsChartCards] owns selection; parent wires
+/// [DashboardAnalyticsDrillDown] with `ref.read(dashboardFilterProvider)` at
+/// callback invocation (not watched -- avoids analytics section rebuilds on
+/// filter edits).
 class DashboardAnalyticsSection extends ConsumerWidget {
   const DashboardAnalyticsSection({super.key, required this.onRefresh});
 
@@ -51,28 +57,84 @@ class DashboardAnalyticsSection extends ConsumerWidget {
           asyncValue: analyticsAsync,
           onRetry: onRefresh,
           loadingStyle: ReportLoadingStyle.skeletonChart,
-          dataBuilder: (_, analytics) => _AnalyticsChartCards(analytics: analytics),
+          dataBuilder: (_, analytics) => _AnalyticsChartCards(
+            analytics: analytics,
+            onDrillDown: (selection) => _navigateDrillDown(
+              context: context,
+              ref: ref,
+              analytics: analytics,
+              selection: selection,
+            ),
+            canDrillDown: (selection) => _canDrillDown(
+              ref: ref,
+              analytics: analytics,
+              selection: selection,
+            ),
+          ),
         ),
       ],
     );
   }
+
+  /// Reads dashboard filter at tap time -- does not add a provider watch.
+  static void _navigateDrillDown({
+    required BuildContext context,
+    required WidgetRef ref,
+    required FinancialDashboardCashAnalytics analytics,
+    required DashboardAnalyticsChartSelection selection,
+  }) {
+    DashboardAnalyticsDrillDown.navigateToCashLedger(
+      context: context,
+      ref: ref,
+      dashboardFilter: ref.read(dashboardFilterProvider),
+      analytics: analytics,
+      selection: selection,
+    );
+  }
+
+  /// Gates drill-down button visibility. [mapSelection] is O(1) over bucket/slice count.
+  static bool _canDrillDown({
+    required WidgetRef ref,
+    required FinancialDashboardCashAnalytics analytics,
+    required DashboardAnalyticsChartSelection selection,
+  }) =>
+      DashboardAnalyticsDrillDown.canNavigate(
+        dashboardFilter: ref.read(dashboardFilterProvider),
+        analytics: analytics,
+        selection: selection,
+      );
 }
+
+typedef _AnalyticsDrillDownCallback = void Function(
+  DashboardAnalyticsChartSelection selection,
+);
+
+typedef _AnalyticsCanDrillDownCallback = bool Function(
+  DashboardAnalyticsChartSelection selection,
+);
 
 /// Renders trend + composition cards from resolved [FinancialDashboardCashAnalytics].
 class _AnalyticsChartCards extends StatefulWidget {
-  const _AnalyticsChartCards({required this.analytics});
+  const _AnalyticsChartCards({
+    required this.analytics,
+    required this.onDrillDown,
+    required this.canDrillDown,
+  });
 
   final FinancialDashboardCashAnalytics analytics;
+  final _AnalyticsDrillDownCallback onDrillDown;
+  final _AnalyticsCanDrillDownCallback canDrillDown;
 
   @override
   State<_AnalyticsChartCards> createState() => _AnalyticsChartCardsState();
 }
 
-/// Local presentation state for read-only chart interaction (Phase 5.3.3.1).
+/// Local presentation state for chart interaction (Phase 5.3.3.1) and drill-down
+/// trigger (Phase 5.3.3.2).
 ///
-/// Caches base chart configs and a single [DashboardAnalyticsChartSelection].
-/// Selection clears when [FinancialDashboardCashAnalytics] changes (value equality).
-/// No additional provider watches -- rebuild scope stays within this state object.
+/// Owns [_selection] only -- not persisted, not in Riverpod. Caches base chart
+/// configs; selection rebuild applies [FinancialDashboardChartMapper.withInteractivity]
+/// without remapping analytics data.
 class _AnalyticsChartCardsState extends State<_AnalyticsChartCards> {
   DashboardAnalyticsChartSelection? _selection;
   late ReportChartConfig _trendBase;
@@ -147,6 +209,12 @@ class _AnalyticsChartCardsState extends State<_AnalyticsChartCards> {
 
   void _clearSelection() => setState(() => _selection = null);
 
+  void _handleDrillDown() {
+    final selection = _selection;
+    if (selection == null) return;
+    widget.onDrillDown(selection);
+  }
+
   @override
   Widget build(BuildContext context) {
     final trendConfig = FinancialDashboardChartMapper.withInteractivity(
@@ -159,6 +227,10 @@ class _AnalyticsChartCardsState extends State<_AnalyticsChartCards> {
       onPointTap: _onCompositionPointTap,
       selectedPointIndex: _selectedCompositionIndex,
     );
+
+    final selection = _selection;
+    // canDrillDown re-evaluates mapSelection when feedback is visible -- bounded work.
+    final showDrillDown = selection != null && widget.canDrillDown(selection);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -175,12 +247,13 @@ class _AnalyticsChartCardsState extends State<_AnalyticsChartCards> {
             showLegend: false,
           ),
         ),
-        if (_selection != null) ...[
+        if (selection != null) ...[
           const SizedBox(height: _kFeedbackSpacing),
           DashboardAnalyticsSelectionFeedback(
             analytics: analytics,
-            selection: _selection!,
+            selection: selection,
             onClear: _clearSelection,
+            onDrillDown: showDrillDown ? _handleDrillDown : null,
           ),
         ],
       ],

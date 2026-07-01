@@ -125,9 +125,20 @@ class _LineChartBody extends StatelessWidget {
   String _formatY(double value) => config.yAxisFormatter?.call(value) ?? value.toStringAsFixed(0);
 }
 
-class _BarChartBody extends StatelessWidget {
+class _BarChartBody extends StatefulWidget {
   const _BarChartBody({required this.config});
   final ReportChartConfig config;
+
+  @override
+  State<_BarChartBody> createState() => _BarChartBodyState();
+}
+
+class _BarChartBodyState extends State<_BarChartBody> {
+  /// Desktop hover highlight — does not notify [ReportChartConfig.onPointTap].
+  /// Persistent selection uses [ReportChartConfig.selectedPointIndex] from parent.
+  int? _hoveredGroupIndex;
+
+  ReportChartConfig get config => widget.config;
 
   @override
   Widget build(BuildContext context) {
@@ -137,6 +148,7 @@ class _BarChartBody extends StatelessWidget {
       ...primary.points.map((p) => p.value),
       if (secondary != null) ...secondary.points.map((p) => p.value),
     ].fold<double>(0, (m, v) => v > m ? v : m);
+    final highlightIndex = _hoveredGroupIndex ?? config.selectedPointIndex;
 
     return BarChart(
       BarChartData(
@@ -144,6 +156,31 @@ class _BarChartBody extends StatelessWidget {
         maxY: maxY * 1.2,
         barTouchData: BarTouchData(
           enabled: true,
+          touchCallback: (event, response) {
+            if (!event.isInterestedForInteractions) {
+              setState(() => _hoveredGroupIndex = null);
+              return;
+            }
+            final spot = response?.spot;
+            if (spot == null) {
+              setState(() => _hoveredGroupIndex = null);
+              return;
+            }
+            final groupIndex = spot.touchedBarGroupIndex;
+            if (event is FlTapUpEvent &&
+                groupIndex >= 0 &&
+                groupIndex < primary.points.length) {
+              final rodIndex = spot.touchedRodDataIndex;
+              final seriesId = rodIndex == 0
+                  ? primary.id
+                  : (secondary?.id ?? primary.id);
+              final point = rodIndex == 0 || secondary == null
+                  ? primary.points[groupIndex]
+                  : secondary.points[groupIndex];
+              config.onPointTap?.call(point, seriesId);
+            }
+            setState(() => _hoveredGroupIndex = groupIndex);
+          },
           touchTooltipData: BarTouchTooltipData(
             getTooltipItem: (group, groupIndex, rod, rodIndex) {
               final i = group.x - 1;
@@ -169,11 +206,14 @@ class _BarChartBody extends StatelessWidget {
         ),
         borderData: FlBorderData(show: false),
         barGroups: primary.points.asMap().entries.map((e) {
+          final highlighted = e.key == highlightIndex;
+          final inflowWidth = secondary == null ? 18.0 : (highlighted ? 16.0 : 14.0);
+          final outflowWidth = highlighted ? 16.0 : 14.0;
           final rods = <BarChartRodData>[
             BarChartRodData(
               toY: e.value.value,
-              color: primary.color,
-              width: secondary == null ? 18 : 14,
+              color: primary.color.withValues(alpha: highlighted ? 1 : 0.82),
+              width: inflowWidth,
               borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
             ),
           ];
@@ -181,8 +221,8 @@ class _BarChartBody extends StatelessWidget {
             rods.add(
               BarChartRodData(
                 toY: secondary.points[e.key].value,
-                color: secondary.color,
-                width: 14,
+                color: secondary.color.withValues(alpha: highlighted ? 1 : 0.82),
+                width: outflowWidth,
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
               ),
             );
@@ -205,7 +245,8 @@ class _PieChartBody extends StatefulWidget {
 }
 
 class _PieChartBodyState extends State<_PieChartBody> {
-  int? _touchedIndex;
+  /// Desktop hover highlight — [ReportChartConfig.onPointTap] fires on tap only.
+  int? _hoveredIndex;
 
   @override
   Widget build(BuildContext context) {
@@ -224,6 +265,8 @@ class _PieChartBodyState extends State<_PieChartBody> {
       AppColors.info,
       AppColors.error,
     ];
+    final highlightIndex = _hoveredIndex ?? config.selectedPointIndex;
+    final captionIndex = highlightIndex;
 
     return Column(
       children: [
@@ -236,28 +279,28 @@ class _PieChartBodyState extends State<_PieChartBody> {
                 touchCallback: (event, response) {
                   setState(() {
                     if (!event.isInterestedForInteractions || response?.touchedSection == null) {
-                      _touchedIndex = null;
+                      _hoveredIndex = null;
                       return;
                     }
-                    _touchedIndex = response!.touchedSection!.touchedSectionIndex;
-                    final idx = _touchedIndex!;
-                    if (idx >= 0 && idx < points.length) {
+                    final idx = response!.touchedSection!.touchedSectionIndex;
+                    if (event is FlTapUpEvent && idx >= 0 && idx < points.length) {
                       config.onPointTap?.call(points[idx], config.series.first.id);
                     }
+                    _hoveredIndex = idx;
                   });
                 },
               ),
               sections: points.asMap().entries.map((e) {
                 final pct = (e.value.value / total) * 100;
-                final touched = e.key == _touchedIndex;
+                final highlighted = e.key == highlightIndex;
                 return PieChartSectionData(
                   value: e.value.value,
-                  title: touched ? '${pct.toStringAsFixed(1)}%' : '${pct.toStringAsFixed(0)}%',
-                  radius: touched ? 62 : 56,
+                  title: highlighted ? '${pct.toStringAsFixed(1)}%' : '${pct.toStringAsFixed(0)}%',
+                  radius: highlighted ? 62 : 56,
                   color: colors[e.key % colors.length],
                   titleStyle: TextStyle(
                     color: Colors.white,
-                    fontSize: touched ? 12 : 11,
+                    fontSize: highlighted ? 12 : 11,
                     fontWeight: FontWeight.w700,
                   ),
                 );
@@ -265,11 +308,11 @@ class _PieChartBodyState extends State<_PieChartBody> {
             ),
           ),
         ),
-        if (_touchedIndex != null && _touchedIndex! < points.length)
+        if (captionIndex != null && captionIndex < points.length)
           Padding(
             padding: const EdgeInsets.only(top: 8),
             child: Text(
-              '${points[_touchedIndex!].label}: ${config.yAxisFormatter?.call(points[_touchedIndex!].value) ?? points[_touchedIndex!].value.toStringAsFixed(0)}',
+              '${points[captionIndex].label}: ${config.yAxisFormatter?.call(points[captionIndex].value) ?? points[captionIndex].value.toStringAsFixed(0)}',
               style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
             ),
           ),

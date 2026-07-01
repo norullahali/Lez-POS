@@ -6,9 +6,10 @@ import '../models/financial_dashboard_cash_analytics.dart';
 
 /// Maps certified Phase 5.3.1 analytics models to shared [ReportChartConfig].
 ///
-/// All chart display formatting lives here — not in provider or repository.
-/// Phase 5.3.2.2 refined labels, legends, and empty states; financial values
-/// are passed through unchanged from repository models.
+/// All chart display formatting lives here -- not in provider or repository.
+/// Phase 5.3.2.2 refined labels, legends, and empty states; Phase 5.3.3.1
+/// adds optional read-only interactivity passthrough ([onPointTap],
+/// [selectedPointIndex]). Financial values are passed through unchanged.
 class FinancialDashboardChartMapper {
   FinancialDashboardChartMapper._();
 
@@ -17,27 +18,29 @@ class FinancialDashboardChartMapper {
   static const _kCompositionEmptyMessage =
       '\u0644\u0627 \u062a\u0648\u062c\u062f \u0628\u0646\u0648\u062f \u0644\u062a\u0648\u0632\u064a\u0639 \u0627\u0644\u062a\u062f\u0641\u0642 \u0627\u0644\u0646\u0642\u062f\u064a \u0641\u064a \u0627\u0644\u0641\u062a\u0631\u0629 \u0627\u0644\u0645\u062d\u062f\u062f\u0629';
 
-  /// When daily bucket count exceeds this and all buckets share one month,
-  /// X-axis labels show day-of-month only (fits shared 8-char axis truncation).
   static const _kDenseDayLabelThreshold = 14;
-
   static const _kTrendLegendInflow = '\u0625\u064a\u0631\u0627\u062f \u0646\u0642\u062f\u064a';
   static const _kTrendLegendOutflow = '\u0635\u0631\u0641 \u0646\u0642\u062f\u064a';
 
-  /// Compact Y-axis and bar-tooltip ticks — no currency suffix; shared axis
-  /// reserves limited width and truncates labels beyond 8 characters.
   static String _yAxisLabel(double value) =>
       AnalyticsFormatters.currency.format(value);
 
-  /// Full money formatting for pie touch captions ([AnalyticsFormatters.money]).
   static String _tooltipMoney(double value) => AnalyticsFormatters.money(value);
 
-  /// Formats repository bucket keys for chart axis labels only (no value transform).
-  ///
-  /// - `week:N` → أسبوع (N+1)
-  /// - day: `dd/MM`, or day-only when [bucketCount] > [_kDenseDayLabelThreshold]
-  ///   and all [allRawLabels] fall in one calendar month
-  /// - month: `MM/yy`
+  /// Public wrapper for selection feedback labels (presentation only).
+  static String formatBucketLabelForDisplay(
+    String raw,
+    DashboardGranularity granularity, {
+    required int bucketCount,
+    required Iterable<String> allRawLabels,
+  }) =>
+      _formatBucketLabel(
+        raw,
+        granularity,
+        bucketCount: bucketCount,
+        allRawLabels: allRawLabels,
+      );
+
   static String _formatBucketLabel(
     String raw,
     DashboardGranularity granularity, {
@@ -75,19 +78,35 @@ class FinancialDashboardChartMapper {
     return raw;
   }
 
-  /// Cash flow trend — inflow vs outflow per time bucket.
+  /// Applies presentation-only interactivity to an existing chart config.
   ///
-  /// Uses [ReportChartType.bar] because the shared line/trend renderer plots
-  /// only the primary series; bar supports dual inflow/outflow via
-  /// [ReportChartConfig.secondarySeries].
-  ///
-  /// [_yAxisLabel] applies to Y-axis and bar tooltips (single shared formatter on
-  /// [ReportChartConfig]); composition pie uses [_tooltipMoney] for touch captions.
-  ///
-  /// Read-only — [ReportChartConfig.onPointTap] omitted (null).
+  /// Does not remap points or alter values -- only attaches [onPointTap] and
+  /// [selectedPointIndex] for [ReportChartWidget] highlight / tap handling.
+  /// Call after caching base configs from [toCashFlowTrendChart] /
+  /// [toCashFlowCompositionChart]; reuse on selection-only rebuilds.
+  static ReportChartConfig withInteractivity(
+    ReportChartConfig base, {
+    void Function(ReportChartPoint point, String seriesId)? onPointTap,
+    int? selectedPointIndex,
+  }) =>
+      ReportChartConfig(
+        title: base.title,
+        type: base.type,
+        series: base.series,
+        secondarySeries: base.secondarySeries,
+        yAxisFormatter: base.yAxisFormatter,
+        emptyMessage: base.emptyMessage,
+        animationDuration: base.animationDuration,
+        onPointTap: onPointTap,
+        selectedPointIndex: selectedPointIndex,
+      );
+
+  /// Optional [onPointTap] / [selectedPointIndex] are presentation-only passthrough.
   static ReportChartConfig toCashFlowTrendChart(
-    FinancialDashboardCashFlowTimeSeries timeSeries,
-  ) {
+    FinancialDashboardCashFlowTimeSeries timeSeries, {
+    void Function(ReportChartPoint point, String seriesId)? onPointTap,
+    int? selectedPointIndex,
+  }) {
     final granularity = timeSeries.granularity;
     final rawLabels = timeSeries.buckets.map((b) => b.label);
     final bucketCount = timeSeries.buckets.length;
@@ -110,6 +129,8 @@ class FinancialDashboardChartMapper {
       type: ReportChartType.bar,
       yAxisFormatter: _yAxisLabel,
       emptyMessage: _kTrendEmptyMessage,
+      onPointTap: onPointTap,
+      selectedPointIndex: selectedPointIndex,
       series: [
         ReportChartSeries(
           id: 'inflow',
@@ -127,16 +148,12 @@ class FinancialDashboardChartMapper {
     );
   }
 
-  /// Cash flow composition — amount by ledger event type.
-  ///
-  /// Zero-amount slices are omitted for pie readability only; repository totals
-  /// are unchanged. Card legend is hidden in [DashboardAnalyticsSection] because
-  /// slice names appear on touch and a single-series legend duplicated the title.
-  ///
-  /// Read-only — no [ReportChartConfig.onPointTap].
+  /// Optional [onPointTap] / [selectedPointIndex] are presentation-only passthrough.
   static ReportChartConfig toCashFlowCompositionChart(
-    FinancialDashboardCashFlowBreakdown breakdown,
-  ) {
+    FinancialDashboardCashFlowBreakdown breakdown, {
+    void Function(ReportChartPoint point, String seriesId)? onPointTap,
+    int? selectedPointIndex,
+  }) {
     final points = breakdown.slices
         .where((s) => s.amount > 0)
         .map(
@@ -152,6 +169,8 @@ class FinancialDashboardChartMapper {
       type: ReportChartType.pie,
       yAxisFormatter: _tooltipMoney,
       emptyMessage: _kCompositionEmptyMessage,
+      onPointTap: onPointTap,
+      selectedPointIndex: selectedPointIndex,
       series: [
         ReportChartSeries(
           id: 'composition',

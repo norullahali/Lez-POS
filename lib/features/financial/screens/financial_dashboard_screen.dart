@@ -8,6 +8,7 @@ import '../providers/dashboard_providers.dart';
 import 'widgets/dashboard_analytics_section.dart';
 import 'widgets/dashboard_cash_flow_section.dart';
 import 'widgets/dashboard_filter_section.dart';
+import 'widgets/dashboard_alerts_section.dart';
 import 'widgets/dashboard_insights_section.dart';
 import 'widgets/dashboard_recent_activity_section.dart';
 import 'widgets/dashboard_supplementary_kpi_section.dart';
@@ -64,6 +65,8 @@ class _FinancialDashboardScreenState
               DashboardAnalyticsSection(onRefresh: _refresh),
               _sectionSpacing,
               DashboardInsightsSection(onRefresh: _refresh),
+              _sectionSpacing,
+              DashboardAlertsSection(onRefresh: _refresh),
               _sectionSpacing,
               DashboardSupplementaryKpiSection(onRefresh: _refresh),
               _sectionSpacing,

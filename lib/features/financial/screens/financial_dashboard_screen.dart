@@ -17,6 +17,7 @@ import '../widgets/dashboard_export_builder.dart';
 import 'widgets/dashboard_export_controls.dart';
 import 'widgets/dashboard_personalization_controls.dart';
 import 'widgets/dashboard_personalized_section.dart';
+import 'widgets/dashboard_notifications_section.dart';
 import 'widgets/dashboard_quick_actions_section.dart';
 import 'widgets/dashboard_recent_activity_section.dart';
 import 'widgets/dashboard_supplementary_kpi_section.dart';
@@ -166,6 +167,11 @@ class _FinancialDashboardScreenState
               // no providers). Fixed placement below header, above filter;
               // not in personalization or export scope.
               const DashboardQuickActionsSection(),
+              _sectionGap(),
+              // Phase 5.4 — presentation-only notifications center (static catalog,
+              // no providers). Fixed placement below quick actions, above filter;
+              // not in personalization or export scope.
+              const DashboardNotificationsSection(),
               _sectionGap(),
               DashboardFilterSection(
                 onRefresh: _refresh,

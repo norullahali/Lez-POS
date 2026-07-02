@@ -16,6 +16,7 @@ import '../widgets/dashboard_export_builder.dart';
 import 'widgets/dashboard_export_controls.dart';
 import 'widgets/dashboard_personalization_controls.dart';
 import 'widgets/dashboard_personalized_section.dart';
+import 'widgets/dashboard_quick_actions_section.dart';
 import 'widgets/dashboard_recent_activity_section.dart';
 import 'widgets/dashboard_supplementary_kpi_section.dart';
 
@@ -112,6 +113,11 @@ class _FinancialDashboardScreenState
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               _buildHeader(context),
+              _sectionGap(),
+              // Phase 5.3.8 — presentation-only quick actions (static catalog,
+              // no providers). Fixed placement below header, above filter;
+              // not in personalization or export scope.
+              const DashboardQuickActionsSection(),
               _sectionGap(),
               DashboardFilterSection(
                 onRefresh: _refresh,

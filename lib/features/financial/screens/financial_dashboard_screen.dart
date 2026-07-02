@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../reports/modules/shared/analytics_permission_gate.dart';
+import '../models/dashboard_personalization.dart';
 import '../providers/dashboard_filter_provider.dart';
 import '../providers/dashboard_providers.dart';
 import 'widgets/dashboard_analytics_section.dart';
@@ -10,6 +11,8 @@ import 'widgets/dashboard_cash_flow_section.dart';
 import 'widgets/dashboard_filter_section.dart';
 import 'widgets/dashboard_alerts_section.dart';
 import 'widgets/dashboard_insights_section.dart';
+import 'widgets/dashboard_personalization_controls.dart';
+import 'widgets/dashboard_personalized_section.dart';
 import 'widgets/dashboard_recent_activity_section.dart';
 import 'widgets/dashboard_supplementary_kpi_section.dart';
 
@@ -24,7 +27,10 @@ class FinancialDashboardScreen extends ConsumerStatefulWidget {
 
 class _FinancialDashboardScreenState
     extends ConsumerState<FinancialDashboardScreen> {
-  static const _sectionSpacing = SizedBox(height: 16);
+  /// Ephemeral presentation preferences (Phase 5.3.6).
+  ///
+  /// Local to this screen — not persisted, not in Riverpod. Discarded on dispose.
+  DashboardPersonalization _personalization = const DashboardPersonalization();
 
   Future<void> _refresh() async {
     ref.invalidate(dashboardCashFlowProvider);
@@ -41,6 +47,32 @@ class _FinancialDashboardScreenState
     }
   }
 
+  void _onPersonalizationChanged(DashboardPersonalization next) {
+    setState(() => _personalization = next);
+  }
+
+  void _toggleSectionCollapsed(DashboardSectionId section) {
+    setState(
+      () => _personalization = _personalization.toggleCollapsed(section),
+    );
+  }
+
+  /// Inter-section spacing from [DashboardPersonalization.displayDensity].
+  Widget _sectionGap() => SizedBox(height: _personalization.sectionSpacing);
+
+  /// Applies collapse chrome without modifying section widget internals.
+  Widget _personalizedSection({
+    required DashboardSectionId sectionId,
+    required Widget child,
+  }) {
+    return DashboardPersonalizedSection(
+      sectionId: sectionId,
+      collapsed: _personalization.isCollapsed(sectionId),
+      onToggleCollapse: () => _toggleSectionCollapsed(sectionId),
+      child: child,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return AnalyticsPermissionGate(
@@ -54,23 +86,49 @@ class _FinancialDashboardScreenState
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               _buildHeader(context),
-              _sectionSpacing,
+              _sectionGap(),
               DashboardFilterSection(
                 onRefresh: _refresh,
                 onReset: _onResetFilter,
               ),
-              _sectionSpacing,
-              DashboardCashFlowSection(onRefresh: _refresh),
-              _sectionSpacing,
-              DashboardAnalyticsSection(onRefresh: _refresh),
-              _sectionSpacing,
-              DashboardInsightsSection(onRefresh: _refresh),
-              _sectionSpacing,
-              DashboardAlertsSection(onRefresh: _refresh),
-              _sectionSpacing,
-              DashboardSupplementaryKpiSection(onRefresh: _refresh),
-              _sectionSpacing,
-              DashboardRecentActivitySection(onRefresh: _refresh),
+              _sectionGap(),
+              _personalizedSection(
+                sectionId: DashboardSectionId.cashFlow,
+                child: DashboardCashFlowSection(onRefresh: _refresh),
+              ),
+              if (_personalization.showAnalyticsCharts) ...[
+                _sectionGap(),
+                _personalizedSection(
+                  sectionId: DashboardSectionId.analytics,
+                  child: DashboardAnalyticsSection(onRefresh: _refresh),
+                ),
+              ],
+              if (_personalization.showInsights) ...[
+                _sectionGap(),
+                _personalizedSection(
+                  sectionId: DashboardSectionId.insights,
+                  child: DashboardInsightsSection(onRefresh: _refresh),
+                ),
+              ],
+              if (_personalization.showAlerts) ...[
+                _sectionGap(),
+                _personalizedSection(
+                  sectionId: DashboardSectionId.alerts,
+                  child: DashboardAlertsSection(onRefresh: _refresh),
+                ),
+              ],
+              _sectionGap(),
+              _personalizedSection(
+                sectionId: DashboardSectionId.supplementaryKpi,
+                child: DashboardSupplementaryKpiSection(onRefresh: _refresh),
+              ),
+              if (_personalization.showRecentActivity) ...[
+                _sectionGap(),
+                _personalizedSection(
+                  sectionId: DashboardSectionId.recentActivity,
+                  child: DashboardRecentActivitySection(onRefresh: _refresh),
+                ),
+              ],
             ],
           ),
         ),
@@ -122,6 +180,16 @@ class _FinancialDashboardScreenState
           ),
         ),
         const _ReadOnlyBadge(),
+        IconButton(
+          tooltip: '\u062a\u062e\u0635\u064a\u0635 \u0627\u0644\u0648\u062d\u0629',
+          icon: const Icon(Icons.tune_rounded, size: 22),
+          color: AppColors.textSecondary,
+          onPressed: () => DashboardPersonalizationControls.show(
+            context: context,
+            personalization: _personalization,
+            onChanged: _onPersonalizationChanged,
+          ),
+        ),
         IconButton(
           tooltip: '\u062a\u062d\u062f\u064a\u062b',
           icon: const Icon(Icons.refresh_rounded, size: 22),

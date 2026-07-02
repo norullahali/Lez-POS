@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../reports/modules/shared/analytics_permission_gate.dart';
+import '../models/dashboard_export.dart';
 import '../models/dashboard_personalization.dart';
 import '../providers/dashboard_filter_provider.dart';
 import '../providers/dashboard_providers.dart';
@@ -11,6 +12,8 @@ import 'widgets/dashboard_cash_flow_section.dart';
 import 'widgets/dashboard_filter_section.dart';
 import 'widgets/dashboard_alerts_section.dart';
 import 'widgets/dashboard_insights_section.dart';
+import '../widgets/dashboard_export_builder.dart';
+import 'widgets/dashboard_export_controls.dart';
 import 'widgets/dashboard_personalization_controls.dart';
 import 'widgets/dashboard_personalized_section.dart';
 import 'widgets/dashboard_recent_activity_section.dart';
@@ -54,6 +57,29 @@ class _FinancialDashboardScreenState
   void _toggleSectionCollapsed(DashboardSectionId section) {
     setState(
       () => _personalization = _personalization.toggleCollapsed(section),
+    );
+  }
+
+  /// Builds an export snapshot from already-loaded provider values (Phase 5.3.7).
+  ///
+  /// **On-demand only:** called when the user opens the export menu — not during
+  /// screen build or personalization updates.
+  ///
+  /// **read vs watch:** uses `ref.read` + `valueOrNull` intentionally — export
+  /// must not subscribe to providers or trigger rebuilds; it reads the current
+  /// cached async value at menu-open time only.
+  ///
+  /// Does not invalidate providers or access repositories.
+  DashboardExportDocument _prepareExportDocument() {
+    return DashboardExportBuilder.build(
+      DashboardExportBuildInput(
+        filter: ref.read(dashboardFilterProvider),
+        personalization: _personalization,
+        cashFlow: ref.read(dashboardCashFlowProvider).valueOrNull,
+        analytics: ref.read(dashboardCashAnalyticsProvider).valueOrNull,
+        currentState: ref.read(dashboardCurrentStateProvider).valueOrNull,
+        recentActivity: ref.read(dashboardRecentActivityProvider).valueOrNull,
+      ),
     );
   }
 
@@ -190,6 +216,7 @@ class _FinancialDashboardScreenState
             onChanged: _onPersonalizationChanged,
           ),
         ),
+        DashboardExportButton(onPrepareDocument: _prepareExportDocument),
         IconButton(
           tooltip: '\u062a\u062d\u062f\u064a\u062b',
           icon: const Icon(Icons.refresh_rounded, size: 22),

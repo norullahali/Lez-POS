@@ -14,7 +14,8 @@ import '../../models/dashboard_personalization.dart';
 /// mutate financial data, filters, or provider state.
 ///
 /// **Callback boundary:** [onChanged] updates screen-local [DashboardPersonalization]
-/// via `setState` — no persistence, no providers, no repository access.
+/// via [_updatePersonalization] — persistence is handled by the screen (Phase 5.3.9),
+/// not by this widget. No providers or repository access.
 class DashboardPersonalizationControls extends StatelessWidget {
   const DashboardPersonalizationControls({
     super.key,

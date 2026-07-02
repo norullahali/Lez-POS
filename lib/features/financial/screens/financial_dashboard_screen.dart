@@ -7,6 +7,7 @@ import '../models/dashboard_export.dart';
 import '../models/dashboard_personalization.dart';
 import '../providers/dashboard_filter_provider.dart';
 import '../providers/dashboard_providers.dart';
+import '../services/dashboard_personalization_store.dart';
 import 'widgets/dashboard_analytics_section.dart';
 import 'widgets/dashboard_cash_flow_section.dart';
 import 'widgets/dashboard_filter_section.dart';
@@ -31,10 +32,53 @@ class FinancialDashboardScreen extends ConsumerStatefulWidget {
 
 class _FinancialDashboardScreenState
     extends ConsumerState<FinancialDashboardScreen> {
-  /// Ephemeral presentation preferences (Phase 5.3.6).
+  // --- Personalization lifecycle (Phase 5.3.6 / 5.3.9) ---
+  // Load once from SharedPreferences on init; save on user change only.
+  // Not in Riverpod — presentation preferences stay on this State object.
+
+  /// Presentation preferences loaded from [DashboardPersonalizationStore].
   ///
-  /// Local to this screen — not persisted, not in Riverpod. Discarded on dispose.
+  /// Updated via [_updatePersonalization] (tune dialog + section collapse).
   DashboardPersonalization _personalization = const DashboardPersonalization();
+
+  /// True after the initial SharedPreferences load completes (no spinner).
+  bool _personalizationReady = false;
+
+  /// Last value written to SharedPreferences — screen-level duplicate-save guard.
+  DashboardPersonalization? _lastPersistedPersonalization;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPersonalization();
+  }
+
+  /// Loads personalization exactly once per screen instance (Phase 5.3.9).
+  Future<void> _loadPersonalization() async {
+    final loaded = await DashboardPersonalizationStore.load();
+    if (!mounted) return;
+    setState(() {
+      _personalization = loaded;
+      _lastPersistedPersonalization = loaded;
+      _personalizationReady = true;
+    });
+  }
+
+  /// Persists when [value] differs from [_lastPersistedPersonalization].
+  ///
+  /// Fire-and-forget — UI is not blocked; store performs JSON-level dedup.
+  Future<void> _persistPersonalization(DashboardPersonalization value) async {
+    if (_lastPersistedPersonalization == value) return;
+    _lastPersistedPersonalization = value;
+    await DashboardPersonalizationStore.save(value);
+  }
+
+  /// Single entry for tune-dialog and collapse changes; saves after setState.
+  void _updatePersonalization(DashboardPersonalization next) {
+    if (_personalization == next) return;
+    setState(() => _personalization = next);
+    _persistPersonalization(next);
+  }
 
   Future<void> _refresh() async {
     ref.invalidate(dashboardCashFlowProvider);
@@ -52,13 +96,11 @@ class _FinancialDashboardScreenState
   }
 
   void _onPersonalizationChanged(DashboardPersonalization next) {
-    setState(() => _personalization = next);
+    _updatePersonalization(next);
   }
 
   void _toggleSectionCollapsed(DashboardSectionId section) {
-    setState(
-      () => _personalization = _personalization.toggleCollapsed(section),
-    );
+    _updatePersonalization(_personalization.toggleCollapsed(section));
   }
 
   /// Builds an export snapshot from already-loaded provider values (Phase 5.3.7).
@@ -102,6 +144,12 @@ class _FinancialDashboardScreenState
 
   @override
   Widget build(BuildContext context) {
+    // Blank frame until prefs load — prevents flashing default layout when saved
+    // preferences differ. Intentionally no spinner (Phase 5.3.9 foundation).
+    if (!_personalizationReady) {
+      return const SizedBox.shrink();
+    }
+
     return AnalyticsPermissionGate(
       requiresFinancial: true,
       requiresInventory: false,

@@ -1,11 +1,19 @@
-/// Presentation-only Financial Dashboard UI preferences (Phase 5.3.6).
+/// Presentation-only Financial Dashboard UI preferences (Phase 5.3.6 / 5.3.9).
 ///
 /// **Ownership:** held by [_FinancialDashboardScreenState._personalization] only.
+/// Serialized by [DashboardPersonalizationStore]; never stored in providers or
+/// repositories.
 ///
 /// **Immutability:** const constructor; updates via [copyWith] / [toggleCollapsed].
+/// Equality ([==] / [hashCode]) supports screen- and store-level duplicate-write guards.
 ///
-/// **Lifecycle:** ephemeral — discarded when the dashboard screen is disposed;
-/// not persisted, not stored in providers or repositories.
+/// **Lifecycle:** loaded once when the dashboard opens via
+/// [DashboardPersonalizationStore.load]; persisted on user change via the screen's
+/// [_persistPersonalization]. Discarded when the screen is disposed.
+///
+/// **Serialization responsibility:** [toJson] / [fromJson] encode presentation
+/// preferences only — visibility toggles, collapse state, display density.
+/// Unknown or malformed JSON fields fall back to constructor defaults.
 ///
 /// **Future extensibility:** optional visibility toggles and [DashboardSectionId]
 /// support additional sections without analytics or repository changes.
@@ -32,17 +40,22 @@ class DashboardPersonalization {
   final bool showRecentActivity;
   /// Sections currently collapsed in the UI.
   ///
-  /// Retained when a section is hidden and restored on re-show; never persisted.
+  /// Retained when a section is hidden and restored on re-show; persisted locally.
   final Set<DashboardSectionId> collapsedSections;
   /// Inter-section spacing density (default: [DashboardDisplayDensity.comfortable]).
   final DashboardDisplayDensity displayDensity;
+
+  static const _kCompactSectionSpacing = 12.0;
+  static const _kComfortableSectionSpacing = 16.0;
 
   /// Vertical gap between dashboard sections.
   ///
   /// Presentation spacing only — does not alter inner section card padding.
   /// Comfortable: 16px (pre-5.3.6 default). Compact: 12px.
   double get sectionSpacing =>
-      displayDensity == DashboardDisplayDensity.compact ? 12.0 : 16.0;
+      displayDensity == DashboardDisplayDensity.compact
+          ? _kCompactSectionSpacing
+          : _kComfortableSectionSpacing;
 
   bool isCollapsed(DashboardSectionId section) =>
       collapsedSections.contains(section);
@@ -75,6 +88,85 @@ class DashboardPersonalization {
     }
     return copyWith(collapsedSections: next);
   }
+
+  /// JSON map for [DashboardPersonalizationStore] (Phase 5.3.9).
+  ///
+  /// Bounded payload: five scalar fields — O(1) serialization complexity.
+  Map<String, dynamic> toJson() => {
+        'showInsights': showInsights,
+        'showAlerts': showAlerts,
+        'showAnalyticsCharts': showAnalyticsCharts,
+        'showRecentActivity': showRecentActivity,
+        'collapsedSections': collapsedSections.map((e) => e.name).toList()
+          ..sort(),
+        'displayDensity': displayDensity.name,
+      };
+
+  /// Restores personalization from [json].
+  ///
+  /// **Safe fallback:** unknown enum names, wrong types, or missing keys use
+  /// constructor defaults — never throws.
+  factory DashboardPersonalization.fromJson(Map<String, dynamic> json) {
+    return DashboardPersonalization(
+      showInsights: json['showInsights'] as bool? ?? true,
+      showAlerts: json['showAlerts'] as bool? ?? true,
+      showAnalyticsCharts: json['showAnalyticsCharts'] as bool? ?? true,
+      showRecentActivity: json['showRecentActivity'] as bool? ?? true,
+      collapsedSections: _collapsedSectionsFromJson(json['collapsedSections']),
+      displayDensity: _displayDensityFromJson(json['displayDensity']),
+    );
+  }
+
+  static Set<DashboardSectionId> _collapsedSectionsFromJson(Object? raw) {
+    final collapsed = <DashboardSectionId>{};
+    if (raw is! List) return collapsed;
+    for (final entry in raw) {
+      if (entry is! String) continue;
+      for (final section in DashboardSectionId.values) {
+        if (section.name == entry) {
+          collapsed.add(section);
+          break;
+        }
+      }
+    }
+    return collapsed;
+  }
+
+  static DashboardDisplayDensity _displayDensityFromJson(Object? raw) {
+    if (raw is! String) return DashboardDisplayDensity.comfortable;
+    for (final value in DashboardDisplayDensity.values) {
+      if (value.name == raw) return value;
+    }
+    return DashboardDisplayDensity.comfortable;
+  }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is DashboardPersonalization &&
+        showInsights == other.showInsights &&
+        showAlerts == other.showAlerts &&
+        showAnalyticsCharts == other.showAnalyticsCharts &&
+        showRecentActivity == other.showRecentActivity &&
+        displayDensity == other.displayDensity &&
+        _setEquals(collapsedSections, other.collapsedSections);
+  }
+
+  @override
+  int get hashCode => Object.hash(
+        showInsights,
+        showAlerts,
+        showAnalyticsCharts,
+        showRecentActivity,
+        displayDensity,
+        Object.hashAllUnordered(collapsedSections),
+      );
+
+  static bool _setEquals(
+    Set<DashboardSectionId> a,
+    Set<DashboardSectionId> b,
+  ) =>
+      a.length == b.length && a.containsAll(b);
 }
 
 /// Collapsible dashboard section identifiers (Phase 5.3.6).

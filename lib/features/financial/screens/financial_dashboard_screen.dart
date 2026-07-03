@@ -17,6 +17,7 @@ import '../widgets/dashboard_export_builder.dart';
 import 'widgets/dashboard_export_controls.dart';
 import 'widgets/dashboard_personalization_controls.dart';
 import 'widgets/dashboard_personalized_section.dart';
+import 'widgets/dashboard_favorites_section.dart';
 import 'widgets/dashboard_notifications_section.dart';
 import 'widgets/dashboard_quick_actions_section.dart';
 import 'widgets/dashboard_recent_activity_section.dart';
@@ -172,6 +173,11 @@ class _FinancialDashboardScreenState
               // no providers). Fixed placement below quick actions, above filter;
               // not in personalization or export scope.
               const DashboardNotificationsSection(),
+              _sectionGap(),
+              // Phase 5.5 — presentation-only favorites (static catalog,
+              // no providers). Fixed placement below notifications, above filter;
+              // not in personalization or export scope.
+              const DashboardFavoritesSection(),
               _sectionGap(),
               DashboardFilterSection(
                 onRefresh: _refresh,

@@ -13,11 +13,11 @@ class DashboardFilter {
 
   final ReportFilterModel dateFilter;
 
-  /// Reserved for Phase 5.3.3 manual chart bucket control.
+  /// Reserved for future manual chart bucket override.
   ///
-  /// **Not read at runtime in Phase 5.3.1.** [dashboardCashAnalyticsProvider]
-  /// always auto-resolves granularity from [resolvedRange] duration. This field
-  /// exists so future UI can persist a user override without a filter-model migration.
+  /// **Not read at runtime.** [dashboardCashAnalyticsProvider] auto-resolves
+  /// granularity from [resolvedRange] duration. This field exists so a future
+  /// filter UI can persist a user override without a filter-model migration.
   final DashboardGranularity granularity;
 
   DateTimeRange get resolvedRange => dateFilter.resolveRange();
@@ -46,6 +46,6 @@ class DashboardFilter {
 
 /// Time-series bucket granularity for Financial Dashboard cash-flow charts.
 ///
-/// Phase 5.3.1: auto-selected in [dashboardCashAnalyticsProvider] from range
-/// duration only. [DashboardFilter.granularity] is reserved, not consumed.
+/// Auto-selected in [dashboardCashAnalyticsProvider] from range duration.
+/// [DashboardFilter.granularity] is reserved for future manual override, not consumed.
 enum DashboardGranularity { day, week, month }

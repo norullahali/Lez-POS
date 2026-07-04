@@ -27,7 +27,6 @@ import "../models/dashboard_filter.dart";
 import "../models/financial_dashboard_cash_analytics.dart";
 import "../models/financial_dashboard_cash_flow.dart";
 import "../models/financial_dashboard_current_state.dart";
-import "../models/financial_dashboard_summary.dart";
 import "../repositories/financial_dashboard_repository.dart";
 import "cash_ledger_providers.dart";
 import "dashboard_filter_provider.dart";
@@ -105,24 +104,6 @@ final dashboardCurrentStateProvider =
   );
 });
 
-// ── Summary (combines both) ───────────────────────────────────────────────
-
-/// Combined snapshot. Watches both sub-providers.
-final dashboardSummaryProvider =
-    FutureProvider.autoDispose<FinancialDashboardSummary>((ref) async {
-  final cashFlowFuture = ref.watch(dashboardCashFlowProvider.future);
-  final currentStateFuture = ref.watch(dashboardCurrentStateProvider.future);
-
-  final cashFlow = await cashFlowFuture;
-  final currentState = await currentStateFuture;
-
-  return FinancialDashboardSummary(
-    cashFlow: cashFlow,
-    currentState: currentState,
-    generatedAt: DateTime.now(),
-  );
-});
-
 // ── Recent Activity (no cache) ────────────────────────────────────────────
 
 /// Top 10 Cash Ledger entries for the period. Watches dashboardFilterProvider.
@@ -153,7 +134,8 @@ final dashboardRecentActivityProvider =
 // dashboard data providers — avoids cascade rebuilds when KPI sections refresh.
 //
 // Granularity: [_resolveAnalyticsGranularity] derives bucket size from filter
-// range duration. [DashboardFilter.granularity] is not read (reserved for 5.3.3).
+// range duration. [DashboardFilter.granularity] is reserved for future manual
+// override — not read by this provider (see dashboard_filter.dart).
 
 /// Chart-ready cash analytics (cash flow trend + composition).
 /// Watches [dashboardFilterProvider] only.

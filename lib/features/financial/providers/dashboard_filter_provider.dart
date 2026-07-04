@@ -19,6 +19,10 @@ class DashboardFilterNotifier extends Notifier<DashboardFilter> {
     );
   }
 
+  /// Updates [DashboardFilter.granularity] for future manual chart-bucket UI.
+  ///
+  /// **Not consumed yet** — [dashboardCashAnalyticsProvider] auto-resolves
+  /// granularity from the date range. Safe to call; no runtime chart effect today.
   void setGranularity(DashboardGranularity granularity) {
     state = state.copyWith(granularity: granularity);
   }

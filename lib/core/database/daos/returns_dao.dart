@@ -65,7 +65,8 @@ class ReturnsDao extends DatabaseAccessor<AppDatabase> with _$ReturnsDaoMixin {
           CustomerReturnItemsCompanion(
             returnId: Value(returnId),
             productId: Value(productId),
-            productName: Value(item['productName'] as String? ?? 'منتج #$productId'),
+            productName:
+                Value(item['productName'] as String? ?? 'منتج #$productId'),
             quantity: Value(qty),
             unitPrice: Value(price),
             unitCost: Value(cost),
@@ -298,20 +299,97 @@ class ReturnsDao extends DatabaseAccessor<AppDatabase> with _$ReturnsDaoMixin {
       (select(supplierReturnItems)..where((i) => i.returnId.equals(returnId)))
           .get();
 
+  /// Remaining quantity returnable against [purchaseItemId] (line-specific, read-only).
+  ///
+  /// SR.1 contract: `purchaseItem.quantity - SUM(linked supplierReturnItems.quantity)`,
+  /// clamped at zero. Legacy null [purchaseItemId] rows are excluded.
+  /// Returns 0.0 when the purchase item does not exist.
+  ///
+  /// Quantity-cap enforcement at save time belongs to SR.2+.
+  Future<double> getReturnableQuantityForPurchaseItem(
+      int purchaseItemId) async {
+    final row = await customSelect(
+      '''
+      SELECT
+        pi.quantity AS purchased_qty,
+        COALESCE((
+          SELECT SUM(sri.quantity)
+          FROM supplier_return_items sri
+          WHERE sri.purchase_item_id = pi.id
+        ), 0) AS returned_qty
+      FROM purchase_items pi
+      WHERE pi.id = ?
+      ''',
+      variables: [Variable.withInt(purchaseItemId)],
+      readsFrom: {attachedDatabase.purchaseItems, supplierReturnItems},
+    ).getSingleOrNull();
+
+    if (row == null) return 0.0;
+
+    final purchased = (row.data['purchased_qty'] as num).toDouble();
+    final returned = (row.data['returned_qty'] as num).toDouble();
+    final remaining = purchased - returned;
+    return remaining < 0 ? 0.0 : remaining;
+  }
+
+  /// Persists a supplier return and deducts stock (RETURN_OUT + [StockGuard]).
+  ///
+  /// Item payload keys: productId, productName, qty, cost; optional purchaseItemId.
+  ///
+  /// SR.1 structural validation when [purchaseItemId] is supplied: purchase item
+  /// exists, belongs to header [purchaseInvoiceId], and product matches.
+  /// Returnable-quantity caps and supplier accounting belong to SR.2+.
   Future<int> saveSupplierReturn({
     required SupplierReturnsCompanion header,
     required List<Map<String, dynamic>> items,
   }) async {
+    final headerPurchaseId = header.purchaseInvoiceId.present
+        ? header.purchaseInvoiceId.value
+        : null;
+
+    for (final item in items) {
+      final purchaseItemId = item['purchaseItemId'] as int?;
+      if (purchaseItemId == null) continue;
+
+      if (headerPurchaseId == null) {
+        throw StateError(
+          'مرتجع المورد المرتبط ببند شراء يتطلب purchaseInvoiceId في الترويسة',
+        );
+      }
+
+      final purchaseItem = await attachedDatabase.purchasesDao
+          .getPurchaseItemById(purchaseItemId);
+      if (purchaseItem == null) {
+        throw StateError('بند الشراء غير موجود: $purchaseItemId');
+      }
+      if (purchaseItem.invoiceId != headerPurchaseId) {
+        throw StateError(
+          'بند الشراء $purchaseItemId لا ينتمي لفاتورة الشراء $headerPurchaseId',
+        );
+      }
+
+      final productId = item['productId'] as int;
+      if (purchaseItem.productId != productId) {
+        throw StateError(
+          'المنتج في المرتجع لا يطابق بند الشراء $purchaseItemId',
+        );
+      }
+    }
+
     return transaction(() async {
       final returnId = await into(supplierReturns).insert(header);
       for (final item in items) {
         final productId = item['productId'] as int;
         final qty = (item['qty'] as num).toDouble();
         final cost = (item['cost'] as num).toDouble();
+        final purchaseItemId = item['purchaseItemId'] as int?;
 
         final itemId = await into(supplierReturnItems).insert(
           SupplierReturnItemsCompanion(
             returnId: Value(returnId),
+            purchaseItemId: purchaseItemId != null
+                ? Value(purchaseItemId)
+                : const Value.absent(),
             productId: Value(productId),
             productName: Value(item['productName'] as String),
             quantity: Value(qty),

@@ -8906,6 +8906,15 @@ class $SupplierReturnItemsTable extends SupplierReturnItems
       requiredDuringInsert: true,
       defaultConstraints: GeneratedColumn.constraintIsAlways(
           'REFERENCES supplier_returns (id) ON DELETE CASCADE'));
+  static const VerificationMeta _purchaseItemIdMeta =
+      const VerificationMeta('purchaseItemId');
+  @override
+  late final GeneratedColumn<int> purchaseItemId = GeneratedColumn<int>(
+      'purchase_item_id', aliasedName, true,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('REFERENCES purchase_items (id)'));
   static const VerificationMeta _productIdMeta =
       const VerificationMeta('productId');
   @override
@@ -8936,8 +8945,16 @@ class $SupplierReturnItemsTable extends SupplierReturnItems
       'total', aliasedName, false,
       type: DriftSqlType.double, requiredDuringInsert: true);
   @override
-  List<GeneratedColumn> get $columns =>
-      [id, returnId, productId, productName, quantity, unitCost, total];
+  List<GeneratedColumn> get $columns => [
+        id,
+        returnId,
+        purchaseItemId,
+        productId,
+        productName,
+        quantity,
+        unitCost,
+        total
+      ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -8956,6 +8973,12 @@ class $SupplierReturnItemsTable extends SupplierReturnItems
           returnId.isAcceptableOrUnknown(data['return_id']!, _returnIdMeta));
     } else if (isInserting) {
       context.missing(_returnIdMeta);
+    }
+    if (data.containsKey('purchase_item_id')) {
+      context.handle(
+          _purchaseItemIdMeta,
+          purchaseItemId.isAcceptableOrUnknown(
+              data['purchase_item_id']!, _purchaseItemIdMeta));
     }
     if (data.containsKey('product_id')) {
       context.handle(_productIdMeta,
@@ -9002,6 +9025,8 @@ class $SupplierReturnItemsTable extends SupplierReturnItems
           .read(DriftSqlType.int, data['${effectivePrefix}id'])!,
       returnId: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}return_id'])!,
+      purchaseItemId: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}purchase_item_id']),
       productId: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}product_id'])!,
       productName: attachedDatabase.typeMapping
@@ -9025,6 +9050,9 @@ class SupplierReturnItem extends DataClass
     implements Insertable<SupplierReturnItem> {
   final int id;
   final int returnId;
+
+  /// Exact purchase line this return item reverses. Nullable for legacy/manual rows.
+  final int? purchaseItemId;
   final int productId;
   final String productName;
   final double quantity;
@@ -9033,6 +9061,7 @@ class SupplierReturnItem extends DataClass
   const SupplierReturnItem(
       {required this.id,
       required this.returnId,
+      this.purchaseItemId,
       required this.productId,
       required this.productName,
       required this.quantity,
@@ -9043,6 +9072,9 @@ class SupplierReturnItem extends DataClass
     final map = <String, Expression>{};
     map['id'] = Variable<int>(id);
     map['return_id'] = Variable<int>(returnId);
+    if (!nullToAbsent || purchaseItemId != null) {
+      map['purchase_item_id'] = Variable<int>(purchaseItemId);
+    }
     map['product_id'] = Variable<int>(productId);
     map['product_name'] = Variable<String>(productName);
     map['quantity'] = Variable<double>(quantity);
@@ -9055,6 +9087,9 @@ class SupplierReturnItem extends DataClass
     return SupplierReturnItemsCompanion(
       id: Value(id),
       returnId: Value(returnId),
+      purchaseItemId: purchaseItemId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(purchaseItemId),
       productId: Value(productId),
       productName: Value(productName),
       quantity: Value(quantity),
@@ -9069,6 +9104,7 @@ class SupplierReturnItem extends DataClass
     return SupplierReturnItem(
       id: serializer.fromJson<int>(json['id']),
       returnId: serializer.fromJson<int>(json['returnId']),
+      purchaseItemId: serializer.fromJson<int?>(json['purchaseItemId']),
       productId: serializer.fromJson<int>(json['productId']),
       productName: serializer.fromJson<String>(json['productName']),
       quantity: serializer.fromJson<double>(json['quantity']),
@@ -9082,6 +9118,7 @@ class SupplierReturnItem extends DataClass
     return <String, dynamic>{
       'id': serializer.toJson<int>(id),
       'returnId': serializer.toJson<int>(returnId),
+      'purchaseItemId': serializer.toJson<int?>(purchaseItemId),
       'productId': serializer.toJson<int>(productId),
       'productName': serializer.toJson<String>(productName),
       'quantity': serializer.toJson<double>(quantity),
@@ -9093,6 +9130,7 @@ class SupplierReturnItem extends DataClass
   SupplierReturnItem copyWith(
           {int? id,
           int? returnId,
+          Value<int?> purchaseItemId = const Value.absent(),
           int? productId,
           String? productName,
           double? quantity,
@@ -9101,6 +9139,8 @@ class SupplierReturnItem extends DataClass
       SupplierReturnItem(
         id: id ?? this.id,
         returnId: returnId ?? this.returnId,
+        purchaseItemId:
+            purchaseItemId.present ? purchaseItemId.value : this.purchaseItemId,
         productId: productId ?? this.productId,
         productName: productName ?? this.productName,
         quantity: quantity ?? this.quantity,
@@ -9111,6 +9151,9 @@ class SupplierReturnItem extends DataClass
     return SupplierReturnItem(
       id: data.id.present ? data.id.value : this.id,
       returnId: data.returnId.present ? data.returnId.value : this.returnId,
+      purchaseItemId: data.purchaseItemId.present
+          ? data.purchaseItemId.value
+          : this.purchaseItemId,
       productId: data.productId.present ? data.productId.value : this.productId,
       productName:
           data.productName.present ? data.productName.value : this.productName,
@@ -9125,6 +9168,7 @@ class SupplierReturnItem extends DataClass
     return (StringBuffer('SupplierReturnItem(')
           ..write('id: $id, ')
           ..write('returnId: $returnId, ')
+          ..write('purchaseItemId: $purchaseItemId, ')
           ..write('productId: $productId, ')
           ..write('productName: $productName, ')
           ..write('quantity: $quantity, ')
@@ -9135,14 +9179,15 @@ class SupplierReturnItem extends DataClass
   }
 
   @override
-  int get hashCode => Object.hash(
-      id, returnId, productId, productName, quantity, unitCost, total);
+  int get hashCode => Object.hash(id, returnId, purchaseItemId, productId,
+      productName, quantity, unitCost, total);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is SupplierReturnItem &&
           other.id == this.id &&
           other.returnId == this.returnId &&
+          other.purchaseItemId == this.purchaseItemId &&
           other.productId == this.productId &&
           other.productName == this.productName &&
           other.quantity == this.quantity &&
@@ -9153,6 +9198,7 @@ class SupplierReturnItem extends DataClass
 class SupplierReturnItemsCompanion extends UpdateCompanion<SupplierReturnItem> {
   final Value<int> id;
   final Value<int> returnId;
+  final Value<int?> purchaseItemId;
   final Value<int> productId;
   final Value<String> productName;
   final Value<double> quantity;
@@ -9161,6 +9207,7 @@ class SupplierReturnItemsCompanion extends UpdateCompanion<SupplierReturnItem> {
   const SupplierReturnItemsCompanion({
     this.id = const Value.absent(),
     this.returnId = const Value.absent(),
+    this.purchaseItemId = const Value.absent(),
     this.productId = const Value.absent(),
     this.productName = const Value.absent(),
     this.quantity = const Value.absent(),
@@ -9170,6 +9217,7 @@ class SupplierReturnItemsCompanion extends UpdateCompanion<SupplierReturnItem> {
   SupplierReturnItemsCompanion.insert({
     this.id = const Value.absent(),
     required int returnId,
+    this.purchaseItemId = const Value.absent(),
     required int productId,
     required String productName,
     required double quantity,
@@ -9184,6 +9232,7 @@ class SupplierReturnItemsCompanion extends UpdateCompanion<SupplierReturnItem> {
   static Insertable<SupplierReturnItem> custom({
     Expression<int>? id,
     Expression<int>? returnId,
+    Expression<int>? purchaseItemId,
     Expression<int>? productId,
     Expression<String>? productName,
     Expression<double>? quantity,
@@ -9193,6 +9242,7 @@ class SupplierReturnItemsCompanion extends UpdateCompanion<SupplierReturnItem> {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (returnId != null) 'return_id': returnId,
+      if (purchaseItemId != null) 'purchase_item_id': purchaseItemId,
       if (productId != null) 'product_id': productId,
       if (productName != null) 'product_name': productName,
       if (quantity != null) 'quantity': quantity,
@@ -9204,6 +9254,7 @@ class SupplierReturnItemsCompanion extends UpdateCompanion<SupplierReturnItem> {
   SupplierReturnItemsCompanion copyWith(
       {Value<int>? id,
       Value<int>? returnId,
+      Value<int?>? purchaseItemId,
       Value<int>? productId,
       Value<String>? productName,
       Value<double>? quantity,
@@ -9212,6 +9263,7 @@ class SupplierReturnItemsCompanion extends UpdateCompanion<SupplierReturnItem> {
     return SupplierReturnItemsCompanion(
       id: id ?? this.id,
       returnId: returnId ?? this.returnId,
+      purchaseItemId: purchaseItemId ?? this.purchaseItemId,
       productId: productId ?? this.productId,
       productName: productName ?? this.productName,
       quantity: quantity ?? this.quantity,
@@ -9228,6 +9280,9 @@ class SupplierReturnItemsCompanion extends UpdateCompanion<SupplierReturnItem> {
     }
     if (returnId.present) {
       map['return_id'] = Variable<int>(returnId.value);
+    }
+    if (purchaseItemId.present) {
+      map['purchase_item_id'] = Variable<int>(purchaseItemId.value);
     }
     if (productId.present) {
       map['product_id'] = Variable<int>(productId.value);
@@ -9252,6 +9307,7 @@ class SupplierReturnItemsCompanion extends UpdateCompanion<SupplierReturnItem> {
     return (StringBuffer('SupplierReturnItemsCompanion(')
           ..write('id: $id, ')
           ..write('returnId: $returnId, ')
+          ..write('purchaseItemId: $purchaseItemId, ')
           ..write('productId: $productId, ')
           ..write('productName: $productName, ')
           ..write('quantity: $quantity, ')
@@ -23214,6 +23270,24 @@ final class $$PurchaseItemsTableReferences
     return ProcessedTableManager(
         manager.$state.copyWith(prefetchedData: [item]));
   }
+
+  static MultiTypedResultKey<$SupplierReturnItemsTable,
+      List<SupplierReturnItem>> _supplierReturnItemsRefsTable(
+          _$AppDatabase db) =>
+      MultiTypedResultKey.fromTable(db.supplierReturnItems,
+          aliasName: $_aliasNameGenerator(
+              db.purchaseItems.id, db.supplierReturnItems.purchaseItemId));
+
+  $$SupplierReturnItemsTableProcessedTableManager get supplierReturnItemsRefs {
+    final manager =
+        $$SupplierReturnItemsTableTableManager($_db, $_db.supplierReturnItems)
+            .filter((f) => f.purchaseItemId.id($_item.id));
+
+    final cache =
+        $_typedResult.readTableOrNull(_supplierReturnItemsRefsTable($_db));
+    return ProcessedTableManager(
+        manager.$state.copyWith(prefetchedData: cache));
+  }
 }
 
 class $$PurchaseItemsTableFilterComposer
@@ -23282,6 +23356,27 @@ class $$PurchaseItemsTableFilterComposer
                   $removeJoinBuilderFromRootComposer,
             ));
     return composer;
+  }
+
+  Expression<bool> supplierReturnItemsRefs(
+      Expression<bool> Function($$SupplierReturnItemsTableFilterComposer f) f) {
+    final $$SupplierReturnItemsTableFilterComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.id,
+        referencedTable: $db.supplierReturnItems,
+        getReferencedColumn: (t) => t.purchaseItemId,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$SupplierReturnItemsTableFilterComposer(
+              $db: $db,
+              $table: $db.supplierReturnItems,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return f(composer);
   }
 }
 
@@ -23420,6 +23515,29 @@ class $$PurchaseItemsTableAnnotationComposer
             ));
     return composer;
   }
+
+  Expression<T> supplierReturnItemsRefs<T extends Object>(
+      Expression<T> Function($$SupplierReturnItemsTableAnnotationComposer a)
+          f) {
+    final $$SupplierReturnItemsTableAnnotationComposer composer =
+        $composerBuilder(
+            composer: this,
+            getCurrentColumn: (t) => t.id,
+            referencedTable: $db.supplierReturnItems,
+            getReferencedColumn: (t) => t.purchaseItemId,
+            builder: (joinBuilder,
+                    {$addJoinBuilderToRootComposer,
+                    $removeJoinBuilderFromRootComposer}) =>
+                $$SupplierReturnItemsTableAnnotationComposer(
+                  $db: $db,
+                  $table: $db.supplierReturnItems,
+                  $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                  joinBuilder: joinBuilder,
+                  $removeJoinBuilderFromRootComposer:
+                      $removeJoinBuilderFromRootComposer,
+                ));
+    return f(composer);
+  }
 }
 
 class $$PurchaseItemsTableTableManager extends RootTableManager<
@@ -23433,7 +23551,8 @@ class $$PurchaseItemsTableTableManager extends RootTableManager<
     $$PurchaseItemsTableUpdateCompanionBuilder,
     (PurchaseItem, $$PurchaseItemsTableReferences),
     PurchaseItem,
-    PrefetchHooks Function({bool invoiceId, bool productId})> {
+    PrefetchHooks Function(
+        {bool invoiceId, bool productId, bool supplierReturnItemsRefs})> {
   $$PurchaseItemsTableTableManager(_$AppDatabase db, $PurchaseItemsTable table)
       : super(TableManagerState(
           db: db,
@@ -23490,10 +23609,15 @@ class $$PurchaseItemsTableTableManager extends RootTableManager<
                     $$PurchaseItemsTableReferences(db, table, e)
                   ))
               .toList(),
-          prefetchHooksCallback: ({invoiceId = false, productId = false}) {
+          prefetchHooksCallback: (
+              {invoiceId = false,
+              productId = false,
+              supplierReturnItemsRefs = false}) {
             return PrefetchHooks(
               db: db,
-              explicitlyWatchedTables: [],
+              explicitlyWatchedTables: [
+                if (supplierReturnItemsRefs) db.supplierReturnItems
+              ],
               addJoins: <
                   T extends TableManagerState<
                       dynamic,
@@ -23531,7 +23655,20 @@ class $$PurchaseItemsTableTableManager extends RootTableManager<
                 return state;
               },
               getPrefetchedDataCallback: (items) async {
-                return [];
+                return [
+                  if (supplierReturnItemsRefs)
+                    await $_getPrefetchedData(
+                        currentTable: table,
+                        referencedTable: $$PurchaseItemsTableReferences
+                            ._supplierReturnItemsRefsTable(db),
+                        managerFromTypedResult: (p0) =>
+                            $$PurchaseItemsTableReferences(db, table, p0)
+                                .supplierReturnItemsRefs,
+                        referencedItemsForCurrentItem:
+                            (item, referencedItems) => referencedItems
+                                .where((e) => e.purchaseItemId == item.id),
+                        typedResults: items)
+                ];
               },
             );
           },
@@ -23549,7 +23686,8 @@ typedef $$PurchaseItemsTableProcessedTableManager = ProcessedTableManager<
     $$PurchaseItemsTableUpdateCompanionBuilder,
     (PurchaseItem, $$PurchaseItemsTableReferences),
     PurchaseItem,
-    PrefetchHooks Function({bool invoiceId, bool productId})>;
+    PrefetchHooks Function(
+        {bool invoiceId, bool productId, bool supplierReturnItemsRefs})>;
 typedef $$PosSessionsTableCreateCompanionBuilder = PosSessionsCompanion
     Function({
   Value<int> id,
@@ -26454,6 +26592,7 @@ typedef $$SupplierReturnItemsTableCreateCompanionBuilder
     = SupplierReturnItemsCompanion Function({
   Value<int> id,
   required int returnId,
+  Value<int?> purchaseItemId,
   required int productId,
   required String productName,
   required double quantity,
@@ -26464,6 +26603,7 @@ typedef $$SupplierReturnItemsTableUpdateCompanionBuilder
     = SupplierReturnItemsCompanion Function({
   Value<int> id,
   Value<int> returnId,
+  Value<int?> purchaseItemId,
   Value<int> productId,
   Value<String> productName,
   Value<double> quantity,
@@ -26486,6 +26626,20 @@ final class $$SupplierReturnItemsTableReferences extends BaseReferences<
         $$SupplierReturnsTableTableManager($_db, $_db.supplierReturns)
             .filter((f) => f.id($_item.returnId!));
     final item = $_typedResult.readTableOrNull(_returnIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+        manager.$state.copyWith(prefetchedData: [item]));
+  }
+
+  static $PurchaseItemsTable _purchaseItemIdTable(_$AppDatabase db) =>
+      db.purchaseItems.createAlias($_aliasNameGenerator(
+          db.supplierReturnItems.purchaseItemId, db.purchaseItems.id));
+
+  $$PurchaseItemsTableProcessedTableManager? get purchaseItemId {
+    if ($_item.purchaseItemId == null) return null;
+    final manager = $$PurchaseItemsTableTableManager($_db, $_db.purchaseItems)
+        .filter((f) => f.id($_item.purchaseItemId!));
+    final item = $_typedResult.readTableOrNull(_purchaseItemIdTable($_db));
     if (item == null) return manager;
     return ProcessedTableManager(
         manager.$state.copyWith(prefetchedData: [item]));
@@ -26531,6 +26685,26 @@ class $$SupplierReturnItemsTableFilterComposer
             $$SupplierReturnsTableFilterComposer(
               $db: $db,
               $table: $db.supplierReturns,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
+
+  $$PurchaseItemsTableFilterComposer get purchaseItemId {
+    final $$PurchaseItemsTableFilterComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.purchaseItemId,
+        referencedTable: $db.purchaseItems,
+        getReferencedColumn: (t) => t.id,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$PurchaseItemsTableFilterComposer(
+              $db: $db,
+              $table: $db.purchaseItems,
               $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
               joinBuilder: joinBuilder,
               $removeJoinBuilderFromRootComposer:
@@ -26586,6 +26760,26 @@ class $$SupplierReturnItemsTableOrderingComposer
             ));
     return composer;
   }
+
+  $$PurchaseItemsTableOrderingComposer get purchaseItemId {
+    final $$PurchaseItemsTableOrderingComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.purchaseItemId,
+        referencedTable: $db.purchaseItems,
+        getReferencedColumn: (t) => t.id,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$PurchaseItemsTableOrderingComposer(
+              $db: $db,
+              $table: $db.purchaseItems,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
 }
 
 class $$SupplierReturnItemsTableAnnotationComposer
@@ -26634,6 +26828,26 @@ class $$SupplierReturnItemsTableAnnotationComposer
             ));
     return composer;
   }
+
+  $$PurchaseItemsTableAnnotationComposer get purchaseItemId {
+    final $$PurchaseItemsTableAnnotationComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.purchaseItemId,
+        referencedTable: $db.purchaseItems,
+        getReferencedColumn: (t) => t.id,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$PurchaseItemsTableAnnotationComposer(
+              $db: $db,
+              $table: $db.purchaseItems,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
 }
 
 class $$SupplierReturnItemsTableTableManager extends RootTableManager<
@@ -26647,7 +26861,7 @@ class $$SupplierReturnItemsTableTableManager extends RootTableManager<
     $$SupplierReturnItemsTableUpdateCompanionBuilder,
     (SupplierReturnItem, $$SupplierReturnItemsTableReferences),
     SupplierReturnItem,
-    PrefetchHooks Function({bool returnId})> {
+    PrefetchHooks Function({bool returnId, bool purchaseItemId})> {
   $$SupplierReturnItemsTableTableManager(
       _$AppDatabase db, $SupplierReturnItemsTable table)
       : super(TableManagerState(
@@ -26664,6 +26878,7 @@ class $$SupplierReturnItemsTableTableManager extends RootTableManager<
           updateCompanionCallback: ({
             Value<int> id = const Value.absent(),
             Value<int> returnId = const Value.absent(),
+            Value<int?> purchaseItemId = const Value.absent(),
             Value<int> productId = const Value.absent(),
             Value<String> productName = const Value.absent(),
             Value<double> quantity = const Value.absent(),
@@ -26673,6 +26888,7 @@ class $$SupplierReturnItemsTableTableManager extends RootTableManager<
               SupplierReturnItemsCompanion(
             id: id,
             returnId: returnId,
+            purchaseItemId: purchaseItemId,
             productId: productId,
             productName: productName,
             quantity: quantity,
@@ -26682,6 +26898,7 @@ class $$SupplierReturnItemsTableTableManager extends RootTableManager<
           createCompanionCallback: ({
             Value<int> id = const Value.absent(),
             required int returnId,
+            Value<int?> purchaseItemId = const Value.absent(),
             required int productId,
             required String productName,
             required double quantity,
@@ -26691,6 +26908,7 @@ class $$SupplierReturnItemsTableTableManager extends RootTableManager<
               SupplierReturnItemsCompanion.insert(
             id: id,
             returnId: returnId,
+            purchaseItemId: purchaseItemId,
             productId: productId,
             productName: productName,
             quantity: quantity,
@@ -26703,7 +26921,7 @@ class $$SupplierReturnItemsTableTableManager extends RootTableManager<
                     $$SupplierReturnItemsTableReferences(db, table, e)
                   ))
               .toList(),
-          prefetchHooksCallback: ({returnId = false}) {
+          prefetchHooksCallback: ({returnId = false, purchaseItemId = false}) {
             return PrefetchHooks(
               db: db,
               explicitlyWatchedTables: [],
@@ -26731,6 +26949,17 @@ class $$SupplierReturnItemsTableTableManager extends RootTableManager<
                         .id,
                   ) as T;
                 }
+                if (purchaseItemId) {
+                  state = state.withJoin(
+                    currentTable: table,
+                    currentColumn: table.purchaseItemId,
+                    referencedTable: $$SupplierReturnItemsTableReferences
+                        ._purchaseItemIdTable(db),
+                    referencedColumn: $$SupplierReturnItemsTableReferences
+                        ._purchaseItemIdTable(db)
+                        .id,
+                  ) as T;
+                }
 
                 return state;
               },
@@ -26753,7 +26982,7 @@ typedef $$SupplierReturnItemsTableProcessedTableManager = ProcessedTableManager<
     $$SupplierReturnItemsTableUpdateCompanionBuilder,
     (SupplierReturnItem, $$SupplierReturnItemsTableReferences),
     SupplierReturnItem,
-    PrefetchHooks Function({bool returnId})>;
+    PrefetchHooks Function({bool returnId, bool purchaseItemId})>;
 typedef $$UsersTableTableCreateCompanionBuilder = UsersTableCompanion Function({
   Value<int> id,
   required String fullName,

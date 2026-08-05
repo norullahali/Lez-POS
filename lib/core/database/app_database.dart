@@ -136,11 +136,15 @@ class AppDatabase extends _$AppDatabase {
     return _instance!;
   }
 
+  /// In-memory executor for SR.1 unit tests only; production uses [instance].
+  AppDatabase.test([QueryExecutor? executor])
+      : super(executor ?? NativeDatabase.memory());
+
   /// Plain (non-Drift-managed) DAO for pricing rules.
   late final pricingDao = PricingDao(this);
 
   @override
-  int get schemaVersion => 30;
+  int get schemaVersion => 31;
 
   @override
   MigrationStrategy get migration {
@@ -532,7 +536,8 @@ class AppDatabase extends _$AppDatabase {
           // Normalise any Eastern-Arabic (٠-٩) and Persian (۰-۹) digits that
           // were previously stored in the barcode column to ASCII digits (0-9).
           // SQLite REPLACE() is idempotent: already-English barcodes are unchanged.
-          debugPrint('[Migration] v18: normalising Arabic/Persian digits in product barcodes...');
+          debugPrint(
+              '[Migration] v18: normalising Arabic/Persian digits in product barcodes...');
           try {
             await customStatement('''
               UPDATE products SET barcode =
@@ -558,7 +563,8 @@ class AppDatabase extends _$AppDatabase {
           // StockGuard (added previously) prevents new negative writes, but
           // historical data may still have negative current_stock values.
           // This migration makes the DB consistent with the UI safeStock guard.
-          debugPrint('[Migration] v19: clamping negative current_stock values to 0...');
+          debugPrint(
+              '[Migration] v19: clamping negative current_stock values to 0...');
           try {
             await customStatement(
               'UPDATE products SET current_stock = 0 WHERE current_stock < 0',
@@ -576,12 +582,14 @@ class AppDatabase extends _$AppDatabase {
               'ALTER TABLE sales_invoices ADD COLUMN invoice_status TEXT NOT NULL DEFAULT \'completed\'',
             );
           } catch (e) {
-            debugPrint('[Migration v20] alter sales_invoices invoice_status skip: $e');
+            debugPrint(
+                '[Migration v20] alter sales_invoices invoice_status skip: $e');
           }
         }
 
         if (from < 21) {
-          debugPrint('[Migration] v21: sales_invoices return metadata columns...');
+          debugPrint(
+              '[Migration] v21: sales_invoices return metadata columns...');
           for (final ddl in [
             'ALTER TABLE sales_invoices ADD COLUMN return_date INTEGER',
             'ALTER TABLE sales_invoices ADD COLUMN return_note TEXT',
@@ -618,7 +626,8 @@ class AppDatabase extends _$AppDatabase {
         }
 
         if (from < 24) {
-          debugPrint('[Migration] v24: adding session close columns to pos_sessions...');
+          debugPrint(
+              '[Migration] v24: adding session close columns to pos_sessions...');
           for (final ddl in [
             'ALTER TABLE pos_sessions ADD COLUMN closed_by_user_id INTEGER',
             'ALTER TABLE pos_sessions ADD COLUMN expected_cash_amount REAL',
@@ -761,7 +770,8 @@ class AppDatabase extends _$AppDatabase {
             await m.createTable(otherIncomeCategories);
             debugPrint('[Migration v30] other_income_categories ready');
           } catch (e) {
-            debugPrint('[Migration v30] create other_income_categories error: $e');
+            debugPrint(
+                '[Migration v30] create other_income_categories error: $e');
           }
           try {
             await m.createTable(otherIncomeRecords);
@@ -769,6 +779,30 @@ class AppDatabase extends _$AppDatabase {
           } catch (e) {
             debugPrint('[Migration v30] create other_income_records error: $e');
           }
+        }
+        if (from < 31) {
+          // SR.1: purchase-item traceability on supplier_return_items (nullable FK).
+          debugPrint(
+              '[Migration v31] supplier return item purchase traceability...');
+          try {
+            await customStatement(
+              'ALTER TABLE supplier_return_items '
+              'ADD COLUMN purchase_item_id INTEGER NULL '
+              'REFERENCES purchase_items(id)',
+            );
+          } catch (e) {
+            debugPrint('[Migration v31] add purchase_item_id skip: $e');
+          }
+          try {
+            await customStatement(
+              'CREATE INDEX IF NOT EXISTS supplier_return_items_purchase_item_idx '
+              'ON supplier_return_items (purchase_item_id)',
+            );
+          } catch (e) {
+            debugPrint('[Migration v31] purchase_item_id index skip: $e');
+          }
+          debugPrint(
+              '[Migration v31] supplier_return_items traceability ready');
         }
       },
       beforeOpen: (details) async {

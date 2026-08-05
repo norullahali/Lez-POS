@@ -14,9 +14,10 @@ mixin _$ReturnsDaoMixin on DatabaseAccessor<AppDatabase> {
   $PurchaseInvoicesTable get purchaseInvoices =>
       attachedDatabase.purchaseInvoices;
   $SupplierReturnsTable get supplierReturns => attachedDatabase.supplierReturns;
-  $SupplierReturnItemsTable get supplierReturnItems =>
-      attachedDatabase.supplierReturnItems;
   $CategoriesTable get categories => attachedDatabase.categories;
   $ProductsTable get products => attachedDatabase.products;
+  $PurchaseItemsTable get purchaseItems => attachedDatabase.purchaseItems;
+  $SupplierReturnItemsTable get supplierReturnItems =>
+      attachedDatabase.supplierReturnItems;
   $StockLedgerTable get stockLedger => attachedDatabase.stockLedger;
 }

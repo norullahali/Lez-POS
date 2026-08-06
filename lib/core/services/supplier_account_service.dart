@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import '../database/app_database.dart';
 
-/// Service to handle supplier accounts and debt transactions.
+/// Service to handle supplier accounts and supplier debt transactions.
 class SupplierAccountService {
   final AppDatabase db;
 

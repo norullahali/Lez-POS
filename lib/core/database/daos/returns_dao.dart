@@ -10,6 +10,22 @@ import '../../services/stock_guard.dart';
 
 part 'returns_dao.g.dart';
 
+/// Thrown when [ReturnsDao.saveSupplierReturn] receives purchase linkage.
+///
+/// New purchase-linked returns must use
+/// [SupplierReturnService.postPurchaseLinkedReturn].
+class SupplierReturnDirectPostingForbiddenException implements Exception {
+  const SupplierReturnDirectPostingForbiddenException([
+    this.message = 'Purchase-linked supplier returns must be posted through '
+        'SupplierReturnService.postPurchaseLinkedReturn().',
+  ]);
+
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
 @DriftAccessor(tables: [
   CustomerReturns,
   CustomerReturnItems,
@@ -332,13 +348,72 @@ class ReturnsDao extends DatabaseAccessor<AppDatabase> with _$ReturnsDaoMixin {
     return remaining < 0 ? 0.0 : remaining;
   }
 
-  /// Persists a supplier return and deducts stock (RETURN_OUT + [StockGuard]).
+  /// Low-level persistence primitive for supplier returns.
   ///
-  /// Item payload keys: productId, productName, qty, cost; optional purchaseItemId.
+  /// Contract (SR.2 hardening):
+  /// - Does NOT own business orchestration or open a transaction.
+  /// - Does NOT enforce returnable quantity or supplier accounting.
+  /// - Expects caller-validated header/items inside a caller-owned transaction.
+  /// - Performs canonical insert + RETURN_OUT + [StockGuard.deductStock].
+  /// - Not a UI-facing or production entry point — use
+  ///   [SupplierReturnService.postPurchaseLinkedReturn] for purchase-linked returns.
+  Future<int> persistSupplierReturn({
+    required SupplierReturnsCompanion header,
+    required List<Map<String, dynamic>> items,
+  }) async {
+    final returnId = await into(supplierReturns).insert(header);
+    for (final item in items) {
+      final productId = item['productId'] as int;
+      final qty = (item['qty'] as num).toDouble();
+      final cost = (item['cost'] as num).toDouble();
+      final purchaseItemId = item['purchaseItemId'] as int?;
+
+      final itemId = await into(supplierReturnItems).insert(
+        SupplierReturnItemsCompanion(
+          returnId: Value(returnId),
+          purchaseItemId: purchaseItemId != null
+              ? Value(purchaseItemId)
+              : const Value.absent(),
+          productId: Value(productId),
+          productName: Value(item['productName'] as String),
+          quantity: Value(qty),
+          unitCost: Value(cost),
+          total: Value(qty * cost),
+        ),
+      );
+
+      await into(stockLedger).insert(
+        StockLedgerCompanion(
+          productId: Value(productId),
+          movementType: Value(StockMovementType.returnOut.code),
+          referenceId: Value(itemId),
+          referenceType: const Value('supplier_return_items'),
+          quantityChange: Value(-qty),
+          unitCost: Value(cost),
+        ),
+      );
+
+      await StockGuard.deductStock(
+        db: attachedDatabase,
+        productId: productId,
+        quantity: qty,
+      );
+    }
+    return returnId;
+  }
+
+  /// Legacy/manual supplier return persistence (stock only, no supplier accounting).
   ///
-  /// SR.1 structural validation when [purchaseItemId] is supplied: purchase item
-  /// exists, belongs to header [purchaseInvoiceId], and product matches.
-  /// Returnable-quantity caps and supplier accounting belong to SR.2+.
+  /// **Not for purchase-linked returns.** If [header.purchaseInvoiceId] is set or
+  /// any item carries [purchaseItemId], this method rejects and directs callers to
+  /// [SupplierReturnService.postPurchaseLinkedReturn].
+  ///
+  /// Item payload keys: productId, productName, qty, cost (no purchaseItemId).
+  @Deprecated(
+    'Purchase-linked supplier returns must be posted through '
+    'SupplierReturnService.postPurchaseLinkedReturn(). '
+    'Use saveSupplierReturn only for legacy/manual unlinked returns.',
+  )
   Future<int> saveSupplierReturn({
     required SupplierReturnsCompanion header,
     required List<Map<String, dynamic>> items,
@@ -346,79 +421,14 @@ class ReturnsDao extends DatabaseAccessor<AppDatabase> with _$ReturnsDaoMixin {
     final headerPurchaseId = header.purchaseInvoiceId.present
         ? header.purchaseInvoiceId.value
         : null;
+    final hasLinkedItems = items.any((item) => item['purchaseItemId'] != null);
 
-    for (final item in items) {
-      final purchaseItemId = item['purchaseItemId'] as int?;
-      if (purchaseItemId == null) continue;
-
-      if (headerPurchaseId == null) {
-        throw StateError(
-          'مرتجع المورد المرتبط ببند شراء يتطلب purchaseInvoiceId في الترويسة',
-        );
-      }
-
-      final purchaseItem = await attachedDatabase.purchasesDao
-          .getPurchaseItemById(purchaseItemId);
-      if (purchaseItem == null) {
-        throw StateError('بند الشراء غير موجود: $purchaseItemId');
-      }
-      if (purchaseItem.invoiceId != headerPurchaseId) {
-        throw StateError(
-          'بند الشراء $purchaseItemId لا ينتمي لفاتورة الشراء $headerPurchaseId',
-        );
-      }
-
-      final productId = item['productId'] as int;
-      if (purchaseItem.productId != productId) {
-        throw StateError(
-          'المنتج في المرتجع لا يطابق بند الشراء $purchaseItemId',
-        );
-      }
+    if (headerPurchaseId != null || hasLinkedItems) {
+      throw const SupplierReturnDirectPostingForbiddenException();
     }
 
-    return transaction(() async {
-      final returnId = await into(supplierReturns).insert(header);
-      for (final item in items) {
-        final productId = item['productId'] as int;
-        final qty = (item['qty'] as num).toDouble();
-        final cost = (item['cost'] as num).toDouble();
-        final purchaseItemId = item['purchaseItemId'] as int?;
-
-        final itemId = await into(supplierReturnItems).insert(
-          SupplierReturnItemsCompanion(
-            returnId: Value(returnId),
-            purchaseItemId: purchaseItemId != null
-                ? Value(purchaseItemId)
-                : const Value.absent(),
-            productId: Value(productId),
-            productName: Value(item['productName'] as String),
-            quantity: Value(qty),
-            unitCost: Value(cost),
-            total: Value(qty * cost),
-          ),
-        );
-
-        // Stock goes OUT when returned to supplier
-        await into(stockLedger).insert(
-          StockLedgerCompanion(
-            productId: Value(productId),
-            movementType: Value(StockMovementType.returnOut.code),
-            referenceId: Value(itemId),
-            referenceType: const Value('supplier_return_items'),
-            quantityChange: Value(-qty), // negative = out
-            unitCost: Value(cost),
-          ),
-        );
-
-        // Guard-protected deduction — supplier return reduces stock.
-        // Must be inside the enclosing transaction for atomicity.
-        await StockGuard.deductStock(
-          db: attachedDatabase,
-          productId: productId,
-          quantity: qty,
-        );
-      }
-      return returnId;
-    });
+    return transaction(
+      () => persistSupplierReturn(header: header, items: items),
+    );
   }
 }

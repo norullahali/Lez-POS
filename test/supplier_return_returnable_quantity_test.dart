@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lez_pos/core/database/app_database.dart';
+import 'package:lez_pos/core/database/daos/returns_dao.dart';
 
 void main() {
   late AppDatabase db;
@@ -191,9 +192,8 @@ void main() {
     });
   });
 
-  group('saveSupplierReturn structural validation', () {
-    test(
-        'A) linked purchaseItemId without header purchaseInvoiceId is rejected',
+  group('saveSupplierReturn purchase-linked guard', () {
+    test('A) purchaseItemId without header is rejected (use service)',
         () async {
       await expectLater(
         db.returnsDao.saveSupplierReturn(
@@ -205,12 +205,11 @@ void main() {
             ),
           ],
         ),
-        throwsA(isA<StateError>()),
+        throwsA(isA<SupplierReturnDirectPostingForbiddenException>()),
       );
     });
 
-    test('B) purchaseItemId from a different purchase invoice is rejected',
-        () async {
+    test('B) purchase header linkage is rejected (use service)', () async {
       await expectLater(
         db.returnsDao.saveSupplierReturn(
           header: supplierReturnHeader(purchaseInvoiceId: invoice2Id),
@@ -221,41 +220,35 @@ void main() {
             ),
           ],
         ),
-        throwsA(isA<StateError>()),
+        throwsA(isA<SupplierReturnDirectPostingForbiddenException>()),
       );
     });
 
-    test('C) purchaseItemId product mismatch is rejected', () async {
-      final otherProductId = await db.into(db.products).insert(
-            const ProductsCompanion(
-              name: Value('Other Widget'),
-              barcode: Value('OTHER-WIDGET-TEST'),
-            ),
-          );
-
+    test('C) purchaseItemId linkage is rejected even when product matches',
+        () async {
       await expectLater(
         db.returnsDao.saveSupplierReturn(
           header: supplierReturnHeader(purchaseInvoiceId: invoice1Id),
           items: [
             supplierReturnItemPayload(
-              productId: otherProductId,
+              productId: productId,
               purchaseItemId: purchaseItem1Id,
             ),
           ],
         ),
-        throwsA(isA<StateError>()),
+        throwsA(isA<SupplierReturnDirectPostingForbiddenException>()),
       );
     });
 
-    test('D) valid purchase linkage passes structural validation', () async {
+    test('D) manual unlinked return still persists via saveSupplierReturn',
+        () async {
       await seedProductStock(5);
 
       final returnId = await db.returnsDao.saveSupplierReturn(
-        header: supplierReturnHeader(purchaseInvoiceId: invoice1Id),
+        header: supplierReturnHeader(),
         items: [
           supplierReturnItemPayload(
             productId: productId,
-            purchaseItemId: purchaseItem1Id,
             qty: 2,
           ),
         ],
@@ -265,11 +258,11 @@ void main() {
 
       final lines = await db.returnsDao.getSupplierReturnItems(returnId);
       expect(lines, hasLength(1));
-      expect(lines.single.purchaseItemId, purchaseItem1Id);
+      expect(lines.single.purchaseItemId, equals(null));
 
       final returnable = await db.returnsDao
           .getReturnableQuantityForPurchaseItem(purchaseItem1Id);
-      expect(returnable, 8);
+      expect(returnable, 10);
     });
   });
 }

@@ -43,59 +43,107 @@ class SupplierAccountsDao extends DatabaseAccessor<AppDatabase>
   // Transaction writing
   // -----------------------------------------------------
 
+  /// Core method — always call inside a Drift transaction.
+  /// Signs: PURCHASE = +amount, PAYMENT = -amount, RETURN = -amount,
+  /// ADJUSTMENT = explicit signed amount.
+  Future<void> applyTransaction({
+    required int supplierId,
+    required String type, // 'PURCHASE' | 'PAYMENT' | 'RETURN' | 'ADJUSTMENT'
+    required double amount,
+    int? referenceId,
+    String note = '',
+  }) async {
+    await into(supplierTransactions).insert(
+      SupplierTransactionsCompanion(
+        supplierId: Value(supplierId),
+        type: Value(type),
+        amount: Value(amount),
+        referenceId: Value(referenceId),
+        note: Value(note),
+      ),
+    );
+
+    final newBalance = await calculateBalanceFromTransactions(supplierId);
+
+    final existing = await (select(supplierAccounts)
+          ..where((a) => a.supplierId.equals(supplierId)))
+        .getSingleOrNull();
+
+    if (existing != null) {
+      await (update(supplierAccounts)..where((a) => a.id.equals(existing.id)))
+          .write(
+        SupplierAccountsCompanion(
+          currentBalance: Value(newBalance),
+          updatedAt: Value(DateTime.now()),
+        ),
+      );
+    } else {
+      await into(supplierAccounts).insert(
+        SupplierAccountsCompanion(
+          supplierId: Value(supplierId),
+          currentBalance: Value(newBalance),
+          updatedAt: Value(DateTime.now()),
+        ),
+      );
+    }
+  }
+
   Future<void> addTransaction({
     required int supplierId,
     required String type, // 'PURCHASE' | 'PAYMENT' | 'ADJUSTMENT'
-    required double amount, // positive = increases debt, negative = decreases debt
+    required double
+        amount, // positive = increases debt, negative = decreases debt
     int? referenceId,
     String note = '',
   }) async {
     await transaction(() async {
-      // 1. Append to ledger
-      await into(supplierTransactions).insert(
-        SupplierTransactionsCompanion(
-          supplierId: Value(supplierId),
-          type: Value(type),
-          amount: Value(amount),
-          referenceId: Value(referenceId),
-          note: Value(note),
-        ),
+      await applyTransaction(
+        supplierId: supplierId,
+        type: type,
+        amount: amount,
+        referenceId: referenceId,
+        note: note,
       );
-
-      // 2. Re-calculate balance
-      final newBalance = await calculateBalanceFromTransactions(supplierId);
-
-      // 3. Upsert
-      final existing = await (select(supplierAccounts)
-            ..where((a) => a.supplierId.equals(supplierId)))
-          .getSingleOrNull();
-
-      if (existing != null) {
-        await (update(supplierAccounts)
-              ..where((a) => a.id.equals(existing.id)))
-            .write(
-          SupplierAccountsCompanion(
-            currentBalance: Value(newBalance),
-            updatedAt: Value(DateTime.now()),
-          ),
-        );
-      } else {
-        await into(supplierAccounts).insert(
-          SupplierAccountsCompanion(
-            supplierId: Value(supplierId),
-            currentBalance: Value(newBalance),
-            updatedAt: Value(DateTime.now()),
-          ),
-        );
-      }
     });
   }
+
+  /// Reduces supplier payable for a purchase-linked return (SR.2).
+  /// [amount] is the positive return value; stored as negative ledger amount.
+  Future<void> recordReturn({
+    required int supplierId,
+    required double amount,
+    required int returnId,
+    String note = '',
+  }) =>
+      addTransaction(
+        supplierId: supplierId,
+        type: 'RETURN',
+        amount: -amount,
+        referenceId: returnId,
+        note: note,
+      );
+
+  /// Same as [recordReturn] but must run inside an enclosing transaction.
+  Future<void> recordReturnInTransaction({
+    required int supplierId,
+    required double amount,
+    required int returnId,
+    String note = '',
+  }) =>
+      applyTransaction(
+        supplierId: supplierId,
+        type: 'RETURN',
+        amount: -amount,
+        referenceId: returnId,
+        note: note,
+      );
 
   // -----------------------------------------------------
   // History queries
   // -----------------------------------------------------
 
-  Stream<List<SupplierTransaction>> watchHistory(int supplierId, {int limit = 50}) {
+  Stream<List<SupplierTransaction>> watchHistory(int supplierId,
+      {int limit = 50}) {
     return (select(supplierTransactions)
           ..where((t) => t.supplierId.equals(supplierId))
           ..orderBy([(t) => OrderingTerm.desc(t.createdAt)])
@@ -103,7 +151,8 @@ class SupplierAccountsDao extends DatabaseAccessor<AppDatabase>
         .watch();
   }
 
-  Future<List<SupplierTransaction>> getHistory(int supplierId, {int limit = 50}) {
+  Future<List<SupplierTransaction>> getHistory(int supplierId,
+      {int limit = 50}) {
     return (select(supplierTransactions)
           ..where((t) => t.supplierId.equals(supplierId))
           ..orderBy([(t) => OrderingTerm.desc(t.createdAt)])

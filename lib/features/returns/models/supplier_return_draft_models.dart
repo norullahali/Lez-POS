@@ -1,5 +1,7 @@
 // lib/features/returns/models/supplier_return_draft_models.dart
 
+import '../../../core/services/supplier_return_service.dart';
+
 class SupplierReturnPurchaseOption {
   final int purchaseInvoiceId;
   final int supplierId;
@@ -71,4 +73,33 @@ String? validateDraftLineQuantity(
     return 'تتجاوز الكمية المتاحة للإرجاع (${line.returnableQty.toStringAsFixed(0)})';
   }
   return null;
+}
+
+/// Builds the certified SR.2 posting input from a validated draft.
+/// Only purchaseItemId + quantity are sent; service derives costs/products.
+SupplierReturnPostingInput? buildPostingInputFromDraft(
+  SupplierReturnPurchaseOption purchase,
+  List<SupplierReturnDraftLine> lines, {
+  String? reason,
+  String? notes,
+}) {
+  final postingLines = lines
+      .where((l) => l.selectedReturnQty > 0.0001)
+      .map(
+        (l) => SupplierReturnPostingLine(
+          purchaseItemId: l.purchaseItemId,
+          quantity: l.selectedReturnQty,
+        ),
+      )
+      .toList();
+
+  if (postingLines.isEmpty) return null;
+
+  return SupplierReturnPostingInput(
+    supplierId: purchase.supplierId,
+    purchaseInvoiceId: purchase.purchaseInvoiceId,
+    lines: postingLines,
+    reason: reason != null && reason.trim().isNotEmpty ? reason.trim() : null,
+    notes: notes != null && notes.trim().isNotEmpty ? notes.trim() : null,
+  );
 }

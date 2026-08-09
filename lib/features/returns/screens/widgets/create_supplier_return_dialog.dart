@@ -9,18 +9,23 @@ import '../../../../core/theme/app_colors.dart';
 import '../../models/supplier_return_draft_models.dart';
 import '../../providers/supplier_return_draft_provider.dart';
 
-Future<void> showCreateSupplierReturnDialog(
+Future<bool> showCreateSupplierReturnDialog(
   BuildContext context,
   WidgetRef ref,
 ) {
   ref.read(supplierReturnDraftProvider.notifier).reset();
-  return showDialog<void>(
+  return showDialog<bool>(
     context: context,
     barrierDismissible: true,
     builder: (_) => const CreateSupplierReturnDialog(),
-  ).whenComplete(() {
+  ).then((posted) {
     ref.read(supplierReturnDraftProvider.notifier).reset();
+    return posted ?? false;
   });
+}
+
+void _closeDialog(BuildContext context, {bool posted = false}) {
+  Navigator.of(context).pop(posted);
 }
 
 class CreateSupplierReturnDialog extends ConsumerStatefulWidget {
@@ -45,37 +50,71 @@ class _CreateSupplierReturnDialogState
   Widget build(BuildContext context) {
     final draft = ref.watch(supplierReturnDraftProvider);
     final dateFmt = DateFormat('yyyy/MM/dd');
+    final canDismiss = !draft.isPosting;
 
-    return Dialog(
-      backgroundColor: AppColors.surface,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 960, maxHeight: 720),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _Header(
-              title: draft.step == SupplierReturnDraftStep.selectPurchase
-                  ? 'اختيار فاتورة الشراء'
-                  : 'إعداد مرتجع المورد',
-              onClose: () => Navigator.of(context).pop(),
-            ),
-            if (draft.errorMessage != null)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Text(
-                  draft.errorMessage!,
-                  style: const TextStyle(color: AppColors.error),
-                  textDirection: TextDirection.rtl,
-                ),
+    return PopScope(
+      canPop: canDismiss,
+      child: Dialog(
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 960, maxHeight: 720),
+          child: Stack(
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _Header(
+                    title: draft.step == SupplierReturnDraftStep.selectPurchase
+                        ? 'اختيار فاتورة الشراء'
+                        : 'إعداد مرتجع المورد',
+                    onClose: canDismiss ? () => _closeDialog(context) : null,
+                  ),
+                  if (draft.errorMessage != null)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: Text(
+                        draft.errorMessage!,
+                        style: const TextStyle(color: AppColors.error),
+                        textDirection: TextDirection.rtl,
+                      ),
+                    ),
+                  Expanded(
+                    child: draft.step == SupplierReturnDraftStep.selectPurchase
+                        ? _PurchaseSelector(dateFmt: dateFmt)
+                        : _DraftLinesEditor(dateFmt: dateFmt),
+                  ),
+                  _Footer(
+                    onClose: canDismiss ? () => _closeDialog(context) : null,
+                  ),
+                ],
               ),
-            Expanded(
-              child: draft.step == SupplierReturnDraftStep.selectPurchase
-                  ? _PurchaseSelector(dateFmt: dateFmt)
-                  : _DraftLinesEditor(dateFmt: dateFmt),
-            ),
-            _Footer(onClose: () => Navigator.of(context).pop()),
-          ],
+              if (draft.isPosting)
+                Positioned.fill(
+                  child: ColoredBox(
+                    color: Colors.black26,
+                    child: Center(
+                      child: Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: const [
+                              CircularProgressIndicator(),
+                              SizedBox(height: 16),
+                              Text(
+                                'جاري حفظ المرتجع...',
+                                textDirection: TextDirection.rtl,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );
@@ -83,10 +122,10 @@ class _CreateSupplierReturnDialogState
 }
 
 class _Header extends StatelessWidget {
-  const _Header({required this.title, required this.onClose});
+  const _Header({required this.title, this.onClose});
 
   final String title;
-  final VoidCallback onClose;
+  final VoidCallback? onClose;
 
   @override
   Widget build(BuildContext context) {
@@ -105,7 +144,10 @@ class _Header extends StatelessWidget {
               textDirection: TextDirection.rtl,
             ),
           ),
-          IconButton(onPressed: onClose, icon: const Icon(Icons.close_rounded)),
+          IconButton(
+            onPressed: onClose,
+            icon: const Icon(Icons.close_rounded),
+          ),
         ],
       ),
     );
@@ -214,7 +256,8 @@ class _DraftLinesEditor extends ConsumerWidget {
           Row(
             children: [
               TextButton.icon(
-                onPressed: notifier.backToPurchaseSelection,
+                onPressed:
+                    draft.isPosting ? null : notifier.backToPurchaseSelection,
                 icon: const Icon(Icons.arrow_back_rounded, size: 18),
                 label: const Text('تغيير الفاتورة'),
               ),
@@ -262,6 +305,15 @@ class _DraftLinesEditor extends ConsumerWidget {
             textDirection: TextDirection.rtl,
             onChanged: notifier.setNotes,
           ),
+          if (draft.postingErrorMessage != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(
+                draft.postingErrorMessage!,
+                style: const TextStyle(color: AppColors.error),
+                textDirection: TextDirection.rtl,
+              ),
+            ),
           const SizedBox(height: 12),
           Row(
             children: [
@@ -271,13 +323,24 @@ class _DraftLinesEditor extends ConsumerWidget {
                 textDirection: TextDirection.rtl,
               ),
               const Spacer(),
-              Tooltip(
-                message: 'سيتم تفعيل الحفظ في المرحلة القادمة (SR.3.2)',
-                child: FilledButton.icon(
-                  onPressed: null,
-                  icon: const Icon(Icons.save_rounded, size: 18),
-                  label: const Text('حفظ المرتجع'),
-                ),
+              FilledButton.icon(
+                onPressed: draft.canSave
+                    ? () async {
+                        final posted = await notifier.submitReturn();
+                        if (!context.mounted) return;
+                        if (posted) {
+                          _closeDialog(context, posted: true);
+                        }
+                      }
+                    : null,
+                icon: draft.isPosting
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.save_rounded, size: 18),
+                label: const Text('حفظ المرتجع'),
               ),
             ],
           ),
@@ -412,9 +475,9 @@ class _LinesTableState extends ConsumerState<_LinesTable> {
 }
 
 class _Footer extends StatelessWidget {
-  const _Footer({required this.onClose});
+  const _Footer({this.onClose});
 
-  final VoidCallback onClose;
+  final VoidCallback? onClose;
 
   @override
   Widget build(BuildContext context) {
@@ -422,7 +485,10 @@ class _Footer extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       child: Align(
         alignment: AlignmentDirectional.centerStart,
-        child: OutlinedButton(onPressed: onClose, child: const Text('إغلاق')),
+        child: OutlinedButton(
+          onPressed: onClose,
+          child: const Text('إغلاق'),
+        ),
       ),
     );
   }

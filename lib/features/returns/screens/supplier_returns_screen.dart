@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
+import '../providers/supplier_return_service_provider.dart';
 import 'widgets/create_supplier_return_dialog.dart';
 
 class SupplierReturnsScreen extends ConsumerStatefulWidget {
@@ -16,6 +17,8 @@ class _SupplierReturnsScreenState extends ConsumerState<SupplierReturnsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(supplierReturnsRefreshProvider);
+
     return Padding(
       padding: const EdgeInsets.all(24),
       child: Column(
@@ -51,13 +54,22 @@ class _SupplierReturnsScreenState extends ConsumerState<SupplierReturnsScreen> {
     );
   }
 
-  void _openCreateSupplierReturnDialog() {
+  Future<void> _openCreateSupplierReturnDialog() async {
     if (_createDialogOpen) return;
     setState(() => _createDialogOpen = true);
-    showCreateSupplierReturnDialog(context, ref).whenComplete(() {
-      if (mounted) {
-        setState(() => _createDialogOpen = false);
+    final posted = await showCreateSupplierReturnDialog(context, ref);
+    if (mounted) {
+      setState(() => _createDialogOpen = false);
+      if (posted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'تم حفظ مرتجع المورد بنجاح',
+              textDirection: TextDirection.rtl,
+            ),
+          ),
+        );
       }
-    });
+    }
   }
 }

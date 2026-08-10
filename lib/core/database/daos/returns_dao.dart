@@ -311,6 +311,49 @@ class ReturnsDao extends DatabaseAccessor<AppDatabase> with _$ReturnsDaoMixin {
             ..orderBy([(r) => OrderingTerm.desc(r.returnDate)]))
           .get();
 
+  Future<SupplierReturn?> getSupplierReturnById(int id) =>
+      (select(supplierReturns)..where((r) => r.id.equals(id)))
+          .getSingleOrNull();
+
+  /// Read-only history rows with supplier/purchase enrichment and line counts.
+  Future<List<Map<String, dynamic>>> listSupplierReturnsHistory({
+    int limit = 100,
+  }) async {
+    final rows = await customSelect(
+      '''
+      SELECT
+        sr.id AS id,
+        sr.return_number AS return_number,
+        sr.return_date AS return_date,
+        sr.total AS total,
+        sr.reason AS reason,
+        sr.notes AS notes,
+        sr.supplier_id AS supplier_id,
+        sr.purchase_invoice_id AS purchase_invoice_id,
+        s.name AS supplier_name,
+        pi.invoice_number AS purchase_invoice_number,
+        (
+          SELECT COUNT(*)
+          FROM supplier_return_items sri
+          WHERE sri.return_id = sr.id
+        ) AS line_count
+      FROM supplier_returns sr
+      LEFT JOIN suppliers s ON s.id = sr.supplier_id
+      LEFT JOIN purchase_invoices pi ON pi.id = sr.purchase_invoice_id
+      ORDER BY sr.return_date DESC
+      LIMIT ?
+      ''',
+      variables: [Variable.withInt(limit)],
+      readsFrom: {
+        supplierReturns,
+        supplierReturnItems,
+        attachedDatabase.suppliers,
+        attachedDatabase.purchaseInvoices,
+      },
+    ).get();
+    return rows.map((row) => row.data).toList();
+  }
+
   Future<List<SupplierReturnItem>> getSupplierReturnItems(int returnId) =>
       (select(supplierReturnItems)..where((i) => i.returnId.equals(returnId)))
           .get();

@@ -22,6 +22,7 @@ class DashboardRecentActivityRow extends StatelessWidget {
       CashLedgerEventType.customerPayment => Icons.payments_rounded,
       CashLedgerEventType.purchaseCash => Icons.shopping_cart_checkout_rounded,
       CashLedgerEventType.supplierPayment => Icons.local_shipping_rounded,
+      CashLedgerEventType.supplierRefund => Icons.call_received_rounded,
       CashLedgerEventType.returnRefund => Icons.replay_rounded,
       CashLedgerEventType.expense => Icons.receipt_long_rounded,
       CashLedgerEventType.otherIncome => Icons.savings_rounded,
@@ -40,10 +41,10 @@ class DashboardRecentActivityRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final accent = _accentFor(event.eventType);
-    final amountColor =
-        event.isInflow ? AppColors.success : AppColors.error;
-    final directionLabel =
-        event.isInflow ? '\u0648\u0627\u0631\u062f' : '\u0635\u0627\u062f\u0631';
+    final amountColor = event.isInflow ? AppColors.success : AppColors.error;
+    final directionLabel = event.isInflow
+        ? '\u0648\u0627\u0631\u062f'
+        : '\u0635\u0627\u062f\u0631';
     final directionIcon = event.isInflow
         ? Icons.arrow_circle_down_rounded
         : Icons.arrow_circle_up_rounded;

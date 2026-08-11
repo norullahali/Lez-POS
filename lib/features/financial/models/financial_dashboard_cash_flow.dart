@@ -11,7 +11,7 @@ class FinancialDashboardCashFlow {
   });
 
   /// Sum of all inflow events in the selected period.
-  /// Includes: SALE_CASH + CUSTOMER_PAYMENT + OTHER_INCOME.
+  /// Includes: SALE_CASH + CUSTOMER_PAYMENT + OTHER_INCOME + SUPPLIER_REFUND.
   final double totalInflow;
 
   /// Sum of all outflow events in the selected period.

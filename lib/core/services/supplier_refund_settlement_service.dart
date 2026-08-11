@@ -3,7 +3,8 @@
 // SR.3.3 Step 1 â€” Supplier credit cash-refund settlement (supplier accounting only).
 //
 // Records actual cash received from a supplier against aggregate supplier credit.
-// Does NOT modify goods-return (RETURN) semantics or Cash Ledger integration.
+// Does NOT modify goods-return (RETURN) semantics.
+// Cash Ledger SUPPLIER_REFUND inflow is derived from committed REFUND rows.
 
 import 'package:flutter/foundation.dart';
 
@@ -29,11 +30,26 @@ class SupplierRefundSettlementException implements Exception {
   String toString() => message;
 }
 
+/// Low-level REFUND persistence hook used by [SupplierRefundSettlementService].
+typedef RefundInTransaction = Future<void> Function({
+  required int supplierId,
+  required double amount,
+  int? returnId,
+  String? note,
+});
+
 /// Canonical service for settling supplier credit via cash received (REFUND txn).
 class SupplierRefundSettlementService {
-  SupplierRefundSettlementService(this._db);
+  SupplierRefundSettlementService(
+    this._db, {
+    @visibleForTesting RefundInTransaction? refundInTransactionOverride,
+    @visibleForTesting Future<void> Function()? postRefundHook,
+  })  : _refundInTransactionOverride = refundInTransactionOverride,
+        _postRefundHook = postRefundHook;
 
   final AppDatabase _db;
+  final RefundInTransaction? _refundInTransactionOverride;
+  final Future<void> Function()? _postRefundHook;
 
   /// Consumes [amount] of aggregate supplier credit for [supplierId].
   ///
@@ -97,12 +113,30 @@ class SupplierRefundSettlementService {
           );
         }
 
-        await _db.supplierAccountsDao.recordRefundInTransaction(
+        final recordRefund = _refundInTransactionOverride ??
+            (({
+              required int supplierId,
+              required double amount,
+              int? returnId,
+              String? note,
+            }) =>
+                _db.supplierAccountsDao.recordRefundInTransaction(
+                  supplierId: supplierId,
+                  amount: amount,
+                  returnId: returnId,
+                  note: note ?? '',
+                ));
+
+        await recordRefund(
           supplierId: supplierId,
           amount: amount,
           returnId: returnId,
-          note: note ?? '',
+          note: note,
         );
+
+        if (_postRefundHook != null) {
+          await _postRefundHook!();
+        }
 
         await _db.logsDao.insertLog(
           userId: null,

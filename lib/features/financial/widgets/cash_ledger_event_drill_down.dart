@@ -44,6 +44,7 @@ class CashLedgerEventDrillDown {
         }
       case CashLedgerEventType.purchaseCash:
       case CashLedgerEventType.supplierPayment:
+      case CashLedgerEventType.supplierRefund:
         if (event.supplierId != null) {
           await ReportDrillDownService.open(
             context,

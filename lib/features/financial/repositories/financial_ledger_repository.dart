@@ -95,6 +95,29 @@ WHERE st.type = 'PAYMENT'
 
 UNION ALL
 
+-- SR.3.3: Supplier cash refund — derived from supplier_transactions REFUND rows.
+-- One committed REFUND txn → exactly one SUPPLIER_REFUND inflow event.
+-- Goods RETURN (type RETURN) is excluded; no double-count guard required.
+SELECT
+  'SUPPLIER_REFUND:' || st.id,
+  st.created_at,
+  'SUPPLIER_REFUND',
+  st.amount,
+  'inflow',
+  'supplier_transaction',
+  st.id,
+  NULL,
+  NULL,
+  st.supplier_id,
+  sr.purchase_invoice_id,
+  COALESCE(NULLIF(st.note, ''), 'استرداد نقدي من مورد')
+FROM supplier_transactions st
+LEFT JOIN supplier_returns sr ON sr.id = st.reference_id
+WHERE st.type = 'REFUND'
+  AND st.amount > 0
+
+UNION ALL
+
 SELECT
   'RETURN_REFUND:' || ral.id,
   ral.created_at,
@@ -200,9 +223,8 @@ SELECT
   COUNT(*) AS cnt
 FROM ($_unionSql) q
 ''';
-      final row = await _db
-          .customSelect(sql, readsFrom: _readSet())
-          .getSingle();
+      final row =
+          await _db.customSelect(sql, readsFrom: _readSet()).getSingle();
       final totalIn = (row.data['total_in'] as num?)?.toDouble() ?? 0;
       final totalOut = (row.data['total_out'] as num?)?.toDouble() ?? 0;
       return CashLedgerSummary(
@@ -230,11 +252,13 @@ SELECT
 FROM ($_unionSql) q
 ${where.clause}
 ''';
-      final row = await _db.customSelect(
-        sql,
-        variables: where.variables,
-        readsFrom: _readSet(),
-      ).getSingle();
+      final row = await _db
+          .customSelect(
+            sql,
+            variables: where.variables,
+            readsFrom: _readSet(),
+          )
+          .getSingle();
       final totalIn = (row.data['total_in'] as num?)?.toDouble() ?? 0;
       final totalOut = (row.data['total_out'] as num?)?.toDouble() ?? 0;
       return CashLedgerSummary(
@@ -254,12 +278,15 @@ ${where.clause}
       final start = _startOfDay(range.start);
       final end = _endExclusive(range.end);
       final where = _buildWhereClause(filter, start, end);
-      final countSql = 'SELECT COUNT(*) AS cnt FROM ($_unionSql) q ${where.clause}';
-      final countRow = await _db.customSelect(
-        countSql,
-        variables: where.variables,
-        readsFrom: _readSet(),
-      ).getSingle();
+      final countSql =
+          'SELECT COUNT(*) AS cnt FROM ($_unionSql) q ${where.clause}';
+      final countRow = await _db
+          .customSelect(
+            countSql,
+            variables: where.variables,
+            readsFrom: _readSet(),
+          )
+          .getSingle();
       final totalCount = (countRow.data['cnt'] as int?) ?? 0;
 
       if (totalCount == 0) {
@@ -294,11 +321,13 @@ ${where.clause}
 ORDER BY q.event_ts $order, q.ledger_id $order
 LIMIT ${filter.pageSize} OFFSET $offset
 ''';
-      final rows = await _db.customSelect(
-        dataSql,
-        variables: where.variables,
-        readsFrom: _readSet(),
-      ).get();
+      final rows = await _db
+          .customSelect(
+            dataSql,
+            variables: where.variables,
+            readsFrom: _readSet(),
+          )
+          .get();
 
       final entries = rows.map(_mapRow).toList();
       return CashLedgerPage(
@@ -358,11 +387,13 @@ GROUP BY $bucketGroup
 ORDER BY bucket_key ASC
 ''';
 
-      final rows = await _db.customSelect(
-        sql,
-        variables: variables,
-        readsFrom: _readSet(),
-      ).get();
+      final rows = await _db
+          .customSelect(
+            sql,
+            variables: variables,
+            readsFrom: _readSet(),
+          )
+          .get();
 
       final totalsByKey = <String, (double inflow, double outflow)>{};
       for (final row in rows) {
@@ -412,30 +443,30 @@ ${where.clause}
 GROUP BY q.event_type, q.direction
 ORDER BY total_amount DESC
 ''';
-      final rows = await _db.customSelect(
-        sql,
-        variables: where.variables,
-        readsFrom: _readSet(),
-      ).get();
+      final rows = await _db
+          .customSelect(
+            sql,
+            variables: where.variables,
+            readsFrom: _readSet(),
+          )
+          .get();
 
-      final slices = rows
-          .map((row) {
-            final type = CashLedgerEventType.fromCode(
-                  row.data['event_type'] as String?,
-                ) ??
-                CashLedgerEventType.saleCash;
-            return FinancialDashboardBreakdownSlice(
-              eventType: type,
-              amount: (row.data['total_amount'] as num?)?.toDouble() ?? 0,
-              direction: CashLedgerDirection.fromCode(
-                row.data['direction'] as String? ??
-                    (type.isInflow
-                        ? CashLedgerDirection.inflow.code
-                        : CashLedgerDirection.outflow.code),
-              ),
-            );
-          })
-          .toList(growable: false);
+      final slices = rows.map((row) {
+        final type = CashLedgerEventType.fromCode(
+              row.data['event_type'] as String?,
+            ) ??
+            CashLedgerEventType.saleCash;
+        return FinancialDashboardBreakdownSlice(
+          eventType: type,
+          amount: (row.data['total_amount'] as num?)?.toDouble() ?? 0,
+          direction: CashLedgerDirection.fromCode(
+            row.data['direction'] as String? ??
+                (type.isInflow
+                    ? CashLedgerDirection.inflow.code
+                    : CashLedgerDirection.outflow.code),
+          ),
+        );
+      }).toList(growable: false);
 
       return FinancialDashboardCashFlowBreakdown(slices: slices);
     } catch (_) {
@@ -497,7 +528,8 @@ ORDER BY total_amount DESC
       timestamp: timestamp,
       eventType: type,
       amount: (data['amount'] as num?)?.toDouble() ?? 0,
-      direction: CashLedgerDirection.fromCode(data['direction'] as String? ?? 'inflow'),
+      direction: CashLedgerDirection.fromCode(
+          data['direction'] as String? ?? 'inflow'),
       referenceType: data['reference_type'] as String? ?? '',
       referenceId: (data['reference_id'] as int?) ?? 0,
       userId: data['user_id'] as int?,
@@ -527,7 +559,8 @@ ORDER BY total_amount DESC
 
     final search = filter.searchQuery.trim();
     if (search.isNotEmpty) {
-      parts.add("(q.description LIKE '%' || ? || '%' ESCAPE '\\' OR CAST(q.reference_id AS TEXT) LIKE '%' || ? || '%')");
+      parts.add(
+          "(q.description LIKE '%' || ? || '%' ESCAPE '\\' OR CAST(q.reference_id AS TEXT) LIKE '%' || ? || '%')");
       variables.add(Variable.withString(_escapeLike(search)));
       variables.add(Variable.withString(_escapeLike(search)));
     }
@@ -535,17 +568,21 @@ ORDER BY total_amount DESC
     return _WhereClause(clause: parts.join(' AND '), variables: variables);
   }
 
-  static String _escapeLike(String input) =>
-      input.replaceAll('\\', '\\\\').replaceAll('%', '\\%').replaceAll('_', '\\_');
+  static String _escapeLike(String input) => input
+      .replaceAll('\\', '\\\\')
+      .replaceAll('%', '\\%')
+      .replaceAll('_', '\\_');
 
-  static int _maxBucketsFor(DashboardGranularity granularity) => switch (granularity) {
+  static int _maxBucketsFor(DashboardGranularity granularity) =>
+      switch (granularity) {
         DashboardGranularity.day => _maxDailyBuckets,
         DashboardGranularity.week => _maxWeeklyBuckets,
         DashboardGranularity.month => _maxMonthlyBuckets,
       };
 
   static (String selectExpr, String groupExpr, List<Variable> extraVariables)
-      _timeSeriesBucketSql(DashboardGranularity granularity, DateTime rangeStart) {
+      _timeSeriesBucketSql(
+          DashboardGranularity granularity, DateTime rangeStart) {
     return switch (granularity) {
       DashboardGranularity.day => (
           "strftime('%Y-%m-%d', q.event_ts)",
@@ -565,12 +602,12 @@ ORDER BY total_amount DESC
     };
   }
 
-  static String? _bucketKeyFromRow(Object? raw, DashboardGranularity granularity) {
+  static String? _bucketKeyFromRow(
+      Object? raw, DashboardGranularity granularity) {
     if (raw == null) return null;
     return switch (granularity) {
       DashboardGranularity.day => raw.toString(),
-      DashboardGranularity.week =>
-        _weekLabelFromIndex((raw as num).toInt()),
+      DashboardGranularity.week => _weekLabelFromIndex((raw as num).toInt()),
       DashboardGranularity.month => raw.toString(),
     };
   }
@@ -587,16 +624,14 @@ ORDER BY total_amount DESC
   }) {
     final maxBuckets = _maxBucketsFor(granularity);
     if (labels.length <= maxBuckets) {
-      return labels
-          .map((label) {
-            final totals = totalsByKey[label];
-            return FinancialDashboardTimeSeriesBucket(
-              label: label,
-              inflow: totals?.$1 ?? 0,
-              outflow: totals?.$2 ?? 0,
-            );
-          })
-          .toList(growable: false);
+      return labels.map((label) {
+        final totals = totalsByKey[label];
+        return FinancialDashboardTimeSeriesBucket(
+          label: label,
+          inflow: totals?.$1 ?? 0,
+          outflow: totals?.$2 ?? 0,
+        );
+      }).toList(growable: false);
     }
 
     final chunkSize = (labels.length + maxBuckets - 1) ~/ maxBuckets;
@@ -636,7 +671,8 @@ ORDER BY total_amount DESC
     };
   }
 
-  static List<String> _generateDayLabels(DateTime start, DateTime endExclusive) {
+  static List<String> _generateDayLabels(
+      DateTime start, DateTime endExclusive) {
     final labels = <String>[];
     var cursor = start;
     while (cursor.isBefore(endExclusive)) {
@@ -646,7 +682,8 @@ ORDER BY total_amount DESC
     return labels;
   }
 
-  static List<String> _generateWeekLabels(DateTime start, DateTime endExclusive) {
+  static List<String> _generateWeekLabels(
+      DateTime start, DateTime endExclusive) {
     final labels = <String>[];
     final totalDays = endExclusive.difference(start).inDays;
     if (totalDays <= 0) return labels;
@@ -689,12 +726,13 @@ ORDER BY total_amount DESC
         _db.customerTransactions,
         _db.purchaseInvoices,
         _db.supplierTransactions,
+        _db.supplierReturns, // SR.3.3 — purchase invoice trace via return linkage
         _db.returnAuditLogs,
         _db.customerReturns,
-        _db.expenseRecords,         // Phase 3.3
-        _db.expenseCategories,      // Phase 3.3 — category name in description
-        _db.otherIncomeRecords,     // Phase 4.3
-        _db.otherIncomeCategories,  // Phase 4.3 — category name in description
+        _db.expenseRecords, // Phase 3.3
+        _db.expenseCategories, // Phase 3.3 — category name in description
+        _db.otherIncomeRecords, // Phase 4.3
+        _db.otherIncomeCategories, // Phase 4.3 — category name in description
       };
 }
 

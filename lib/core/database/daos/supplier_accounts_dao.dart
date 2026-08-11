@@ -45,10 +45,12 @@ class SupplierAccountsDao extends DatabaseAccessor<AppDatabase>
 
   /// Core method — always call inside a Drift transaction.
   /// Signs: PURCHASE = +amount, PAYMENT = -amount, RETURN = -amount,
+  /// REFUND = +amount (SR.3.3 cash received against credit),
   /// ADJUSTMENT = explicit signed amount.
   Future<void> applyTransaction({
     required int supplierId,
-    required String type, // 'PURCHASE' | 'PAYMENT' | 'RETURN' | 'ADJUSTMENT'
+    required String
+        type, // 'PURCHASE' | 'PAYMENT' | 'RETURN' | 'REFUND' | 'ADJUSTMENT'
     required double amount,
     int? referenceId,
     String note = '',
@@ -134,6 +136,25 @@ class SupplierAccountsDao extends DatabaseAccessor<AppDatabase>
         supplierId: supplierId,
         type: 'RETURN',
         amount: -amount,
+        referenceId: returnId,
+        note: note,
+      );
+
+  /// Records cash received from supplier against supplier credit (SR.3.3).
+  ///
+  /// [amount] is the positive settlement value stored as a positive ledger amount,
+  /// consuming credit (balance moves toward zero). Must run inside an enclosing
+  /// transaction — business validation belongs in the service layer.
+  Future<void> recordRefundInTransaction({
+    required int supplierId,
+    required double amount,
+    int? returnId,
+    String note = '',
+  }) =>
+      applyTransaction(
+        supplierId: supplierId,
+        type: 'REFUND',
+        amount: amount,
         referenceId: returnId,
         note: note,
       );

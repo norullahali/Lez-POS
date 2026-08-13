@@ -9,6 +9,7 @@ import '../providers/suppliers_provider.dart';
 import '../providers/supplier_accounts_provider.dart';
 import '../models/supplier_model.dart';
 import '../../purchases/models/purchase_invoice_model.dart';
+import '../../returns/screens/widgets/supplier_credit_refund_entry.dart';
 import 'widgets/supplier_debt_aging_widget.dart';
 
 class SupplierProfileScreen extends ConsumerStatefulWidget {
@@ -181,6 +182,21 @@ class _SupplierProfileScreenState extends ConsumerState<SupplierProfileScreen> {
                     );
                   });
                 },
+              ),
+              const SizedBox(height: 16),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: SupplierCreditRefundEntry(
+                  supplierId: supplier.id!,
+                  supplierName: supplier.name,
+                  padding: EdgeInsets.zero,
+                ),
               ),
               const SizedBox(height: 24),
 

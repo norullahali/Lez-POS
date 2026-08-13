@@ -8,6 +8,13 @@ import '../../suppliers/providers/supplier_accounts_provider.dart';
 import '../utils/supplier_refund_settlement_messages.dart';
 import 'supplier_return_service_provider.dart';
 
+/// Refreshes read-only supplier credit/balance displays after successful refund.
+void invalidateSupplierRefundDisplays(Ref ref, int supplierId) {
+  ref.invalidate(supplierAvailableCreditProvider(supplierId));
+  ref.invalidate(supplierBalanceProvider(supplierId));
+  ref.invalidate(supplierHistoryProvider(supplierId));
+}
+
 /// Canonical SR.3.3 settlement service — sole financial write boundary for refunds.
 final supplierRefundSettlementServiceProvider =
     Provider<SupplierRefundSettlementService>((ref) {
@@ -204,7 +211,7 @@ class SupplierRefundSettlementUiNotifier
       if (!_isCurrentSubmit(generation)) return false;
 
       ref.read(supplierReturnsRefreshProvider.notifier).state++;
-      ref.invalidate(supplierAvailableCreditProvider(current.supplierId));
+      invalidateSupplierRefundDisplays(ref, current.supplierId);
 
       state = current.copyWith(
         status: SupplierRefundSettlementUiStatus.success,

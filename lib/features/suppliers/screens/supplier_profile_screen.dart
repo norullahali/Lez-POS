@@ -11,6 +11,7 @@ import '../models/supplier_model.dart';
 import '../../purchases/models/purchase_invoice_model.dart';
 import '../../returns/screens/widgets/supplier_credit_refund_entry.dart';
 import 'widgets/supplier_debt_aging_widget.dart';
+import 'widgets/supplier_transactions_tab.dart';
 
 class SupplierProfileScreen extends ConsumerStatefulWidget {
   final int supplierId;
@@ -288,7 +289,10 @@ class _SupplierProfileScreenState extends ConsumerState<SupplierProfileScreen> {
                         child: TabBarView(
                           children: [
                             _InvoicesTab(supplierId: supplier.id!, nf: _nf),
-                            _TransactionsTab(supplierId: supplier.id!, nf: _nf),
+                            SupplierTransactionsTab(
+                              supplierId: supplier.id!,
+                              moneyFormat: _nf,
+                            ),
                           ],
                         ),
                       ),
@@ -361,71 +365,6 @@ class _InvoicesTab extends ConsumerWidget {
           ),
         );
       },
-    );
-  }
-}
-
-class _TransactionsTab extends ConsumerWidget {
-  final int supplierId;
-  final NumberFormat nf;
-  const _TransactionsTab({required this.supplierId, required this.nf});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final historyAsync = ref.watch(supplierHistoryProvider(supplierId));
-
-    return historyAsync.when(
-      data: (transactions) {
-        if (transactions.isEmpty) {
-          return const Center(
-              child: Text('لا توجد حركات مالية',
-                  style: TextStyle(color: AppColors.textSecondary)));
-        }
-
-        return Card(
-          child: ListView.separated(
-            itemCount: transactions.length,
-            separatorBuilder: (_, __) => const Divider(height: 1),
-            itemBuilder: (context, index) {
-              final tx = transactions[index];
-              final isPayment = tx.type == 'PAYMENT';
-
-              return ListTile(
-                leading: CircleAvatar(
-                  backgroundColor: isPayment
-                      ? AppColors.success.withValues(alpha: 0.1)
-                      : AppColors.error.withValues(alpha: 0.1),
-                  child: Icon(
-                    isPayment
-                        ? Icons.payments_rounded
-                        : Icons.shopping_cart_rounded,
-                    color: isPayment ? AppColors.success : AppColors.error,
-                  ),
-                ),
-                title: Text(
-                    tx.note.isEmpty
-                        ? (isPayment ? 'دفعة نقدية' : 'فاتورة مشتريات')
-                        : tx.note,
-                    style: const TextStyle(fontWeight: FontWeight.w600)),
-                subtitle:
-                    Text(DateFormat('yyyy/MM/dd HH:mm').format(tx.createdAt)),
-                trailing: Text(
-                  '${tx.amount > 0 ? "+" : ""}${nf.format(tx.amount)} د.ع',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: tx.amount > 0 ? AppColors.error : AppColors.success,
-                  ),
-                  textDirection: TextDirection.ltr,
-                ),
-              );
-            },
-          ),
-        );
-      },
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(
-          child:
-              Text('خطأ: $e', style: const TextStyle(color: AppColors.error))),
     );
   }
 }

@@ -28,9 +28,11 @@ import '../providers/invoice_history_provider.dart';
 // ---------------------------------------------------------------------------
 // Provider: already-returned quantities per invoice (keyed by sale_item_id).
 // ---------------------------------------------------------------------------
-final _partialReturnQtysProvider = FutureProvider.autoDispose
-    .family<Map<int, double>, int>((ref, invoiceId) {
-  return ref.read(partialReturnServiceProvider).getReturnedQuantitiesForInvoice(invoiceId);
+final _partialReturnQtysProvider =
+    FutureProvider.autoDispose.family<Map<int, double>, int>((ref, invoiceId) {
+  return ref
+      .read(partialReturnServiceProvider)
+      .getReturnedQuantitiesForInvoice(invoiceId);
 });
 
 /// Read-only desktop dialog: header, line items, totals, full/partial return, reprint + close.
@@ -140,7 +142,8 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
       );
       ScaffoldMessenger.maybeOf(context)?.showSnackBar(
         const SnackBar(
-          content: Text('تعذر التحقق من هوية المستخدم. الرجاء تسجيل الدخول مجدداً.'),
+          content:
+              Text('تعذر التحقق من هوية المستخدم. الرجاء تسجيل الدخول مجدداً.'),
           backgroundColor: AppColors.error,
         ),
       );
@@ -156,6 +159,7 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
       );
 
       ref.invalidate(invoiceDetailProvider(widget.invoiceId));
+      ref.invalidate(_partialReturnQtysProvider(widget.invoiceId));
       ref.invalidate(invoiceHistoryPageProvider);
       ref.invalidate(customerReturnsProvider);
       ref.invalidate(productsNotifierProvider);
@@ -276,7 +280,7 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
 // Main body
 // ---------------------------------------------------------------------------
 
-class _InvoiceDetailBody extends StatelessWidget {
+class _InvoiceDetailBody extends ConsumerWidget {
   const _InvoiceDetailBody({
     required this.data,
     required this.canFullRefund,
@@ -296,7 +300,7 @@ class _InvoiceDetailBody extends StatelessWidget {
   final VoidCallback onPartialReturnDone;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final titleStyle = Theme.of(context).textTheme.titleSmall?.copyWith(
           fontWeight: FontWeight.w700,
           color: AppColors.textPrimary,
@@ -304,10 +308,23 @@ class _InvoiceDetailBody extends StatelessWidget {
     final h = data.header;
     final statusAr = invoiceLifecycleLabelAr(h.invoiceStatus);
     final hasAnyReturn = invoiceHasAnyReturn(h.invoiceStatus);
-    // Full return is blocked once any partial return exists.
-    final canReturn = canFullRefund && !hasAnyReturn && !returning;
-    final canPartialReturn =
-        canFullRefund && invoiceCanBeReturned(h.invoiceStatus) && !returning;
+    final returnedQtysAsync = ref.watch(_partialReturnQtysProvider(h.id));
+    final hasRemainingReturnable = returnedQtysAsync.when(
+      data: (returnedMap) => data.lines.any(
+        (line) => (line.quantity - (returnedMap[line.id] ?? 0.0)) > 0.0001,
+      ),
+      loading: () => !data.isReturned && invoiceCanBeReturned(h.invoiceStatus),
+      error: (_, __) => false,
+    );
+    final canReturnAll = canFullRefund &&
+        hasRemainingReturnable &&
+        !returning &&
+        !data.isReturned;
+    final canPartialReturn = canFullRefund &&
+        hasRemainingReturnable &&
+        !returning &&
+        !data.isReturned;
+    final returnAllLabel = hasAnyReturn ? 'إرجاع الكل' : 'إرجاع كامل الفاتورة';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -391,7 +408,8 @@ class _InvoiceDetailBody extends StatelessWidget {
                       columns: [
                         DataColumn(label: Text('الصنف', style: titleStyle)),
                         DataColumn(label: Text('الكمية', style: titleStyle)),
-                        DataColumn(label: Text('سعر الوحدة', style: titleStyle)),
+                        DataColumn(
+                            label: Text('سعر الوحدة', style: titleStyle)),
                         DataColumn(label: Text('الخصم', style: titleStyle)),
                         DataColumn(label: Text('الإجمالي', style: titleStyle)),
                       ],
@@ -469,10 +487,10 @@ class _InvoiceDetailBody extends StatelessWidget {
                   message: data.isReturned
                       ? 'هذه الفاتورة مرتجعة بالكامل'
                       : hasAnyReturn
-                          ? 'لا يمكن الإرجاع الكامل بعد تسجيل إرجاع جزئي'
+                          ? 'إرجاع جميع الكميات المتبقية واستعادة المخزون'
                           : 'إرجاع كامل مع استعادة المخزون',
                   child: FilledButton.icon(
-                    onPressed: canReturn ? onFullReturn : null,
+                    onPressed: canReturnAll ? onFullReturn : null,
                     style: FilledButton.styleFrom(
                       backgroundColor: AppColors.warning,
                       foregroundColor: AppColors.textPrimary,
@@ -480,7 +498,7 @@ class _InvoiceDetailBody extends StatelessWidget {
                       disabledBackgroundColor: AppColors.surfaceVariant,
                     ),
                     icon: const Icon(Icons.undo_rounded, size: 20),
-                    label: const Text('إرجاع كامل الفاتورة'),
+                    label: Text(returnAllLabel),
                   ),
                 ),
               OutlinedButton(
@@ -553,8 +571,7 @@ class _PartialReturnSectionState extends ConsumerState<_PartialReturnSection> {
           style: const TextStyle(color: AppColors.error),
         ),
       ),
-      data: (alreadyReturned) =>
-          _buildBody(context, alreadyReturned),
+      data: (alreadyReturned) => _buildBody(context, alreadyReturned),
     );
   }
 
@@ -675,9 +692,8 @@ class _PartialReturnSectionState extends ConsumerState<_PartialReturnSection> {
         return;
       }
 
-      final available =
-          (line.quantity - (alreadyReturned[line.id] ?? 0.0))
-              .clamp(0.0, double.infinity);
+      final available = (line.quantity - (alreadyReturned[line.id] ?? 0.0))
+          .clamp(0.0, double.infinity);
 
       if (qty > available + 0.0001) {
         _showError(
@@ -713,7 +729,8 @@ class _PartialReturnSectionState extends ConsumerState<_PartialReturnSection> {
     final userId = ref.read(authProvider).valueOrNull?.user?.id;
     if (userId == null) {
       if (!context.mounted) return;
-      _showError(context, 'تعذر التحقق من هوية المستخدم. الرجاء تسجيل الدخول مجدداً.');
+      _showError(
+          context, 'تعذر التحقق من هوية المستخدم. الرجاء تسجيل الدخول مجدداً.');
       return;
     }
 
@@ -800,9 +817,8 @@ class _LineRow extends StatelessWidget {
                       color: isFullyReturned
                           ? AppColors.textSecondary
                           : AppColors.textPrimary,
-                      decoration: isFullyReturned
-                          ? TextDecoration.lineThrough
-                          : null,
+                      decoration:
+                          isFullyReturned ? TextDecoration.lineThrough : null,
                     ),
                   ),
                 ),
@@ -1036,8 +1052,7 @@ Widget _kv(String k, String val, {TextStyle? valueStyle}) {
         Expanded(
           child: Text(
             val,
-            style: valueStyle ??
-                const TextStyle(color: AppColors.textPrimary),
+            style: valueStyle ?? const TextStyle(color: AppColors.textPrimary),
           ),
         ),
       ],
@@ -1189,7 +1204,8 @@ class _ReturnMetadataCard extends StatelessWidget {
           Expanded(
             child: Text(
               value,
-              style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
+              style:
+                  const TextStyle(color: AppColors.textPrimary, fontSize: 13),
             ),
           ),
         ],
@@ -1230,7 +1246,8 @@ class _ReturnConfirmDialogState extends State<_ReturnConfirmDialog> {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text('سيتم تنفيذ الإرجاع الكامل لهذه الفاتورة وفق التالي:'),
+                const Text(
+                    'سيتم تنفيذ الإرجاع الكامل لهذه الفاتورة وفق التالي:'),
                 const SizedBox(height: 12),
                 const Text('• إعادة جميع الكميات المباعة إلى المخزون.'),
                 const SizedBox(height: 6),

@@ -71,8 +71,7 @@ class SaleItemReturnsDao extends DatabaseAccessor<AppDatabase>
 
   // Original sold quantity for a sale line.
   Future<double?> getSaleItemQuantity(int saleItemId) async {
-    final row = await (select(saleItems)
-          ..where((i) => i.id.equals(saleItemId)))
+    final row = await (select(saleItems)..where((i) => i.id.equals(saleItemId)))
         .getSingleOrNull();
     return row?.quantity;
   }
@@ -114,8 +113,7 @@ class SaleItemReturnsDao extends DatabaseAccessor<AppDatabase>
       );
 
   // Restore stock for a product by adding qty back.
-  Future<void> restoreProductStock(int productId, double qty) =>
-      customUpdate(
+  Future<void> restoreProductStock(int productId, double qty) => customUpdate(
         'UPDATE products SET current_stock = current_stock + ? WHERE id = ?',
         variables: [Variable.withReal(qty), Variable.withInt(productId)],
         updates: {products},
@@ -149,4 +147,27 @@ class SaleItemReturnsDao extends DatabaseAccessor<AppDatabase>
         ],
         updates: {salesInvoices},
       );
+
+  /// Return metadata columns when an invoice becomes fully returned.
+  Future<void> setInvoiceReturnMetadata({
+    required int saleInvoiceId,
+    required String note,
+    required int returnedByUserId,
+  }) async {
+    final now = DateTime.now();
+    await customUpdate(
+      '''UPDATE sales_invoices
+         SET return_date = ?,
+             return_note = ?,
+             returned_by_user_id = ?
+         WHERE id = ?''',
+      variables: [
+        Variable.withInt(now.millisecondsSinceEpoch),
+        Variable.withString(note.trim()),
+        Variable.withInt(returnedByUserId),
+        Variable.withInt(saleInvoiceId),
+      ],
+      updates: {salesInvoices},
+    );
+  }
 }

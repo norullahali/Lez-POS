@@ -46,9 +46,52 @@ class CustomerAccountsDao extends DatabaseAccessor<AppDatabase>
   // Transaction writing (all balance-altering ops)
   // -----------------------------------------------------
 
-  /// Core method — always call inside a Drift transaction.
+  /// Core write — participates in the caller's Drift transaction (no nested txn).
   /// Signs: SALE = +amount (balance grows), PAYMENT = -amount (balance shrinks),
   /// RETURN = -amount (balance shrinks), ADJUSTMENT = explicit signed amount.
+  Future<void> applyTransaction({
+    required int customerId,
+    required String type, // 'SALE' | 'PAYMENT' | 'ADJUSTMENT' | 'RETURN'
+    required double amount, // already signed correctly
+    int? referenceId,
+    String note = '',
+  }) async {
+    await into(customerTransactions).insert(
+      CustomerTransactionsCompanion(
+        customerId: Value(customerId),
+        type: Value(type),
+        amount: Value(amount),
+        referenceId: Value(referenceId),
+        note: Value(note),
+      ),
+    );
+
+    final newBalance = await calculateBalanceFromTransactions(customerId);
+
+    final existing = await (select(customerAccounts)
+          ..where((a) => a.customerId.equals(customerId)))
+        .getSingleOrNull();
+
+    if (existing != null) {
+      await (update(customerAccounts)..where((a) => a.id.equals(existing.id)))
+          .write(
+        CustomerAccountsCompanion(
+          currentBalance: Value(newBalance),
+          updatedAt: Value(DateTime.now()),
+        ),
+      );
+    } else {
+      await into(customerAccounts).insert(
+        CustomerAccountsCompanion(
+          customerId: Value(customerId),
+          currentBalance: Value(newBalance),
+          updatedAt: Value(DateTime.now()),
+        ),
+      );
+    }
+  }
+
+  /// Opens a transaction — use for standalone writes outside a caller txn.
   Future<void> addTransaction({
     required int customerId,
     required String type, // 'SALE' | 'PAYMENT' | 'ADJUSTMENT' | 'RETURN'
@@ -57,43 +100,13 @@ class CustomerAccountsDao extends DatabaseAccessor<AppDatabase>
     String note = '',
   }) async {
     await transaction(() async {
-      // 1. Append to immutable ledger
-      await into(customerTransactions).insert(
-        CustomerTransactionsCompanion(
-          customerId: Value(customerId),
-          type: Value(type),
-          amount: Value(amount),
-          referenceId: Value(referenceId),
-          note: Value(note),
-        ),
+      await applyTransaction(
+        customerId: customerId,
+        type: type,
+        amount: amount,
+        referenceId: referenceId,
+        note: note,
       );
-
-      // 2. Re-calculate authoritative balance from all transactions
-      final newBalance = await calculateBalanceFromTransactions(customerId);
-
-      // 3. Upsert customer_accounts row safely honoring the unique customer_id
-      final existing = await (select(customerAccounts)
-            ..where((a) => a.customerId.equals(customerId)))
-          .getSingleOrNull();
-
-      if (existing != null) {
-        await (update(customerAccounts)
-              ..where((a) => a.id.equals(existing.id)))
-            .write(
-          CustomerAccountsCompanion(
-            currentBalance: Value(newBalance),
-            updatedAt: Value(DateTime.now()),
-          ),
-        );
-      } else {
-        await into(customerAccounts).insert(
-          CustomerAccountsCompanion(
-            customerId: Value(customerId),
-            currentBalance: Value(newBalance),
-            updatedAt: Value(DateTime.now()),
-          ),
-        );
-      }
     });
   }
 
@@ -103,7 +116,8 @@ class CustomerAccountsDao extends DatabaseAccessor<AppDatabase>
     required double amount,
     required int invoiceId,
     String note = '',
-  }) => addTransaction(
+  }) =>
+      addTransaction(
         customerId: customerId,
         type: 'SALE',
         amount: amount, // positive — increases debt
@@ -116,7 +130,8 @@ class CustomerAccountsDao extends DatabaseAccessor<AppDatabase>
     required int customerId,
     required double amount,
     String note = '',
-  }) => addTransaction(
+  }) =>
+      addTransaction(
         customerId: customerId,
         type: 'PAYMENT',
         amount: -amount, // negative — decreases debt
@@ -128,7 +143,8 @@ class CustomerAccountsDao extends DatabaseAccessor<AppDatabase>
     required int customerId,
     required double signedAmount,
     required String reason,
-  }) => addTransaction(
+  }) =>
+      addTransaction(
         customerId: customerId,
         type: 'ADJUSTMENT',
         amount: signedAmount,
@@ -150,12 +166,63 @@ class CustomerAccountsDao extends DatabaseAccessor<AppDatabase>
         note: note,
       );
 
+  /// Same as [recordReturn] but must run inside an enclosing transaction.
+  Future<void> recordReturnInTransaction({
+    required int customerId,
+    required double amount,
+    required int returnId,
+    String note = '',
+  }) =>
+      applyTransaction(
+        customerId: customerId,
+        type: 'RETURN',
+        amount: -amount,
+        referenceId: returnId,
+        note: note,
+      );
+
+  /// Total credit already reversed for [invoiceId] via RETURN rows linked to
+  /// customer_returns or sale_item_returns on that invoice.
+  Future<double> getCreditReversalTotalForSaleInvoice({
+    required int customerId,
+    required int invoiceId,
+  }) async {
+    final row = await customSelect(
+      '''
+      SELECT COALESCE(SUM(ABS(ct.amount)), 0) AS total
+      FROM customer_transactions ct
+      WHERE ct.customer_id = ?
+        AND ct.type = 'RETURN'
+        AND (
+          ct.reference_id IN (
+            SELECT id FROM customer_returns WHERE original_invoice_id = ?
+          )
+          OR ct.reference_id IN (
+            SELECT id FROM sale_item_returns WHERE sale_invoice_id = ?
+          )
+        )
+      ''',
+      variables: [
+        Variable.withInt(customerId),
+        Variable.withInt(invoiceId),
+        Variable.withInt(invoiceId),
+      ],
+      readsFrom: {
+        customerTransactions,
+        attachedDatabase.customerReturns,
+        attachedDatabase.saleItemReturns,
+      },
+    ).getSingle();
+    return (row.data['total'] as num?)?.toDouble() ?? 0.0;
+  }
+
   // -----------------------------------------------------
   // History queries
   // -----------------------------------------------------
 
   /// Stream of full transaction history for one customer, newest first.
-  Stream<List<CustomerTransaction>> watchHistory(int customerId, {int limit = 50}) {
+  Stream<List<CustomerTransaction>> watchHistory(int customerId,
+      {int limit = 50}) {
     return (select(customerTransactions)
           ..where((t) => t.customerId.equals(customerId))
           ..orderBy([(t) => OrderingTerm.desc(t.createdAt)])
@@ -163,7 +230,8 @@ class CustomerAccountsDao extends DatabaseAccessor<AppDatabase>
         .watch();
   }
 
-  Future<List<CustomerTransaction>> getHistory(int customerId, {int limit = 50}) {
+  Future<List<CustomerTransaction>> getHistory(int customerId,
+      {int limit = 50}) {
     return (select(customerTransactions)
           ..where((t) => t.customerId.equals(customerId))
           ..orderBy([(t) => OrderingTerm.desc(t.createdAt)])
@@ -236,7 +304,8 @@ class CustomerAccountsDao extends DatabaseAccessor<AppDatabase>
 
   /// Returns true if adding [extraAmount] to this customer's balance would
   /// exceed their credit_limit (0 = no limit, always returns false).
-  Future<bool> wouldExceedCreditLimit(int customerId, double extraAmount) async {
+  Future<bool> wouldExceedCreditLimit(
+      int customerId, double extraAmount) async {
     final customer = await (select(customers)
           ..where((c) => c.id.equals(customerId)))
         .getSingleOrNull();

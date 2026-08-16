@@ -7,6 +7,7 @@ import '../tables/stock_ledger_table.dart';
 import '../../constants/invoice_lifecycle.dart';
 import '../../constants/movement_types.dart';
 import '../../services/stock_guard.dart';
+import '../../services/partial_return_service.dart';
 
 part 'returns_dao.g.dart';
 
@@ -130,10 +131,13 @@ class ReturnsDao extends DatabaseAccessor<AppDatabase> with _$ReturnsDaoMixin {
     });
   }
 
-  /// Full sale invoice return: restores stock, ledger rows, [CustomerReturns] record,
-  /// reverses credit [debtAmount] on customer account when applicable,
+  /// Full sale invoice return (or return-all-remaining after partial returns):
+  /// restores stock, ledger rows, reverses credit [debtAmount] when applicable,
   /// sets original invoice [invoiceStatus] to [InvoiceLifecycleStatus.returned]
   /// and persists return metadata ([note], [returnedByUserId]).
+  ///
+  /// When prior partial returns exist, only **remaining** quantities are returned
+  /// via [PartialReturnService.returnAllRemainingSaleInvoice].
   ///
   /// Does not delete or rewrite original [SaleItems] or monetary totals on the sale.
   Future<int> returnFullSaleInvoice(
@@ -141,11 +145,29 @@ class ReturnsDao extends DatabaseAccessor<AppDatabase> with _$ReturnsDaoMixin {
     required String note,
     required int returnedByUserId,
   }) async {
+    final inv = await attachedDatabase.salesDao.getInvoiceById(invoiceId);
+    if (inv == null) {
+      throw StateError('الفاتورة غير موجودة');
+    }
+    if (inv.invoiceStatus == InvoiceLifecycleStatus.returned) {
+      throw StateError('الفاتورة مرتجعة مسبقاً');
+    }
+
+    final hasPartialReturns =
+        await attachedDatabase.saleItemReturnsDao.hasAnyReturns(invoiceId);
+
+    if (hasPartialReturns ||
+        inv.invoiceStatus == InvoiceLifecycleStatus.partiallyReturned) {
+      await PartialReturnService(attachedDatabase)
+          .returnAllRemainingSaleInvoice(
+        saleInvoiceId: invoiceId,
+        returnedByUserId: returnedByUserId,
+        note: note,
+      );
+      return 0;
+    }
+
     return transaction(() async {
-      final inv = await attachedDatabase.salesDao.getInvoiceById(invoiceId);
-      if (inv == null) {
-        throw StateError('الفاتورة غير موجودة');
-      }
       if (inv.invoiceStatus == InvoiceLifecycleStatus.returned) {
         throw StateError('الفاتورة مرتجعة مسبقاً');
       }
@@ -293,7 +315,7 @@ class ReturnsDao extends DatabaseAccessor<AppDatabase> with _$ReturnsDaoMixin {
       }
 
       if (inv.debtAmount > 0 && customerId != null && customerId != 1) {
-        await attachedDatabase.customerAccountsDao.recordReturn(
+        await attachedDatabase.customerAccountsDao.recordReturnInTransaction(
           customerId: customerId,
           amount: inv.debtAmount,
           returnId: returnId,

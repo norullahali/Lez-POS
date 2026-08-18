@@ -48,10 +48,12 @@ class CustomerAccountsDao extends DatabaseAccessor<AppDatabase>
 
   /// Core write — participates in the caller's Drift transaction (no nested txn).
   /// Signs: SALE = +amount (balance grows), PAYMENT = -amount (balance shrinks),
-  /// RETURN = -amount (balance shrinks), ADJUSTMENT = explicit signed amount.
+  /// RETURN = -amount (balance shrinks), REFUND = +amount (consumes credit),
+  /// ADJUSTMENT = explicit signed amount.
   Future<void> applyTransaction({
     required int customerId,
-    required String type, // 'SALE' | 'PAYMENT' | 'ADJUSTMENT' | 'RETURN'
+    required String
+        type, // 'SALE' | 'PAYMENT' | 'RETURN' | 'REFUND' | 'ADJUSTMENT'
     required double amount, // already signed correctly
     int? referenceId,
     String note = '',
@@ -177,6 +179,25 @@ class CustomerAccountsDao extends DatabaseAccessor<AppDatabase>
         customerId: customerId,
         type: 'RETURN',
         amount: -amount,
+        referenceId: returnId,
+        note: note,
+      );
+
+  /// Records cash paid to customer against accumulated credit (Phase C.2).
+  ///
+  /// [amount] is the positive settlement value stored as a positive ledger amount,
+  /// consuming credit (balance moves toward zero). Must run inside an enclosing
+  /// transaction — business validation belongs in the service layer.
+  Future<void> recordRefundInTransaction({
+    required int customerId,
+    required double amount,
+    int? returnId,
+    String note = '',
+  }) =>
+      applyTransaction(
+        customerId: customerId,
+        type: 'REFUND',
+        amount: amount,
         referenceId: returnId,
         note: note,
       );

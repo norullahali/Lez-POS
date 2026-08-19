@@ -53,6 +53,29 @@ WHERE ct.type = 'PAYMENT'
 
 UNION ALL
 
+-- Phase C Step 2.2: Customer cash refund — derived from customer_transactions REFUND rows.
+-- One committed REFUND txn → exactly one CUSTOMER_REFUND outflow event.
+-- Goods RETURN (type RETURN) is excluded; no double-count guard required.
+SELECT
+  'CUSTOMER_REFUND:' || ct.id,
+  ct.created_at,
+  'CUSTOMER_REFUND',
+  ct.amount,
+  'outflow',
+  'customer_transaction',
+  ct.id,
+  NULL,
+  ct.customer_id,
+  NULL,
+  cr.original_invoice_id,
+  COALESCE(NULLIF(ct.note, ''), 'استرداد نقدي للعميل')
+FROM customer_transactions ct
+LEFT JOIN customer_returns cr ON cr.id = ct.reference_id
+WHERE ct.type = 'REFUND'
+  AND ct.amount > 0
+
+UNION ALL
+
 SELECT
   'PURCHASE_CASH:' || pi.id,
   pi.purchase_date,

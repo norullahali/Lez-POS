@@ -20,6 +20,7 @@ class DashboardRecentActivityRow extends StatelessWidget {
     return switch (type) {
       CashLedgerEventType.saleCash => Icons.point_of_sale_rounded,
       CashLedgerEventType.customerPayment => Icons.payments_rounded,
+      CashLedgerEventType.customerRefund => Icons.call_made_rounded,
       CashLedgerEventType.purchaseCash => Icons.shopping_cart_checkout_rounded,
       CashLedgerEventType.supplierPayment => Icons.local_shipping_rounded,
       CashLedgerEventType.supplierRefund => Icons.call_received_rounded,

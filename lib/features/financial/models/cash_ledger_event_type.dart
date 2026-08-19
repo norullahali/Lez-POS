@@ -2,6 +2,11 @@
 enum CashLedgerEventType {
   saleCash('SALE_CASH', 'بيع نقدي', true),
   customerPayment('CUSTOMER_PAYMENT', 'تحصيل عميل', true),
+
+  /// Cash paid to customer against accumulated credit (Phase C Step 2.2).
+  /// Source of truth: customer_transactions WHERE type = 'REFUND'.
+  customerRefund('CUSTOMER_REFUND', 'استرداد نقدي للعميل', false),
+
   purchaseCash('PURCHASE_CASH', 'دفع مشتريات', false),
   supplierPayment('SUPPLIER_PAYMENT', 'دفع مورد', false),
 

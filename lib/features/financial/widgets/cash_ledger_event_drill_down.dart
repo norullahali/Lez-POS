@@ -32,6 +32,7 @@ class CashLedgerEventDrillDown {
           ),
         );
       case CashLedgerEventType.customerPayment:
+      case CashLedgerEventType.customerRefund:
         if (event.customerId != null && event.customerId! > 1) {
           await ReportDrillDownService.open(
             context,

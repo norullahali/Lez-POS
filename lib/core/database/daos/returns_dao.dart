@@ -43,6 +43,10 @@ class ReturnsDao extends DatabaseAccessor<AppDatabase> with _$ReturnsDaoMixin {
             ..orderBy([(r) => OrderingTerm.desc(r.returnDate)]))
           .get();
 
+  Future<CustomerReturn?> getCustomerReturnById(int id) =>
+      (select(customerReturns)..where((r) => r.id.equals(id)))
+          .getSingleOrNull();
+
   Future<List<CustomerReturnItem>> getCustomerReturnItems(int returnId) =>
       (select(customerReturnItems)..where((i) => i.returnId.equals(returnId)))
           .get();

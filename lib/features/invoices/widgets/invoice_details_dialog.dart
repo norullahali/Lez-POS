@@ -18,6 +18,7 @@ import '../../auth/utils/permission_actions.dart';
 import '../../pos/models/invoice_models.dart';
 import '../../pos/providers/pos_products_provider.dart';
 import '../../products/providers/products_provider.dart';
+import '../../customers/screens/widgets/customer_credit_refund_entry.dart';
 import '../../returns/providers/partial_return_provider.dart';
 import '../../returns/providers/return_analytics_provider.dart';
 import '../../returns/screens/customer_returns_screen.dart';
@@ -28,12 +29,16 @@ import '../providers/invoice_history_provider.dart';
 // ---------------------------------------------------------------------------
 // Provider: already-returned quantities per invoice (keyed by sale_item_id).
 // ---------------------------------------------------------------------------
-final _partialReturnQtysProvider =
+/// Returned quantities per sale line — overridable in widget tests.
+final invoicePartialReturnQtysProvider =
     FutureProvider.autoDispose.family<Map<int, double>, int>((ref, invoiceId) {
   return ref
       .read(partialReturnServiceProvider)
       .getReturnedQuantitiesForInvoice(invoiceId);
 });
+
+bool _isInvoiceRefundCustomerEligible(int? customerId) =>
+    customerId != null && customerId != 1;
 
 /// Read-only desktop dialog: header, line items, totals, full/partial return, reprint + close.
 class InvoiceDetailsDialog extends ConsumerStatefulWidget {
@@ -159,7 +164,7 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
       );
 
       ref.invalidate(invoiceDetailProvider(widget.invoiceId));
-      ref.invalidate(_partialReturnQtysProvider(widget.invoiceId));
+      ref.invalidate(invoicePartialReturnQtysProvider(widget.invoiceId));
       ref.invalidate(invoiceHistoryPageProvider);
       ref.invalidate(customerReturnsProvider);
       ref.invalidate(productsNotifierProvider);
@@ -197,7 +202,7 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
   /// Called by [_PartialReturnSection] after a successful partial return.
   void _onPartialReturnDone() {
     ref.invalidate(invoiceDetailProvider(widget.invoiceId));
-    ref.invalidate(_partialReturnQtysProvider(widget.invoiceId));
+    ref.invalidate(invoicePartialReturnQtysProvider(widget.invoiceId));
     ref.invalidate(invoiceHistoryPageProvider);
     ref.invalidate(productsNotifierProvider);
     ref.invalidate(posProductsProvider);
@@ -308,7 +313,7 @@ class _InvoiceDetailBody extends ConsumerWidget {
     final h = data.header;
     final statusAr = invoiceLifecycleLabelAr(h.invoiceStatus);
     final hasAnyReturn = invoiceHasAnyReturn(h.invoiceStatus);
-    final returnedQtysAsync = ref.watch(_partialReturnQtysProvider(h.id));
+    final returnedQtysAsync = ref.watch(invoicePartialReturnQtysProvider(h.id));
     final hasRemainingReturnable = returnedQtysAsync.when(
       data: (returnedMap) => data.lines.any(
         (line) => (line.quantity - (returnedMap[line.id] ?? 0.0)) > 0.0001,
@@ -440,6 +445,20 @@ class _InvoiceDetailBody extends ConsumerWidget {
                   const SizedBox(height: 8),
                   _TotalsCard(data: data),
 
+                  if (_isInvoiceRefundCustomerEligible(h.customerId)) ...[
+                    const SizedBox(height: 24),
+                    _SectionTitle(
+                      text: 'استرداد نقدي للعميل',
+                      style: titleStyle,
+                    ),
+                    const SizedBox(height: 8),
+                    CustomerCreditRefundEntry(
+                      customerId: h.customerId!,
+                      customerName: h.customerName,
+                      padding: EdgeInsets.zero,
+                    ),
+                  ],
+
                   // ── Full-return metadata ─────────────────────────────
                   if (data.isReturned) ...[
                     const SizedBox(height: 24),
@@ -557,7 +576,8 @@ class _PartialReturnSectionState extends ConsumerState<_PartialReturnSection> {
 
   @override
   Widget build(BuildContext context) {
-    final qtysAsync = ref.watch(_partialReturnQtysProvider(widget.invoiceId));
+    final qtysAsync =
+        ref.watch(invoicePartialReturnQtysProvider(widget.invoiceId));
 
     return qtysAsync.when(
       loading: () => const Padding(

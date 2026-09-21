@@ -8,6 +8,7 @@ import '../../../core/constants/invoice_lifecycle.dart';
 class ReturnMetadata {
   final DateTime? returnDate;
   final String? returnNote;
+
   /// Display name of the user who performed the return.
   final String? returnedByName;
 
@@ -28,9 +29,13 @@ class InvoiceDetailHeader {
   final int id;
   final String invoiceNumber;
   final DateTime saleDate;
+
+  /// Resolved from sales_invoices.customer_id; null for walk-in / general sales.
+  final int? customerId;
   final String customerName;
   final String cashierName;
   final String paymentMethod;
+
   /// `completed` | `returned` — see [InvoiceLifecycleStatus].
   final String invoiceStatus;
   final double subtotal;
@@ -39,6 +44,7 @@ class InvoiceDetailHeader {
   final double cashPaid;
   final double cardPaid;
   final double changeAmount;
+
   /// Non-null when [invoiceStatus] == `returned`.
   final ReturnMetadata? returnMetadata;
 
@@ -46,6 +52,7 @@ class InvoiceDetailHeader {
     required this.id,
     required this.invoiceNumber,
     required this.saleDate,
+    this.customerId,
     required this.customerName,
     required this.cashierName,
     required this.paymentMethod,
@@ -64,11 +71,13 @@ class InvoiceDetailHeader {
 class InvoiceDetailLine {
   /// sale_items.id — required for partial return lookups.
   final int id;
+
   /// sale_items.product_id — required for stock restoration.
   final int productId;
   final String productName;
   final double quantity;
   final double unitPrice;
+
   /// Snapshot cost at time of sale — used for ledger valuation on return.
   final double unitCost;
   final double discount;
@@ -99,7 +108,8 @@ class InvoiceDetailData {
   });
 
   /// Net after invoice-level discounts (subtotal − discount), before tax line.
-  double get netBeforeTax => (header.subtotal - header.discountTotal).clamp(0.0, double.infinity);
+  double get netBeforeTax =>
+      (header.subtotal - header.discountTotal).clamp(0.0, double.infinity);
 
   double get taxAmount => showTax ? netBeforeTax * 0.15 : 0.0;
 

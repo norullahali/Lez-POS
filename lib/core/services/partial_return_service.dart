@@ -9,11 +9,13 @@
 //  - Stock movements table is updated for audit trail.
 //  - Invoice status is auto-updated after each return batch.
 //  - Credit receivable reversal for credit invoices (Phase C.1).
+//  - Invoice-linked customer_returns document (Phase C.2.6).
 //  - ALL Drift Companion / generated-type usage lives in DAOs.
 
 import 'package:drift/drift.dart' show Variable;
 
 import '../database/app_database.dart';
+import '../database/daos/returns_dao.dart';
 import '../constants/invoice_lifecycle.dart';
 import '../constants/movement_types.dart';
 import '../activity/activity_categories.dart';
@@ -200,6 +202,8 @@ class PartialReturnService {
 
       int? firstReturnLineId;
       final returnedQtyBySaleItemId = <int, double>{};
+      final documentLines = <CustomerReturnDocumentLine>[];
+      var batchGoodsTotal = 0.0;
 
       for (final line in lines) {
         // 1. Validate against current DB state inside txn
@@ -230,6 +234,21 @@ class PartialReturnService {
         );
         firstReturnLineId ??= returnLineId;
         returnedQtyBySaleItemId[line.saleItemId] = line.quantity;
+
+        final lineTotal = line.quantity * line.unitPrice;
+        batchGoodsTotal += lineTotal;
+        final product = await _db.productsDao.getProductById(line.productId);
+        final productName = product?.name ?? 'منتج #${line.productId}';
+        documentLines.add(
+          CustomerReturnDocumentLine(
+            productId: line.productId,
+            productName: productName,
+            quantity: line.quantity,
+            unitPrice: line.unitPrice,
+            unitCost: line.unitCost,
+            lineTotal: lineTotal,
+          ),
+        );
 
         // 3. Restore stock
         final stockBefore = await _db.stockDao.getStock(line.productId);
@@ -279,7 +298,20 @@ class PartialReturnService {
         );
       }
 
-      // 7. Customer credit reversal (credit invoices only)
+      // 7. Invoice-linked customer return document (one header per invoice)
+      final customerReturnId =
+          await _db.returnsDao.upsertPartialReturnDocumentHeader(
+        saleInvoiceId: saleInvoiceId,
+        invoiceNumber: inv.invoiceNumber,
+        batchGoodsTotal: batchGoodsTotal,
+        returnReason: returnReason,
+      );
+      await _db.returnsDao.appendCustomerReturnDocumentLines(
+        returnId: customerReturnId,
+        lines: documentLines,
+      );
+
+      // 8. Customer credit reversal (credit invoices only)
       if (inv.debtAmount > 0 &&
           customerId != null &&
           customerId != 1 &&
@@ -318,7 +350,7 @@ class PartialReturnService {
         }
       }
 
-      // 8. Recalculate and persist invoice status
+      // 9. Recalculate and persist invoice status
       final allFullyReturned = await _refreshInvoiceStatus(saleInvoiceId);
 
       if (persistReturnMetadata && allFullyReturned && note != null) {

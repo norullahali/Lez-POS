@@ -11,6 +11,25 @@ import '../../services/partial_return_service.dart';
 
 part 'returns_dao.g.dart';
 
+/// Snapshot line for partial-return [customer_return_items] append.
+class CustomerReturnDocumentLine {
+  const CustomerReturnDocumentLine({
+    required this.productId,
+    required this.productName,
+    required this.quantity,
+    required this.unitPrice,
+    required this.unitCost,
+    required this.lineTotal,
+  });
+
+  final int productId;
+  final String productName;
+  final double quantity;
+  final double unitPrice;
+  final double unitCost;
+  final double lineTotal;
+}
+
 /// Thrown when [ReturnsDao.saveSupplierReturn] receives purchase linkage.
 ///
 /// New purchase-linked returns must use
@@ -50,6 +69,69 @@ class ReturnsDao extends DatabaseAccessor<AppDatabase> with _$ReturnsDaoMixin {
   Future<List<CustomerReturnItem>> getCustomerReturnItems(int returnId) =>
       (select(customerReturnItems)..where((i) => i.returnId.equals(returnId)))
           .get();
+
+  /// Invoice-linked header lookup — must run inside an enclosing transaction.
+  Future<CustomerReturn?> findCustomerReturnByOriginalInvoiceId(
+          int invoiceId) =>
+      (select(customerReturns)
+            ..where((r) => r.originalInvoiceId.equals(invoiceId)))
+          .getSingleOrNull();
+
+  /// Find-or-create one [customer_returns] header per invoice for partial returns.
+  ///
+  /// Must run inside an enclosing transaction. Reuses existing header and adds
+  /// [batchGoodsTotal] to [CustomerReturn.total] when the header already exists.
+  Future<int> upsertPartialReturnDocumentHeader({
+    required int saleInvoiceId,
+    required String invoiceNumber,
+    required double batchGoodsTotal,
+    required String returnReason,
+  }) async {
+    final existing = await findCustomerReturnByOriginalInvoiceId(saleInvoiceId);
+    if (existing != null) {
+      await (update(customerReturns)..where((r) => r.id.equals(existing.id)))
+          .write(
+        CustomerReturnsCompanion(
+          total: Value(existing.total + batchGoodsTotal),
+        ),
+      );
+      return existing.id;
+    }
+
+    final returnNumber =
+        'RET-$saleInvoiceId-${DateTime.now().millisecondsSinceEpoch}';
+    return into(customerReturns).insert(
+      CustomerReturnsCompanion(
+        originalInvoiceId: Value(saleInvoiceId),
+        returnNumber: Value(returnNumber),
+        total: Value(batchGoodsTotal),
+        reason: Value(returnReason),
+        notes: Value('فاتورة أصلية: $invoiceNumber'),
+      ),
+    );
+  }
+
+  /// Appends snapshot lines to an invoice-linked customer return document.
+  ///
+  /// Must run inside an enclosing transaction. Does not affect stock.
+  Future<void> appendCustomerReturnDocumentLines({
+    required int returnId,
+    required List<CustomerReturnDocumentLine> lines,
+  }) async {
+    for (final item in lines) {
+      await into(customerReturnItems).insert(
+        CustomerReturnItemsCompanion(
+          returnId: Value(returnId),
+          productId: Value(item.productId),
+          productName: Value(item.productName),
+          quantity: Value(item.quantity),
+          unitPrice: Value(item.unitPrice),
+          unitCost: Value(item.unitCost),
+          total: Value(item.lineTotal),
+        ),
+      );
+    }
+  }
 
   Future<int> saveCustomerReturn({
     required CustomerReturnsCompanion header,

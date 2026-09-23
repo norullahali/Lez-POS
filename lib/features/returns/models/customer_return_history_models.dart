@@ -1,5 +1,24 @@
 // lib/features/returns/models/customer_return_history_models.dart
 
+/// Read-only settlement snapshot for return-linked refund UX (Phase C Step 2.7C).
+class ReturnRefundableSnapshot {
+  const ReturnRefundableSnapshot({
+    required this.returnId,
+    required this.customerId,
+    required this.originalInvoiceId,
+    required this.creditCap,
+    required this.settledAmount,
+    required this.remainingRefundable,
+  });
+
+  final int returnId;
+  final int customerId;
+  final int originalInvoiceId;
+  final double creditCap;
+  final double settledAmount;
+  final double remainingRefundable;
+}
+
 class CustomerReturnDetailLine {
   final int id;
   final int productId;

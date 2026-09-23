@@ -4,14 +4,25 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../../core/services/customer_refund_settlement_service.dart';
+import '../../returns/models/customer_return_history_models.dart';
+import '../../returns/providers/customer_return_detail_provider.dart';
 import '../providers/customer_accounts_provider.dart';
 import '../utils/customer_refund_settlement_messages.dart';
 
+const customerRefundDisplayTolerance = 0.0001;
+
 /// Refreshes read-only customer credit/balance displays after successful refund.
-void invalidateCustomerRefundDisplays(Ref ref, int customerId) {
+void invalidateCustomerRefundDisplays(
+  Ref ref,
+  int customerId, {
+  int? returnId,
+}) {
   ref.invalidate(customerAvailableCreditProvider(customerId));
   ref.invalidate(customerBalanceProvider(customerId));
   ref.invalidate(customerHistoryProvider(customerId));
+  if (returnId != null) {
+    ref.invalidate(customerReturnRemainingRefundableProvider(returnId));
+  }
 }
 
 /// Canonical Phase C Step 2.1 settlement service — sole financial write boundary for refunds.
@@ -28,6 +39,13 @@ final customerAvailableCreditProvider =
   return balance < 0 ? -balance : 0.0;
 });
 
+/// Read-only remaining refundable capacity for a linked customer return.
+final customerReturnRemainingRefundableProvider = FutureProvider.autoDispose
+    .family<ReturnRefundableSnapshot?, int>((ref, returnId) async {
+  final repo = ref.read(customerReturnReadRepositoryProvider);
+  return repo.getReturnRefundableSnapshot(returnId);
+});
+
 enum CustomerRefundSettlementUiStatus { idle, submitting, success, failure }
 
 class CustomerRefundSettlementUiState {
@@ -38,6 +56,7 @@ class CustomerRefundSettlementUiState {
   final String note;
   final int? returnId;
   final String? returnLabel;
+  final double? maxReturnRefundable;
   final CustomerRefundSettlementUiStatus status;
   final String? errorMessage;
 
@@ -49,14 +68,18 @@ class CustomerRefundSettlementUiState {
     this.note = '',
     this.returnId,
     this.returnLabel,
+    this.maxReturnRefundable,
     this.status = CustomerRefundSettlementUiStatus.idle,
     this.errorMessage,
   });
 
   double? get parsedAmount => parseCustomerRefundAmountText(amountText);
 
-  String? get amountValidationError =>
-      validateCustomerRefundAmountText(amountText, availableCredit);
+  String? get amountValidationError => validateCustomerRefundAmountText(
+        amountText,
+        availableCredit,
+        maxReturnRefundable: maxReturnRefundable,
+      );
 
   double? get remainingCreditPreview {
     final amount = parsedAmount;
@@ -68,13 +91,20 @@ class CustomerRefundSettlementUiState {
       status == CustomerRefundSettlementUiStatus.submitting;
 
   bool get canSubmit =>
-      !isSubmitting && amountValidationError == null && (parsedAmount ?? 0) > 0;
+      !isSubmitting &&
+      amountValidationError == null &&
+      (parsedAmount ?? 0) > 0 &&
+      (returnId == null ||
+          (maxReturnRefundable != null &&
+              maxReturnRefundable! > customerRefundDisplayTolerance));
 
-  bool get hasAvailableCredit => availableCredit > 0.0001;
+  bool get hasAvailableCredit =>
+      availableCredit > customerRefundDisplayTolerance;
 
   CustomerRefundSettlementUiState copyWith({
     String? amountText,
     String? note,
+    double? maxReturnRefundable,
     CustomerRefundSettlementUiStatus? status,
     String? errorMessage,
     bool clearError = false,
@@ -87,6 +117,7 @@ class CustomerRefundSettlementUiState {
       note: note ?? this.note,
       returnId: returnId,
       returnLabel: returnLabel,
+      maxReturnRefundable: maxReturnRefundable ?? this.maxReturnRefundable,
       status: status ?? this.status,
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
     );
@@ -101,7 +132,11 @@ double? parseCustomerRefundAmountText(String text) {
 }
 
 /// UX-only validation — service remains authoritative for financial checks.
-String? validateCustomerRefundAmountText(String text, double availableCredit) {
+String? validateCustomerRefundAmountText(
+  String text,
+  double availableCredit, {
+  double? maxReturnRefundable,
+}) {
   final normalized = text.trim();
   if (normalized.isEmpty) {
     return 'مبلغ الاسترداد مطلوب';
@@ -113,8 +148,22 @@ String? validateCustomerRefundAmountText(String text, double availableCredit) {
   if (amount <= 0) {
     return 'مبلغ الاسترداد غير صالح';
   }
-  if (amount > availableCredit + 0.0001) {
-    return 'مبلغ الاسترداد يتجاوز الرصيد الدائن المتاح';
+  if (maxReturnRefundable != null) {
+    if (maxReturnRefundable <= customerRefundDisplayTolerance) {
+      return customerRefundSettlementFailureMessage(
+        CustomerRefundSettlementFailure.noReturnRefundableAmount,
+      );
+    }
+    if (amount > maxReturnRefundable + customerRefundDisplayTolerance) {
+      return customerRefundSettlementFailureMessage(
+        CustomerRefundSettlementFailure.amountExceedsReturnRefundableAmount,
+      );
+    }
+  }
+  if (amount > availableCredit + customerRefundDisplayTolerance) {
+    return customerRefundSettlementFailureMessage(
+      CustomerRefundSettlementFailure.amountExceedsCredit,
+    );
   }
   return null;
 }
@@ -132,6 +181,7 @@ class CustomerRefundSettlementUiNotifier
     required double availableCredit,
     int? returnId,
     String? returnLabel,
+    double? maxReturnRefundable,
   }) {
     _submitGeneration = 0;
     state = CustomerRefundSettlementUiState(
@@ -140,6 +190,7 @@ class CustomerRefundSettlementUiNotifier
       availableCredit: availableCredit,
       returnId: returnId,
       returnLabel: returnLabel,
+      maxReturnRefundable: returnId != null ? maxReturnRefundable : null,
     );
   }
 
@@ -166,6 +217,12 @@ class CustomerRefundSettlementUiNotifier
       clearError: true,
       status: CustomerRefundSettlementUiStatus.idle,
     );
+  }
+
+  void setMaxReturnRefundable(double? value) {
+    final current = state;
+    if (current == null) return;
+    state = current.copyWith(maxReturnRefundable: value);
   }
 
   /// Submits via [CustomerRefundSettlementService.settleCredit].
@@ -209,7 +266,11 @@ class CustomerRefundSettlementUiNotifier
           );
       if (!_isCurrentSubmit(generation)) return false;
 
-      invalidateCustomerRefundDisplays(ref, current.customerId);
+      invalidateCustomerRefundDisplays(
+        ref,
+        current.customerId,
+        returnId: current.returnId,
+      );
 
       state = current.copyWith(
         status: CustomerRefundSettlementUiStatus.success,

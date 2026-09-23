@@ -8,6 +8,48 @@ class CustomerReturnReadRepository {
 
   final AppDatabase _db;
 
+  static const _displayTolerance = 0.0001;
+
+  /// Read-only remaining refundable capacity for a linked return document.
+  ///
+  /// Uses the same DAO sources as [CustomerRefundSettlementService.settleCredit].
+  Future<ReturnRefundableSnapshot?> getReturnRefundableSnapshot(
+    int returnId,
+  ) async {
+    final header = await _db.returnsDao.getCustomerReturnById(returnId);
+    if (header == null) return null;
+
+    final originalInvoiceId = header.originalInvoiceId;
+    if (originalInvoiceId == null) return null;
+
+    final invoice = await _db.salesDao.getInvoiceById(originalInvoiceId);
+    final customerId = invoice?.customerId;
+    if (customerId == null) return null;
+
+    final creditCap =
+        await _db.customerAccountsDao.getCreditReversalTotalForSaleInvoice(
+      customerId: customerId,
+      invoiceId: originalInvoiceId,
+    );
+
+    final settledAmount =
+        await _db.returnsDao.getSettledAmountForCustomerReturn(returnId) ?? 0.0;
+
+    var remainingRefundable = creditCap - settledAmount;
+    if (remainingRefundable <= _displayTolerance) {
+      remainingRefundable = 0;
+    }
+
+    return ReturnRefundableSnapshot(
+      returnId: returnId,
+      customerId: customerId,
+      originalInvoiceId: originalInvoiceId,
+      creditCap: creditCap,
+      settledAmount: settledAmount,
+      remainingRefundable: remainingRefundable,
+    );
+  }
+
   /// Read-only detail for a persisted customer return with invoice/customer resolution.
   Future<CustomerReturnDetail?> getCustomerReturnDetail(int returnId) async {
     final header = await _db.returnsDao.getCustomerReturnById(returnId);

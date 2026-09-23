@@ -16,6 +16,7 @@ Future<bool> showCustomerRefundSettlementDialog(
   required double availableCredit,
   int? returnId,
   String? returnLabel,
+  double? maxReturnRefundable,
 }) {
   ref.read(customerRefundSettlementProvider.notifier).init(
         customerId: customerId,
@@ -23,6 +24,7 @@ Future<bool> showCustomerRefundSettlementDialog(
         availableCredit: availableCredit,
         returnId: returnId,
         returnLabel: returnLabel,
+        maxReturnRefundable: returnId != null ? maxReturnRefundable : null,
       );
   return showDialog<bool>(
     context: context,
@@ -40,6 +42,13 @@ void _closeDialog(BuildContext context, {bool settled = false}) {
 
 class CustomerRefundSettlementDialog extends ConsumerWidget {
   const CustomerRefundSettlementDialog({super.key});
+
+  static const returnRemainingLabel =
+      'المبلغ المتبقي القابل للاسترداد على هذا المرتجع';
+
+  static const returnRemainingLoadError = 'تعذر تحميل المبلغ المتبقي للمرتجع';
+
+  static const availableCreditLabel = 'الرصيد الدائن المتاح';
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -92,10 +101,14 @@ class CustomerRefundSettlementDialog extends ConsumerWidget {
                     ),
                     const SizedBox(height: 8),
                     _InfoRow(
-                      label: 'الرصيد الدائن المتاح',
+                      label: availableCreditLabel,
                       value: '${moneyFmt.format(ui.availableCredit)} د.ع',
                       emphasize: true,
                     ),
+                    if (ui.returnId != null) ...[
+                      const SizedBox(height: 8),
+                      _ReturnRemainingInfoRow(returnId: ui.returnId!),
+                    ],
                     if (ui.returnLabel != null) ...[
                       const SizedBox(height: 8),
                       _InfoRow(
@@ -244,6 +257,56 @@ class CustomerRefundSettlementDialog extends ConsumerWidget {
   }
 }
 
+class _ReturnRemainingInfoRow extends ConsumerWidget {
+  const _ReturnRemainingInfoRow({required this.returnId});
+
+  final int returnId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    ref.listen(
+      customerReturnRemainingRefundableProvider(returnId),
+      (previous, next) {
+        next.whenData((snapshot) {
+          ref
+              .read(customerRefundSettlementProvider.notifier)
+              .setMaxReturnRefundable(snapshot?.remainingRefundable);
+        });
+      },
+    );
+    final remainingAsync =
+        ref.watch(customerReturnRemainingRefundableProvider(returnId));
+    final moneyFmt = NumberFormat('#,##0.##');
+
+    return remainingAsync.when(
+      loading: () => const Padding(
+        padding: EdgeInsets.symmetric(vertical: 4),
+        child: LinearProgressIndicator(minHeight: 2),
+      ),
+      error: (_, __) => const Text(
+        CustomerRefundSettlementDialog.returnRemainingLoadError,
+        style: TextStyle(color: AppColors.error, fontSize: 13),
+        textDirection: TextDirection.rtl,
+      ),
+      data: (snapshot) {
+        if (snapshot == null) {
+          return const Text(
+            CustomerRefundSettlementDialog.returnRemainingLoadError,
+            style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+            textDirection: TextDirection.rtl,
+          );
+        }
+        return _InfoRow(
+          label: CustomerRefundSettlementDialog.returnRemainingLabel,
+          value: '${moneyFmt.format(snapshot.remainingRefundable)} د.ع',
+          emphasize:
+              snapshot.remainingRefundable > customerRefundDisplayTolerance,
+        );
+      },
+    );
+  }
+}
+
 class _InfoRow extends StatelessWidget {
   const _InfoRow({
     required this.label,
@@ -261,17 +324,12 @@ class _InfoRow extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       textDirection: TextDirection.rtl,
       children: [
-        Text(
-          '$label: ',
-          style: const TextStyle(color: AppColors.textSecondary),
-          textDirection: TextDirection.rtl,
-        ),
         Expanded(
           child: Text(
-            value,
+            '$label: $value',
             style: TextStyle(
               fontWeight: emphasize ? FontWeight.w700 : FontWeight.w600,
-              color: emphasize ? AppColors.primary : null,
+              color: emphasize ? AppColors.primary : AppColors.textSecondary,
             ),
             textDirection: TextDirection.rtl,
           ),

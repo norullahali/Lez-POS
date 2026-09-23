@@ -135,6 +135,7 @@ void main() {
         (tester) async {
       late int returnId;
       late CustomerReturnDetail detail;
+      late ReturnRefundableSnapshot returnSnapshot;
       late double availableCredit;
       var beforeRefunds = 0;
 
@@ -144,6 +145,8 @@ void main() {
         expect(loaded, isNotNull);
         expect(loaded!.isRefundLinkEligible, isTrue);
         detail = loaded;
+        returnSnapshot =
+            (await readRepo.getReturnRefundableSnapshot(returnId))!;
         final balance = await db.customerAccountsDao
             .calculateBalanceFromTransactions(customerId);
         availableCredit = balance < 0 ? -balance : 0.0;
@@ -164,6 +167,8 @@ void main() {
                 .overrideWith((ref) async => detail),
             customerAvailableCreditProvider(customerId)
                 .overrideWith((ref) async => availableCredit),
+            customerReturnRemainingRefundableProvider(returnId)
+                .overrideWith((ref) async => returnSnapshot),
           ],
           child: MaterialApp(
             home: Directionality(
@@ -189,6 +194,7 @@ void main() {
       expect(entry.returnId, returnId);
       expect(entry.returnLabel, detail.displayReturnNumber);
 
+      await tester.pumpAndSettle();
       await pumpUntilFound(tester, refundButtonFinder());
       expect(find.textContaining('الرصيد الدائن'), findsOneWidget);
       expect(

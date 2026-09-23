@@ -151,26 +151,29 @@ class CustomerRefundSettlementService {
           );
         }
 
-        final recordRefund = _refundInTransactionOverride ??
-            (({
-              required int customerId,
-              required double amount,
-              int? returnId,
-              String? note,
-            }) =>
-                _db.customerAccountsDao.recordRefundInTransaction(
-                  customerId: customerId,
-                  amount: amount,
-                  returnId: returnId,
-                  note: note ?? '',
-                ));
-
-        await recordRefund(
-          customerId: customerId,
-          amount: amount,
-          returnId: returnId,
-          note: note,
-        );
+        if (_refundInTransactionOverride != null) {
+          await _refundInTransactionOverride!(
+            customerId: customerId,
+            amount: amount,
+            returnId: returnId,
+            note: note,
+          );
+        } else {
+          final inserted = await _db.customerAccountsDao
+              .recordRefundInTransactionIfWithinAggregateCredit(
+            customerId: customerId,
+            amount: amount,
+            returnId: returnId,
+            note: note ?? '',
+            tolerance: tolerance,
+          );
+          if (!inserted) {
+            throw CustomerRefundSettlementException(
+              CustomerRefundSettlementFailure.amountExceedsCredit,
+              'settlement exceeds available credit (concurrent update)',
+            );
+          }
+        }
 
         if (returnId != null) {
           final incremented =

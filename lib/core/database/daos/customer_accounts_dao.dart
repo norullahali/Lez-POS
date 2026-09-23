@@ -188,6 +188,9 @@ class CustomerAccountsDao extends DatabaseAccessor<AppDatabase>
   /// [amount] is the positive settlement value stored as a positive ledger amount,
   /// consuming credit (balance moves toward zero). Must run inside an enclosing
   /// transaction — business validation belongs in the service layer.
+  ///
+  /// Prefer [recordRefundInTransactionIfWithinAggregateCredit] from
+  /// [CustomerRefundSettlementService] for authoritative concurrency safety.
   Future<void> recordRefundInTransaction({
     required int customerId,
     required double amount,
@@ -201,6 +204,75 @@ class CustomerAccountsDao extends DatabaseAccessor<AppDatabase>
         referenceId: returnId,
         note: note,
       );
+
+  /// Atomically inserts a REFUND row only when aggregate customer credit can
+  /// absorb [amount] without driving the transaction balance above [tolerance].
+  ///
+  /// Uses the same authoritative balance source as
+  /// [calculateBalanceFromTransactions]: `SUM(customer_transactions.amount)`.
+  ///
+  /// Invariant: `current_sum + amount <= tolerance` (Phase C Step 2.8A).
+  /// Must run inside an enclosing transaction.
+  ///
+  /// Returns true when a REFUND row was inserted.
+  Future<bool> recordRefundInTransactionIfWithinAggregateCredit({
+    required int customerId,
+    required double amount,
+    int? returnId,
+    String note = '',
+    double tolerance = 0.0001,
+  }) async {
+    if (amount <= 0) return false;
+
+    await customStatement(
+      '''
+      INSERT INTO customer_transactions (customer_id, type, amount, reference_id, note)
+      SELECT ?, 'REFUND', ?, ?, ?
+      WHERE COALESCE(
+        (SELECT SUM(amount) FROM customer_transactions WHERE customer_id = ?),
+        0
+      ) + ? <= ?
+      ''',
+      [
+        customerId,
+        amount,
+        returnId,
+        note,
+        customerId,
+        amount,
+        tolerance,
+      ],
+    );
+
+    final changesRow =
+        await customSelect('SELECT changes() AS inserted').getSingle();
+    if (changesRow.read<int>('inserted') != 1) return false;
+
+    final newBalance = await calculateBalanceFromTransactions(customerId);
+    final existing = await (select(customerAccounts)
+          ..where((a) => a.customerId.equals(customerId)))
+        .getSingleOrNull();
+
+    if (existing != null) {
+      await (update(customerAccounts)..where((a) => a.id.equals(existing.id)))
+          .write(
+        CustomerAccountsCompanion(
+          currentBalance: Value(newBalance),
+          updatedAt: Value(DateTime.now()),
+        ),
+      );
+    } else {
+      await into(customerAccounts).insert(
+        CustomerAccountsCompanion(
+          customerId: Value(customerId),
+          currentBalance: Value(newBalance),
+          updatedAt: Value(DateTime.now()),
+        ),
+      );
+    }
+
+    return true;
+  }
 
   /// Total credit already reversed for [invoiceId] via RETURN rows linked to
   /// customer_returns or sale_item_returns on that invoice.

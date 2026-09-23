@@ -144,7 +144,7 @@ class AppDatabase extends _$AppDatabase {
   late final pricingDao = PricingDao(this);
 
   @override
-  int get schemaVersion => 31;
+  int get schemaVersion => 32;
 
   @override
   MigrationStrategy get migration {
@@ -803,6 +803,35 @@ class AppDatabase extends _$AppDatabase {
           }
           debugPrint(
               '[Migration v31] supplier_return_items traceability ready');
+        }
+        if (from < 32) {
+          // Phase C Step 2.7A: per-return REFUND settlement state.
+          debugPrint('[Migration v32] customer_returns settled_amount...');
+          try {
+            await customStatement(
+              'ALTER TABLE customer_returns '
+              'ADD COLUMN settled_amount REAL NOT NULL DEFAULT 0',
+            );
+          } catch (e) {
+            debugPrint('[Migration v32] add settled_amount skip: $e');
+          }
+          try {
+            await customStatement(
+              '''
+              UPDATE customer_returns
+              SET settled_amount = COALESCE((
+                SELECT SUM(ct.amount)
+                FROM customer_transactions ct
+                WHERE ct.type = 'REFUND'
+                  AND ct.reference_id = customer_returns.id
+                  AND ct.amount > 0
+              ), 0)
+              ''',
+            );
+          } catch (e) {
+            debugPrint('[Migration v32] backfill settled_amount error: $e');
+          }
+          debugPrint('[Migration v32] customer_returns settled_amount ready');
         }
       },
       beforeOpen: (details) async {

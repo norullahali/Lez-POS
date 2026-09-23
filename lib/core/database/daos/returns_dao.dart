@@ -66,6 +66,45 @@ class ReturnsDao extends DatabaseAccessor<AppDatabase> with _$ReturnsDaoMixin {
       (select(customerReturns)..where((r) => r.id.equals(id)))
           .getSingleOrNull();
 
+  /// Read-only settled REFUND total for [returnId].
+  ///
+  /// Returns null when the return row does not exist.
+  Future<double?> getSettledAmountForCustomerReturn(int returnId) async {
+    final row = await getCustomerReturnById(returnId);
+    return row?.settledAmount;
+  }
+
+  /// Atomically increments [customer_returns.settledAmount] when the new total
+  /// would not exceed [creditCap]. Must run inside an enclosing transaction.
+  ///
+  /// Returns true when exactly one row was updated.
+  Future<bool> incrementSettledAmountIfWithinCap({
+    required int returnId,
+    required double amount,
+    required double creditCap,
+  }) async {
+    if (amount <= 0) return false;
+
+    const tolerance = 0.0001;
+    final updated = await customUpdate(
+      '''
+      UPDATE customer_returns
+      SET settled_amount = settled_amount + ?
+      WHERE id = ?
+        AND settled_amount + ? <= ? + ?
+      ''',
+      variables: [
+        Variable.withReal(amount),
+        Variable.withInt(returnId),
+        Variable.withReal(amount),
+        Variable.withReal(creditCap),
+        Variable.withReal(tolerance),
+      ],
+      updates: {customerReturns},
+    );
+    return updated == 1;
+  }
+
   Future<List<CustomerReturnItem>> getCustomerReturnItems(int returnId) =>
       (select(customerReturnItems)..where((i) => i.returnId.equals(returnId)))
           .get();

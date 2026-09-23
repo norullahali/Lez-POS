@@ -7683,6 +7683,14 @@ class $CustomerReturnsTable extends CustomerReturns
       type: DriftSqlType.double,
       requiredDuringInsert: false,
       defaultValue: const Constant(0.0));
+  static const VerificationMeta _settledAmountMeta =
+      const VerificationMeta('settledAmount');
+  @override
+  late final GeneratedColumn<double> settledAmount = GeneratedColumn<double>(
+      'settled_amount', aliasedName, false,
+      type: DriftSqlType.double,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0.0));
   static const VerificationMeta _reasonMeta = const VerificationMeta('reason');
   @override
   late final GeneratedColumn<String> reason = GeneratedColumn<String>(
@@ -7698,8 +7706,16 @@ class $CustomerReturnsTable extends CustomerReturns
       requiredDuringInsert: false,
       defaultValue: const Constant(''));
   @override
-  List<GeneratedColumn> get $columns =>
-      [id, originalInvoiceId, returnNumber, returnDate, total, reason, notes];
+  List<GeneratedColumn> get $columns => [
+        id,
+        originalInvoiceId,
+        returnNumber,
+        returnDate,
+        total,
+        settledAmount,
+        reason,
+        notes
+      ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -7737,6 +7753,12 @@ class $CustomerReturnsTable extends CustomerReturns
       context.handle(
           _totalMeta, total.isAcceptableOrUnknown(data['total']!, _totalMeta));
     }
+    if (data.containsKey('settled_amount')) {
+      context.handle(
+          _settledAmountMeta,
+          settledAmount.isAcceptableOrUnknown(
+              data['settled_amount']!, _settledAmountMeta));
+    }
     if (data.containsKey('reason')) {
       context.handle(_reasonMeta,
           reason.isAcceptableOrUnknown(data['reason']!, _reasonMeta));
@@ -7764,6 +7786,8 @@ class $CustomerReturnsTable extends CustomerReturns
           .read(DriftSqlType.dateTime, data['${effectivePrefix}return_date'])!,
       total: attachedDatabase.typeMapping
           .read(DriftSqlType.double, data['${effectivePrefix}total'])!,
+      settledAmount: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}settled_amount'])!,
       reason: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}reason'])!,
       notes: attachedDatabase.typeMapping
@@ -7783,6 +7807,9 @@ class CustomerReturn extends DataClass implements Insertable<CustomerReturn> {
   final String returnNumber;
   final DateTime returnDate;
   final double total;
+
+  /// Total positive REFUND cash already settled against this customer return.
+  final double settledAmount;
   final String reason;
   final String notes;
   const CustomerReturn(
@@ -7791,6 +7818,7 @@ class CustomerReturn extends DataClass implements Insertable<CustomerReturn> {
       required this.returnNumber,
       required this.returnDate,
       required this.total,
+      required this.settledAmount,
       required this.reason,
       required this.notes});
   @override
@@ -7803,6 +7831,7 @@ class CustomerReturn extends DataClass implements Insertable<CustomerReturn> {
     map['return_number'] = Variable<String>(returnNumber);
     map['return_date'] = Variable<DateTime>(returnDate);
     map['total'] = Variable<double>(total);
+    map['settled_amount'] = Variable<double>(settledAmount);
     map['reason'] = Variable<String>(reason);
     map['notes'] = Variable<String>(notes);
     return map;
@@ -7817,6 +7846,7 @@ class CustomerReturn extends DataClass implements Insertable<CustomerReturn> {
       returnNumber: Value(returnNumber),
       returnDate: Value(returnDate),
       total: Value(total),
+      settledAmount: Value(settledAmount),
       reason: Value(reason),
       notes: Value(notes),
     );
@@ -7831,6 +7861,7 @@ class CustomerReturn extends DataClass implements Insertable<CustomerReturn> {
       returnNumber: serializer.fromJson<String>(json['returnNumber']),
       returnDate: serializer.fromJson<DateTime>(json['returnDate']),
       total: serializer.fromJson<double>(json['total']),
+      settledAmount: serializer.fromJson<double>(json['settledAmount']),
       reason: serializer.fromJson<String>(json['reason']),
       notes: serializer.fromJson<String>(json['notes']),
     );
@@ -7844,6 +7875,7 @@ class CustomerReturn extends DataClass implements Insertable<CustomerReturn> {
       'returnNumber': serializer.toJson<String>(returnNumber),
       'returnDate': serializer.toJson<DateTime>(returnDate),
       'total': serializer.toJson<double>(total),
+      'settledAmount': serializer.toJson<double>(settledAmount),
       'reason': serializer.toJson<String>(reason),
       'notes': serializer.toJson<String>(notes),
     };
@@ -7855,6 +7887,7 @@ class CustomerReturn extends DataClass implements Insertable<CustomerReturn> {
           String? returnNumber,
           DateTime? returnDate,
           double? total,
+          double? settledAmount,
           String? reason,
           String? notes}) =>
       CustomerReturn(
@@ -7865,6 +7898,7 @@ class CustomerReturn extends DataClass implements Insertable<CustomerReturn> {
         returnNumber: returnNumber ?? this.returnNumber,
         returnDate: returnDate ?? this.returnDate,
         total: total ?? this.total,
+        settledAmount: settledAmount ?? this.settledAmount,
         reason: reason ?? this.reason,
         notes: notes ?? this.notes,
       );
@@ -7880,6 +7914,9 @@ class CustomerReturn extends DataClass implements Insertable<CustomerReturn> {
       returnDate:
           data.returnDate.present ? data.returnDate.value : this.returnDate,
       total: data.total.present ? data.total.value : this.total,
+      settledAmount: data.settledAmount.present
+          ? data.settledAmount.value
+          : this.settledAmount,
       reason: data.reason.present ? data.reason.value : this.reason,
       notes: data.notes.present ? data.notes.value : this.notes,
     );
@@ -7893,6 +7930,7 @@ class CustomerReturn extends DataClass implements Insertable<CustomerReturn> {
           ..write('returnNumber: $returnNumber, ')
           ..write('returnDate: $returnDate, ')
           ..write('total: $total, ')
+          ..write('settledAmount: $settledAmount, ')
           ..write('reason: $reason, ')
           ..write('notes: $notes')
           ..write(')'))
@@ -7900,8 +7938,8 @@ class CustomerReturn extends DataClass implements Insertable<CustomerReturn> {
   }
 
   @override
-  int get hashCode => Object.hash(
-      id, originalInvoiceId, returnNumber, returnDate, total, reason, notes);
+  int get hashCode => Object.hash(id, originalInvoiceId, returnNumber,
+      returnDate, total, settledAmount, reason, notes);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -7911,6 +7949,7 @@ class CustomerReturn extends DataClass implements Insertable<CustomerReturn> {
           other.returnNumber == this.returnNumber &&
           other.returnDate == this.returnDate &&
           other.total == this.total &&
+          other.settledAmount == this.settledAmount &&
           other.reason == this.reason &&
           other.notes == this.notes);
 }
@@ -7921,6 +7960,7 @@ class CustomerReturnsCompanion extends UpdateCompanion<CustomerReturn> {
   final Value<String> returnNumber;
   final Value<DateTime> returnDate;
   final Value<double> total;
+  final Value<double> settledAmount;
   final Value<String> reason;
   final Value<String> notes;
   const CustomerReturnsCompanion({
@@ -7929,6 +7969,7 @@ class CustomerReturnsCompanion extends UpdateCompanion<CustomerReturn> {
     this.returnNumber = const Value.absent(),
     this.returnDate = const Value.absent(),
     this.total = const Value.absent(),
+    this.settledAmount = const Value.absent(),
     this.reason = const Value.absent(),
     this.notes = const Value.absent(),
   });
@@ -7938,6 +7979,7 @@ class CustomerReturnsCompanion extends UpdateCompanion<CustomerReturn> {
     required String returnNumber,
     this.returnDate = const Value.absent(),
     this.total = const Value.absent(),
+    this.settledAmount = const Value.absent(),
     this.reason = const Value.absent(),
     this.notes = const Value.absent(),
   }) : returnNumber = Value(returnNumber);
@@ -7947,6 +7989,7 @@ class CustomerReturnsCompanion extends UpdateCompanion<CustomerReturn> {
     Expression<String>? returnNumber,
     Expression<DateTime>? returnDate,
     Expression<double>? total,
+    Expression<double>? settledAmount,
     Expression<String>? reason,
     Expression<String>? notes,
   }) {
@@ -7956,6 +7999,7 @@ class CustomerReturnsCompanion extends UpdateCompanion<CustomerReturn> {
       if (returnNumber != null) 'return_number': returnNumber,
       if (returnDate != null) 'return_date': returnDate,
       if (total != null) 'total': total,
+      if (settledAmount != null) 'settled_amount': settledAmount,
       if (reason != null) 'reason': reason,
       if (notes != null) 'notes': notes,
     });
@@ -7967,6 +8011,7 @@ class CustomerReturnsCompanion extends UpdateCompanion<CustomerReturn> {
       Value<String>? returnNumber,
       Value<DateTime>? returnDate,
       Value<double>? total,
+      Value<double>? settledAmount,
       Value<String>? reason,
       Value<String>? notes}) {
     return CustomerReturnsCompanion(
@@ -7975,6 +8020,7 @@ class CustomerReturnsCompanion extends UpdateCompanion<CustomerReturn> {
       returnNumber: returnNumber ?? this.returnNumber,
       returnDate: returnDate ?? this.returnDate,
       total: total ?? this.total,
+      settledAmount: settledAmount ?? this.settledAmount,
       reason: reason ?? this.reason,
       notes: notes ?? this.notes,
     );
@@ -7998,6 +8044,9 @@ class CustomerReturnsCompanion extends UpdateCompanion<CustomerReturn> {
     if (total.present) {
       map['total'] = Variable<double>(total.value);
     }
+    if (settledAmount.present) {
+      map['settled_amount'] = Variable<double>(settledAmount.value);
+    }
     if (reason.present) {
       map['reason'] = Variable<String>(reason.value);
     }
@@ -8015,6 +8064,7 @@ class CustomerReturnsCompanion extends UpdateCompanion<CustomerReturn> {
           ..write('returnNumber: $returnNumber, ')
           ..write('returnDate: $returnDate, ')
           ..write('total: $total, ')
+          ..write('settledAmount: $settledAmount, ')
           ..write('reason: $reason, ')
           ..write('notes: $notes')
           ..write(')'))
@@ -8613,6 +8663,9 @@ class $SupplierReturnsTable extends SupplierReturns
 class SupplierReturn extends DataClass implements Insertable<SupplierReturn> {
   final int id;
   final int? supplierId;
+
+  /// Original purchase header for purchase-linked returns (SR.1).
+  /// Nullable for legacy/manual supplier returns without purchase linkage.
   final int? purchaseInvoiceId;
   final String returnNumber;
   final DateTime returnDate;
@@ -9051,7 +9104,8 @@ class SupplierReturnItem extends DataClass
   final int id;
   final int returnId;
 
-  /// Exact purchase line this return item reverses. Nullable for legacy/manual rows.
+  /// Exact purchase line this return item reverses (SR.1 line-level traceability).
+  /// Nullable for legacy/manual rows; null rows are excluded from returnable-qty sums.
   final int? purchaseItemId;
   final int productId;
   final String productName;
@@ -25414,6 +25468,7 @@ typedef $$CustomerReturnsTableCreateCompanionBuilder = CustomerReturnsCompanion
   required String returnNumber,
   Value<DateTime> returnDate,
   Value<double> total,
+  Value<double> settledAmount,
   Value<String> reason,
   Value<String> notes,
 });
@@ -25424,6 +25479,7 @@ typedef $$CustomerReturnsTableUpdateCompanionBuilder = CustomerReturnsCompanion
   Value<String> returnNumber,
   Value<DateTime> returnDate,
   Value<double> total,
+  Value<double> settledAmount,
   Value<String> reason,
   Value<String> notes,
 });
@@ -25486,6 +25542,9 @@ class $$CustomerReturnsTableFilterComposer
 
   ColumnFilters<double> get total => $composableBuilder(
       column: $table.total, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get settledAmount => $composableBuilder(
+      column: $table.settledAmount, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<String> get reason => $composableBuilder(
       column: $table.reason, builder: (column) => ColumnFilters(column));
@@ -25557,6 +25616,10 @@ class $$CustomerReturnsTableOrderingComposer
   ColumnOrderings<double> get total => $composableBuilder(
       column: $table.total, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<double> get settledAmount => $composableBuilder(
+      column: $table.settledAmount,
+      builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<String> get reason => $composableBuilder(
       column: $table.reason, builder: (column) => ColumnOrderings(column));
 
@@ -25604,6 +25667,9 @@ class $$CustomerReturnsTableAnnotationComposer
 
   GeneratedColumn<double> get total =>
       $composableBuilder(column: $table.total, builder: (column) => column);
+
+  GeneratedColumn<double> get settledAmount => $composableBuilder(
+      column: $table.settledAmount, builder: (column) => column);
 
   GeneratedColumn<String> get reason =>
       $composableBuilder(column: $table.reason, builder: (column) => column);
@@ -25685,6 +25751,7 @@ class $$CustomerReturnsTableTableManager extends RootTableManager<
             Value<String> returnNumber = const Value.absent(),
             Value<DateTime> returnDate = const Value.absent(),
             Value<double> total = const Value.absent(),
+            Value<double> settledAmount = const Value.absent(),
             Value<String> reason = const Value.absent(),
             Value<String> notes = const Value.absent(),
           }) =>
@@ -25694,6 +25761,7 @@ class $$CustomerReturnsTableTableManager extends RootTableManager<
             returnNumber: returnNumber,
             returnDate: returnDate,
             total: total,
+            settledAmount: settledAmount,
             reason: reason,
             notes: notes,
           ),
@@ -25703,6 +25771,7 @@ class $$CustomerReturnsTableTableManager extends RootTableManager<
             required String returnNumber,
             Value<DateTime> returnDate = const Value.absent(),
             Value<double> total = const Value.absent(),
+            Value<double> settledAmount = const Value.absent(),
             Value<String> reason = const Value.absent(),
             Value<String> notes = const Value.absent(),
           }) =>
@@ -25712,6 +25781,7 @@ class $$CustomerReturnsTableTableManager extends RootTableManager<
             returnNumber: returnNumber,
             returnDate: returnDate,
             total: total,
+            settledAmount: settledAmount,
             reason: reason,
             notes: notes,
           ),

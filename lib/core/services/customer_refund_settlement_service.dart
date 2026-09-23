@@ -15,6 +15,8 @@ enum CustomerRefundSettlementFailure {
   noCustomerCredit,
   invalidAmount,
   amountExceedsCredit,
+  noReturnRefundableAmount,
+  amountExceedsReturnRefundableAmount,
   returnNotFound,
   returnCustomerMismatch,
   unexpectedFailure,
@@ -55,12 +57,17 @@ class CustomerRefundSettlementService {
   ///
   /// When [returnId] is supplied, it is stored on the REFUND row for traceability
   /// after validating the return exists and belongs to [customerId].
+  ///
+  /// Linked refunds also enforce per-return remaining refundable capacity
+  /// (Phase C Step 2.7B).
   Future<void> settleCredit({
     required int customerId,
     required double amount,
     int? returnId,
     String? note,
   }) async {
+    const tolerance = 0.0001;
+
     try {
       await _db.transaction(() async {
         final customer = await _db.customersDao.getCustomerById(customerId);
@@ -78,6 +85,7 @@ class CustomerRefundSettlementService {
           );
         }
 
+        double? returnCreditCap;
         if (returnId != null) {
           final returnCustomerId = await _resolveReturnCustomerId(returnId);
           if (returnCustomerId == null) {
@@ -90,6 +98,35 @@ class CustomerRefundSettlementService {
             throw CustomerRefundSettlementException(
               CustomerRefundSettlementFailure.returnCustomerMismatch,
               'customer return $returnId does not belong to customer $customerId',
+            );
+          }
+
+          final header = await _db.returnsDao.getCustomerReturnById(returnId);
+          final originalInvoiceId = header!.originalInvoiceId!;
+
+          returnCreditCap = await _db.customerAccountsDao
+              .getCreditReversalTotalForSaleInvoice(
+            customerId: customerId,
+            invoiceId: originalInvoiceId,
+          );
+
+          final settledAmount = await _db.returnsDao
+                  .getSettledAmountForCustomerReturn(returnId) ??
+              0.0;
+          final remainingReturnRefund = returnCreditCap - settledAmount;
+
+          if (remainingReturnRefund <= tolerance) {
+            throw CustomerRefundSettlementException(
+              CustomerRefundSettlementFailure.noReturnRefundableAmount,
+              'no return refundable amount remaining for return $returnId',
+            );
+          }
+
+          if (amount > remainingReturnRefund + tolerance) {
+            throw CustomerRefundSettlementException(
+              CustomerRefundSettlementFailure
+                  .amountExceedsReturnRefundableAmount,
+              'settlement exceeds remaining return refundable amount',
             );
           }
         }
@@ -107,7 +144,7 @@ class CustomerRefundSettlementService {
           );
         }
 
-        if (amount > availableCredit + 0.0001) {
+        if (amount > availableCredit + tolerance) {
           throw CustomerRefundSettlementException(
             CustomerRefundSettlementFailure.amountExceedsCredit,
             'settlement exceeds available credit',
@@ -134,6 +171,22 @@ class CustomerRefundSettlementService {
           returnId: returnId,
           note: note,
         );
+
+        if (returnId != null) {
+          final incremented =
+              await _db.returnsDao.incrementSettledAmountIfWithinCap(
+            returnId: returnId,
+            amount: amount,
+            creditCap: returnCreditCap!,
+          );
+          if (!incremented) {
+            throw CustomerRefundSettlementException(
+              CustomerRefundSettlementFailure
+                  .amountExceedsReturnRefundableAmount,
+              'settlement exceeds return refundable amount (concurrent update)',
+            );
+          }
+        }
 
         if (_postRefundHook != null) {
           await _postRefundHook!();

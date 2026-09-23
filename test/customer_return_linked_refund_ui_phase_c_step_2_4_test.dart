@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lez_pos/core/database/app_database.dart';
 import 'package:lez_pos/core/services/customer_refund_settlement_service.dart';
+import 'package:lez_pos/core/services/partial_return_service.dart';
 import 'package:lez_pos/features/customers/providers/customer_accounts_provider.dart';
 import 'package:lez_pos/features/customers/providers/customer_refund_settlement_provider.dart';
 import 'package:lez_pos/features/customers/screens/widgets/customer_credit_refund_entry.dart';
@@ -55,26 +56,22 @@ void main() {
 
     Future<int> seedLinkedReturn({double returnTotal = 50}) async {
       await seedCredit();
-      final returnId = await db.into(db.customerReturns).insert(
-            CustomerReturnsCompanion(
-              originalInvoiceId: Value(invoiceId),
-              returnNumber:
-                  Value('RET-LINK-${DateTime.now().microsecondsSinceEpoch}'),
-              total: Value(returnTotal),
-              reason: const Value('test linked return'),
-            ),
-          );
-      await db.into(db.customerReturnItems).insert(
-            CustomerReturnItemsCompanion.insert(
-              returnId: returnId,
-              productId: productId,
-              productName: 'UI Product',
-              quantity: 10,
-              unitPrice: 5,
-              total: returnTotal,
-            ),
-          );
-      return returnId;
+      final saleItemId =
+          (await db.salesDao.getItemsForInvoice(invoiceId)).single.id;
+      await PartialReturnService(db).processPartialReturn(
+        saleInvoiceId: invoiceId,
+        returnedByUserId: 1,
+        lines: [
+          PartialReturnLine(
+            saleItemId: saleItemId,
+            productId: productId,
+            quantity: returnTotal / 5,
+            unitPrice: 5,
+            unitCost: 5,
+          ),
+        ],
+      );
+      return (await db.select(db.customerReturns).get()).single.id;
     }
 
     Future<int> seedUnlinkedReturn() async {
@@ -387,6 +384,22 @@ void main() {
     test('I) full available-credit refund works through canonical service',
         () async {
       final returnId = await seedLinkedReturn();
+      final balance =
+          await db.customerAccountsDao.calculateBalanceFromTransactions(
+        customerId,
+      );
+      final availableCredit = balance < 0 ? -balance : 0.0;
+      final creditCap =
+          await db.customerAccountsDao.getCreditReversalTotalForSaleInvoice(
+        customerId: customerId,
+        invoiceId: invoiceId,
+      );
+      final settled =
+          await db.returnsDao.getSettledAmountForCustomerReturn(returnId) ?? 0;
+      final returnRemaining = creditCap - settled;
+      final refundAmount = availableCredit <= returnRemaining + 0.0001
+          ? availableCredit
+          : returnRemaining;
       final container =
           containerWithService(CustomerRefundSettlementService(db));
       addTearDown(container.dispose);
@@ -395,15 +408,15 @@ void main() {
       notifier.init(
         customerId: customerId,
         customerName: 'Return Customer',
-        availableCredit: 20,
+        availableCredit: availableCredit,
         returnId: returnId,
         returnLabel: 'RET-LINK',
       );
-      notifier.setAmountText('20');
+      notifier.setAmountText(refundAmount.toString());
       expect(await notifier.submit(), isTrue);
       final credit = await container
           .read(customerAvailableCreditProvider(customerId).future);
-      expect(credit, closeTo(0, 0.001));
+      expect(credit, closeTo(availableCredit - refundAmount, 0.001));
     });
 
     test('J) UI does not directly write customer_transactions', () async {

@@ -14,6 +14,10 @@ String customerRefundSettlementFailureMessage(
       return 'مبلغ الاسترداد غير صالح';
     case CustomerRefundSettlementFailure.amountExceedsCredit:
       return 'مبلغ الاسترداد يتجاوز الرصيد الدائن المتاح';
+    case CustomerRefundSettlementFailure.noReturnRefundableAmount:
+      return 'لا يوجد مبلغ متبقٍ قابل للاسترداد على هذا المرتجع';
+    case CustomerRefundSettlementFailure.amountExceedsReturnRefundableAmount:
+      return 'مبلغ الاسترداد يتجاوز المبلغ المتبقي القابل للاسترداد على هذا المرتجع';
     case CustomerRefundSettlementFailure.returnNotFound:
       return 'مرتجع العميل غير موجود';
     case CustomerRefundSettlementFailure.returnCustomerMismatch:

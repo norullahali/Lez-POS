@@ -144,13 +144,18 @@ class AppDatabase extends _$AppDatabase {
   late final pricingDao = PricingDao(this);
 
   @override
-  int get schemaVersion => 32;
+  int get schemaVersion => 33;
 
   @override
   MigrationStrategy get migration {
     return MigrationStrategy(
       onCreate: (Migrator m) async {
         await m.createAll();
+        await customStatement(
+          'CREATE UNIQUE INDEX IF NOT EXISTS uq_customer_returns_original_invoice '
+          'ON customer_returns(original_invoice_id) '
+          'WHERE original_invoice_id IS NOT NULL',
+        );
         // Enable foreign keys
         await customStatement('PRAGMA foreign_keys = ON');
         // Set WAL mode for better concurrent performance
@@ -832,6 +837,39 @@ class AppDatabase extends _$AppDatabase {
             debugPrint('[Migration v32] backfill settled_amount error: $e');
           }
           debugPrint('[Migration v32] customer_returns settled_amount ready');
+        }
+        if (from < 33) {
+          // Phase C Step 2.8B: one invoice-linked customer_returns header per invoice.
+          debugPrint(
+              '[Migration v33] customer_returns original_invoice unique index...');
+          final duplicateGroups = await customSelect(
+            '''
+            SELECT original_invoice_id, COUNT(*) AS cnt
+            FROM customer_returns
+            WHERE original_invoice_id IS NOT NULL
+            GROUP BY original_invoice_id
+            HAVING COUNT(*) > 1
+            ''',
+            readsFrom: {customerReturns},
+          ).get();
+          if (duplicateGroups.isNotEmpty) {
+            throw StateError(
+              'Migration v33 blocked: duplicate customer_returns.original_invoice_id '
+              'rows exist (${duplicateGroups.length} invoice group(s))',
+            );
+          }
+          try {
+            await customStatement(
+              'CREATE UNIQUE INDEX IF NOT EXISTS uq_customer_returns_original_invoice '
+              'ON customer_returns(original_invoice_id) '
+              'WHERE original_invoice_id IS NOT NULL',
+            );
+          } catch (e) {
+            debugPrint('[Migration v33] unique index skip/error: $e');
+            rethrow;
+          }
+          debugPrint(
+              '[Migration v33] customer_returns original_invoice unique index ready');
         }
       },
       beforeOpen: (details) async {

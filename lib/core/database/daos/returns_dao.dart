@@ -128,24 +128,50 @@ class ReturnsDao extends DatabaseAccessor<AppDatabase> with _$ReturnsDaoMixin {
   }) async {
     final existing = await findCustomerReturnByOriginalInvoiceId(saleInvoiceId);
     if (existing != null) {
-      await (update(customerReturns)..where((r) => r.id.equals(existing.id)))
-          .write(
-        CustomerReturnsCompanion(
-          total: Value(existing.total + batchGoodsTotal),
-        ),
-      );
+      await _incrementCustomerReturnHeaderTotal(existing.id, batchGoodsTotal);
       return existing.id;
     }
 
     final returnNumber =
         'RET-$saleInvoiceId-${DateTime.now().millisecondsSinceEpoch}';
-    return into(customerReturns).insert(
+    final insertedId = await into(customerReturns).insert(
       CustomerReturnsCompanion(
         originalInvoiceId: Value(saleInvoiceId),
         returnNumber: Value(returnNumber),
         total: Value(batchGoodsTotal),
         reason: Value(returnReason),
         notes: Value('فاتورة أصلية: $invoiceNumber'),
+      ),
+      mode: InsertMode.insertOrIgnore,
+    );
+
+    if (insertedId != 0) {
+      return insertedId;
+    }
+
+    final recovered =
+        await findCustomerReturnByOriginalInvoiceId(saleInvoiceId);
+    if (recovered == null) {
+      throw StateError(
+        'customer_returns header missing after insert-or-ignore for invoice '
+        '$saleInvoiceId',
+      );
+    }
+
+    await _incrementCustomerReturnHeaderTotal(recovered.id, batchGoodsTotal);
+    return recovered.id;
+  }
+
+  Future<void> _incrementCustomerReturnHeaderTotal(
+    int returnId,
+    double batchGoodsTotal,
+  ) async {
+    final header = await (select(customerReturns)
+          ..where((r) => r.id.equals(returnId)))
+        .getSingle();
+    await (update(customerReturns)..where((r) => r.id.equals(returnId))).write(
+      CustomerReturnsCompanion(
+        total: Value(header.total + batchGoodsTotal),
       ),
     );
   }

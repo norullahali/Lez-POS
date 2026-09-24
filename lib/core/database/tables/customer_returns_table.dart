@@ -15,6 +15,15 @@ class CustomerReturns extends Table {
 
   TextColumn get reason => text().withDefault(const Constant(''))();
   TextColumn get notes => text().withDefault(const Constant(''))();
+
+  List<Index> get indexes => [
+        Index(
+          'uq_customer_returns_original_invoice',
+          'CREATE UNIQUE INDEX IF NOT EXISTS uq_customer_returns_original_invoice '
+              'ON customer_returns (original_invoice_id) '
+              'WHERE original_invoice_id IS NOT NULL',
+        ),
+      ];
 }
 
 class CustomerReturnItems extends Table {

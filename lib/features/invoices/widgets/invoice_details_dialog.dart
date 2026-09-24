@@ -19,6 +19,8 @@ import '../../pos/models/invoice_models.dart';
 import '../../pos/providers/pos_products_provider.dart';
 import '../../products/providers/products_provider.dart';
 import '../../customers/screens/widgets/customer_credit_refund_entry.dart';
+import '../../returns/models/customer_return_history_models.dart';
+import '../../returns/providers/customer_return_detail_provider.dart';
 import '../../returns/providers/partial_return_provider.dart';
 import '../../returns/providers/return_analytics_provider.dart';
 import '../../returns/screens/customer_returns_screen.dart';
@@ -35,6 +37,14 @@ final invoicePartialReturnQtysProvider =
   return ref
       .read(partialReturnServiceProvider)
       .getReturnedQuantitiesForInvoice(invoiceId);
+});
+
+/// Invoice-linked customer return header — overridable in widget tests.
+final invoiceLinkedCustomerReturnProvider =
+    FutureProvider.autoDispose.family<CustomerReturn?, int>((ref, invoiceId) {
+  return ref
+      .read(customerReturnReadRepositoryProvider)
+      .findInvoiceLinkedHeader(invoiceId);
 });
 
 bool _isInvoiceRefundCustomerEligible(int? customerId) =>
@@ -165,6 +175,7 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
 
       ref.invalidate(invoiceDetailProvider(widget.invoiceId));
       ref.invalidate(invoicePartialReturnQtysProvider(widget.invoiceId));
+      ref.invalidate(invoiceLinkedCustomerReturnProvider(widget.invoiceId));
       ref.invalidate(invoiceHistoryPageProvider);
       ref.invalidate(customerReturnsProvider);
       ref.invalidate(productsNotifierProvider);
@@ -203,7 +214,9 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
   void _onPartialReturnDone() {
     ref.invalidate(invoiceDetailProvider(widget.invoiceId));
     ref.invalidate(invoicePartialReturnQtysProvider(widget.invoiceId));
+    ref.invalidate(invoiceLinkedCustomerReturnProvider(widget.invoiceId));
     ref.invalidate(invoiceHistoryPageProvider);
+    ref.invalidate(customerReturnsProvider);
     ref.invalidate(productsNotifierProvider);
     ref.invalidate(posProductsProvider);
     invalidateReturnAnalytics(ref);
@@ -452,10 +465,10 @@ class _InvoiceDetailBody extends ConsumerWidget {
                       style: titleStyle,
                     ),
                     const SizedBox(height: 8),
-                    CustomerCreditRefundEntry(
+                    _InvoiceCustomerRefundEntry(
+                      invoiceId: h.id,
                       customerId: h.customerId!,
                       customerName: h.customerName,
-                      padding: EdgeInsets.zero,
                     ),
                   ],
 
@@ -528,6 +541,53 @@ class _InvoiceDetailBody extends ConsumerWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Invoice-linked customer refund entry
+// ---------------------------------------------------------------------------
+
+class _InvoiceCustomerRefundEntry extends ConsumerWidget {
+  const _InvoiceCustomerRefundEntry({
+    required this.invoiceId,
+    required this.customerId,
+    required this.customerName,
+  });
+
+  final int invoiceId;
+  final int customerId;
+  final String customerName;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final linkedAsync =
+        ref.watch(invoiceLinkedCustomerReturnProvider(invoiceId));
+
+    return linkedAsync.when(
+      data: (header) => CustomerCreditRefundEntry(
+        customerId: customerId,
+        customerName: customerName,
+        returnId: header?.id,
+        returnLabel: header == null
+            ? null
+            : displayCustomerReturnNumber(
+                id: header.id,
+                returnNumber: header.returnNumber,
+              ),
+        padding: EdgeInsets.zero,
+      ),
+      loading: () => CustomerCreditRefundEntry(
+        customerId: customerId,
+        customerName: customerName,
+        padding: EdgeInsets.zero,
+      ),
+      error: (_, __) => CustomerCreditRefundEntry(
+        customerId: customerId,
+        customerName: customerName,
+        padding: EdgeInsets.zero,
+      ),
     );
   }
 }

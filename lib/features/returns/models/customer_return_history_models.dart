@@ -1,5 +1,12 @@
 // lib/features/returns/models/customer_return_history_models.dart
 
+/// Display label for a customer return document header.
+String displayCustomerReturnNumber({
+  required int id,
+  required String returnNumber,
+}) =>
+    returnNumber.isNotEmpty ? returnNumber : '#$id';
+
 /// Read-only settlement snapshot for return-linked refund UX (Phase C Step 2.7C).
 class ReturnRefundableSnapshot {
   const ReturnRefundableSnapshot({
@@ -70,7 +77,7 @@ class CustomerReturnDetail {
       isInvoiceLinked && customerId != null && customerId != 1;
 
   String get displayReturnNumber =>
-      returnNumber.isNotEmpty ? returnNumber : '#$id';
+      displayCustomerReturnNumber(id: id, returnNumber: returnNumber);
 
   String get displaySaleInvoice {
     if (saleInvoiceNumber != null && saleInvoiceNumber!.isNotEmpty) {

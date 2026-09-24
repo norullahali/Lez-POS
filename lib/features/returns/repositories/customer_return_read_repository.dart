@@ -10,6 +10,10 @@ class CustomerReturnReadRepository {
 
   static const _displayTolerance = 0.0001;
 
+  /// Read-only invoice-linked customer return header lookup.
+  Future<CustomerReturn?> findInvoiceLinkedHeader(int invoiceId) =>
+      _db.returnsDao.findCustomerReturnByOriginalInvoiceId(invoiceId);
+
   /// Read-only remaining refundable capacity for a linked return document.
   ///
   /// Uses the same DAO sources as [CustomerRefundSettlementService.settleCredit].

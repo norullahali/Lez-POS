@@ -1,4 +1,4 @@
-﻿import 'package:drift/drift.dart' hide isNotNull, isNull;
+import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -135,6 +135,8 @@ void main() {
         invoiceDetailProvider(invoiceId).overrideWith((ref) async => detail),
         invoicePartialReturnQtysProvider(invoiceId)
             .overrideWith((ref) async => <int, double>{}),
+        invoiceLinkedCustomerReturnProvider(invoiceId)
+            .overrideWith((ref) async => null),
         partialReturnServiceProvider
             .overrideWith((ref) => PartialReturnService(db)),
         customerAccountsDaoProvider.overrideWithValue(db.customerAccountsDao),
@@ -489,7 +491,9 @@ void main() {
       expect(refunds.last.referenceId, isNull);
     });
 
-    testWidgets('L) invoice ID is not passed as returnId', (tester) async {
+    testWidgets(
+        'L) without linked header, invoice ID is not passed as returnId',
+        (tester) async {
       final detail = buildDetail(
         id: invoiceId,
         detailCustomerId: customerId,

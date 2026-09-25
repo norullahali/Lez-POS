@@ -2,6 +2,7 @@ import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'support/customer_refund_test_keys.dart';
 import 'package:lez_pos/core/constants/invoice_lifecycle.dart';
 import 'package:lez_pos/core/database/app_database.dart';
 import 'package:lez_pos/core/services/customer_refund_settlement_service.dart';
@@ -342,7 +343,8 @@ void main() {
           await db.returnsDao.getSettledAmountForCustomerReturn(returnId);
 
       await service.settleCredit(
-        customerId: customerId,
+        
+            idempotencyKey: refundTestIdempotencyKey(),customerId: customerId,
         amount: 50,
         returnId: returnId,
       );

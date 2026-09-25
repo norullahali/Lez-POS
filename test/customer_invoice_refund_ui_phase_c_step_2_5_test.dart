@@ -344,6 +344,10 @@ void main() {
           String? note,
         }) async {
           callCount++;
+                  final row = await db.customSelect(
+            'SELECT last_insert_rowid() AS id',
+          ).getSingle();
+          return row.read<int>('id');
         },
       );
       final container = ProviderContainer(
@@ -386,6 +390,10 @@ void main() {
             returnId: returnId,
             note: note ?? '',
           );
+          final row = await db.customSelect(
+            'SELECT last_insert_rowid() AS id',
+          ).getSingle();
+          return row.read<int>('id');
         },
       );
       final container = ProviderContainer(

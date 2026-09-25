@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'support/customer_refund_test_keys.dart';
 import 'package:lez_pos/core/database/app_database.dart';
 import 'package:lez_pos/core/services/customer_account_service.dart';
 import 'package:lez_pos/core/services/customer_refund_settlement_service.dart';
@@ -150,7 +151,8 @@ void main() {
     test('A) customer REFUND produces exactly one CUSTOMER_REFUND event',
         () async {
       await seedCredit100();
-      await settlementService.settleCredit(customerId: customerId, amount: 100);
+      await settlementService.settleCredit(
+            idempotencyKey: refundTestIdempotencyKey(),customerId: customerId, amount: 100);
       expect(await refundTxnCount(), 1);
       final events = await customerRefundLedgerEvents();
       expect(events.length, 1);
@@ -159,7 +161,8 @@ void main() {
 
     test('B) amount is positive magnitude', () async {
       await seedCredit100();
-      await settlementService.settleCredit(customerId: customerId, amount: 40);
+      await settlementService.settleCredit(
+            idempotencyKey: refundTestIdempotencyKey(),customerId: customerId, amount: 40);
       final event = (await customerRefundLedgerEvents()).single;
       expect(event.amount, 40);
       expect(event.amount, greaterThan(0));
@@ -169,7 +172,8 @@ void main() {
         () async {
       await seedCredit100();
       final summaryBefore = await ledger.getSummary(ledgerFilter);
-      await settlementService.settleCredit(customerId: customerId, amount: 40);
+      await settlementService.settleCredit(
+            idempotencyKey: refundTestIdempotencyKey(),customerId: customerId, amount: 40);
       final event = (await customerRefundLedgerEvents()).single;
       expect(event.isInflow, isFalse);
       expect(event.direction.code, 'outflow');
@@ -213,8 +217,10 @@ void main() {
     test('G) multiple REFUND rows produce one CUSTOMER_REFUND per REFUND',
         () async {
       await seedCredit100();
-      await settlementService.settleCredit(customerId: customerId, amount: 40);
-      await settlementService.settleCredit(customerId: customerId, amount: 60);
+      await settlementService.settleCredit(
+            idempotencyKey: refundTestIdempotencyKey(),customerId: customerId, amount: 40);
+      await settlementService.settleCredit(
+            idempotencyKey: refundTestIdempotencyKey(),customerId: customerId, amount: 60);
       expect(await refundTxnCount(), 2);
       expect((await customerRefundLedgerEvents()).length, 2);
     });
@@ -222,7 +228,8 @@ void main() {
     test('H) ledger_id is deterministic CUSTOMER_REFUND:<transaction-id>',
         () async {
       await seedCredit100();
-      await settlementService.settleCredit(customerId: customerId, amount: 25);
+      await settlementService.settleCredit(
+            idempotencyKey: refundTestIdempotencyKey(),customerId: customerId, amount: 25);
       final txn = (await db.customerAccountsDao.getHistory(customerId))
           .firstWhere((t) => t.type == 'REFUND');
       expect((await customerRefundLedgerEvents()).single.id,
@@ -231,14 +238,16 @@ void main() {
 
     test('I) reference_type is customer_transaction', () async {
       await seedCredit100();
-      await settlementService.settleCredit(customerId: customerId, amount: 25);
+      await settlementService.settleCredit(
+            idempotencyKey: refundTestIdempotencyKey(),customerId: customerId, amount: 25);
       expect((await customerRefundLedgerEvents()).single.referenceType,
           'customer_transaction');
     });
 
     test('J) reference_id is customer_transactions.id', () async {
       await seedCredit100();
-      await settlementService.settleCredit(customerId: customerId, amount: 25);
+      await settlementService.settleCredit(
+            idempotencyKey: refundTestIdempotencyKey(),customerId: customerId, amount: 25);
       final txn = (await db.customerAccountsDao.getHistory(customerId))
           .firstWhere((t) => t.type == 'REFUND');
       expect((await customerRefundLedgerEvents()).single.referenceId, txn.id);
@@ -246,7 +255,8 @@ void main() {
 
     test('K) customer_id is correct', () async {
       await seedCredit100();
-      await settlementService.settleCredit(customerId: customerId, amount: 25);
+      await settlementService.settleCredit(
+            idempotencyKey: refundTestIdempotencyKey(),customerId: customerId, amount: 25);
       expect(
           (await customerRefundLedgerEvents()).single.customerId, customerId);
     });
@@ -255,7 +265,8 @@ void main() {
         () async {
       final returnId = await postReturnCredit100();
       await settlementService.settleCredit(
-          customerId: customerId, amount: 10, returnId: returnId);
+          
+            idempotencyKey: refundTestIdempotencyKey(),customerId: customerId, amount: 10, returnId: returnId);
       expect((await customerRefundLedgerEvents()).single.invoiceId, invoiceId);
     });
 
@@ -267,7 +278,8 @@ void main() {
         throw Exception('forced');
       });
       await expectLater(
-          failingService.settleCredit(customerId: customerId, amount: 40),
+          failingService.settleCredit(
+            idempotencyKey: refundTestIdempotencyKey(),customerId: customerId, amount: 40),
           throwsA(isA<CustomerRefundSettlementException>()));
       expect(await refundTxnCount(), 0);
       expect(await customerRefundLedgerEvents(), isEmpty);
@@ -285,7 +297,8 @@ void main() {
         throw Exception('forced');
       });
       await expectLater(
-          failingService.settleCredit(customerId: customerId, amount: 40),
+          failingService.settleCredit(
+            idempotencyKey: refundTestIdempotencyKey(),customerId: customerId, amount: 40),
           throwsA(isA<CustomerRefundSettlementException>()));
       expect(await refundTxnCount(), 0);
       expect(await customerRefundLedgerEvents(), isEmpty);
@@ -324,7 +337,8 @@ void main() {
               purchaseItemId: purchaseItems.single.id, quantity: 4)
         ],
       ));
-      await supplierSettlement.settleCredit(supplierId: supplierId, amount: 20);
+      await supplierSettlement.settleCredit(
+            supplierId: supplierId, amount: 20);
       final supplierEvents = (await ledger.getEntries(ledgerFilter))
           .entries
           .where((e) => e.eventType == CashLedgerEventType.supplierRefund)

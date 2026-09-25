@@ -12,6 +12,7 @@ import 'tables/suppliers_table.dart';
 import 'tables/customers_table.dart';
 import 'tables/customer_accounts_table.dart';
 import 'tables/customer_transactions_table.dart';
+import 'tables/customer_refund_idempotency_table.dart';
 import 'tables/products_table.dart';
 import 'tables/product_batches_table.dart';
 import 'tables/stock_ledger_table.dart';
@@ -52,6 +53,7 @@ import 'daos/categories_dao.dart';
 import 'daos/suppliers_dao.dart';
 import 'daos/customers_dao.dart';
 import 'daos/customer_accounts_dao.dart';
+import 'daos/customer_refund_idempotency_dao.dart';
 import 'daos/supplier_accounts_dao.dart';
 import 'daos/products_dao.dart';
 import 'daos/stock_dao.dart';
@@ -70,6 +72,7 @@ part 'app_database.g.dart';
     Customers,
     CustomerAccounts,
     CustomerTransactions,
+    CustomerRefundIdempotency,
     SupplierAccounts,
     SupplierTransactions,
     Products,
@@ -110,6 +113,7 @@ part 'app_database.g.dart';
     SuppliersDao,
     CustomersDao,
     CustomerAccountsDao,
+    CustomerRefundIdempotencyDao,
     SupplierAccountsDao,
     ProductsDao,
     StockDao,
@@ -144,7 +148,7 @@ class AppDatabase extends _$AppDatabase {
   late final pricingDao = PricingDao(this);
 
   @override
-  int get schemaVersion => 33;
+  int get schemaVersion => 34;
 
   @override
   MigrationStrategy get migration {
@@ -155,6 +159,10 @@ class AppDatabase extends _$AppDatabase {
           'CREATE UNIQUE INDEX IF NOT EXISTS uq_customer_returns_original_invoice '
           'ON customer_returns(original_invoice_id) '
           'WHERE original_invoice_id IS NOT NULL',
+        );
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS cri_customer_created_idx '
+          'ON customer_refund_idempotency (customer_id, created_at)',
         );
         // Enable foreign keys
         await customStatement('PRAGMA foreign_keys = ON');
@@ -870,6 +878,20 @@ class AppDatabase extends _$AppDatabase {
           }
           debugPrint(
               '[Migration v33] customer_returns original_invoice unique index ready');
+        }
+        if (from < 34) {
+          debugPrint('[Migration v34] customer_refund_idempotency table...');
+          await m.createTable(customerRefundIdempotency);
+          try {
+            await customStatement(
+              'CREATE INDEX IF NOT EXISTS cri_customer_created_idx '
+              'ON customer_refund_idempotency (customer_id, created_at)',
+            );
+          } catch (e) {
+            debugPrint('[Migration v34] idempotency index skip/error: $e');
+            rethrow;
+          }
+          debugPrint('[Migration v34] customer_refund_idempotency ready');
         }
       },
       beforeOpen: (details) async {

@@ -153,7 +153,7 @@ void main() {
 
   group('Phase C Step 2.7A customer return settlement state', () {
     test('A) schema version is 33', () {
-      expect(db.schemaVersion, 33);
+      expect(db.schemaVersion, 34);
     });
 
     test('B) new customer_returns rows default settled_amount = 0', () async {

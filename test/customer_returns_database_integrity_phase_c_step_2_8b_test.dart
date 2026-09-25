@@ -221,8 +221,8 @@ void main() {
   }
 
   group('Phase C Step 2.8B customer_returns database integrity', () {
-    test('A) schema version is 33', () {
-      expect(db.schemaVersion, 33);
+    test('A) schema version is 34', () {
+      expect(db.schemaVersion, 34);
     });
 
     test('B) partial unique index exists', () async {
@@ -427,7 +427,7 @@ void main() {
       );
       addTearDown(migrated.close);
 
-      expect(migrated.schemaVersion, 33);
+      expect(migrated.schemaVersion, 34);
       expect(await uniqueIndexExists(migrated), isTrue);
 
       final linked = await migrated.returnsDao.getCustomerReturnById(1);

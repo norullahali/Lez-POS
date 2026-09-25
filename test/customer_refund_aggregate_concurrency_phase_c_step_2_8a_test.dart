@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'support/customer_refund_test_keys.dart';
 import 'package:lez_pos/core/database/app_database.dart';
 import 'package:lez_pos/core/services/customer_refund_settlement_service.dart';
 import 'package:lez_pos/features/customers/utils/customer_refund_settlement_messages.dart';
@@ -126,7 +127,8 @@ void main() {
     test('A) single refund within aggregate credit passes', () async {
       await seedAggregateCredit(100);
       await settlementService.settleCredit(
-        customerId: customerId,
+        
+            idempotencyKey: refundTestIdempotencyKey(),customerId: customerId,
         amount: 40,
       );
       expect(await refundTxnCount(), 1);
@@ -137,7 +139,8 @@ void main() {
     test('B) single refund exactly equal to aggregate credit passes', () async {
       await seedAggregateCredit(100);
       await settlementService.settleCredit(
-        customerId: customerId,
+        
+            idempotencyKey: refundTestIdempotencyKey(),customerId: customerId,
         amount: 100,
       );
       expect(await refundTxnCount(), 1);
@@ -148,7 +151,8 @@ void main() {
       await seedAggregateCredit(100);
       await expectLater(
         settlementService.settleCredit(
-          customerId: customerId,
+          
+            idempotencyKey: refundTestIdempotencyKey(),customerId: customerId,
           amount: 100.01,
         ),
         throwsA(
@@ -167,11 +171,13 @@ void main() {
         () async {
       await seedAggregateCredit(100);
       await settlementService.settleCredit(
-        customerId: customerId,
+        
+            idempotencyKey: refundTestIdempotencyKey(),customerId: customerId,
         amount: 40,
       );
       await settlementService.settleCredit(
-        customerId: customerId,
+        
+            idempotencyKey: refundTestIdempotencyKey(),customerId: customerId,
         amount: 40,
       );
       expect(await refundTxnCount(), 2);
@@ -216,7 +222,8 @@ void main() {
       final results = await Future.wait<bool>([
         () async {
           try {
-            await serviceA.settleCredit(customerId: cid, amount: 60);
+            await serviceA.settleCredit(
+            idempotencyKey: refundTestIdempotencyKey(),customerId: cid, amount: 60);
             return true;
           } on CustomerRefundSettlementException {
             return false;
@@ -224,7 +231,8 @@ void main() {
         }(),
         () async {
           try {
-            await serviceB.settleCredit(customerId: cid, amount: 60);
+            await serviceB.settleCredit(
+            idempotencyKey: refundTestIdempotencyKey(),customerId: cid, amount: 60);
             return true;
           } on CustomerRefundSettlementException {
             return false;
@@ -256,13 +264,15 @@ void main() {
       expect(await balance(), closeTo(-100, 0.001));
 
       await settlementService.settleCredit(
-        customerId: customerId,
+        
+            idempotencyKey: refundTestIdempotencyKey(),customerId: customerId,
         amount: 60,
         returnId: returnA,
       );
       await expectLater(
         settlementService.settleCredit(
-          customerId: customerId,
+          
+            idempotencyKey: refundTestIdempotencyKey(),customerId: customerId,
           amount: 50,
           returnId: returnB,
         ),
@@ -282,13 +292,15 @@ void main() {
       final returnId = await seedLinkedReturn(returnTotal: 100);
 
       await settlementService.settleCredit(
-        customerId: customerId,
+        
+            idempotencyKey: refundTestIdempotencyKey(),customerId: customerId,
         amount: 60,
         returnId: returnId,
       );
       await expectLater(
         settlementService.settleCredit(
-          customerId: customerId,
+          
+            idempotencyKey: refundTestIdempotencyKey(),customerId: customerId,
           amount: 50,
         ),
         throwsA(
@@ -306,7 +318,8 @@ void main() {
       await seedAggregateCredit(50);
       await expectLater(
         settlementService.settleCredit(
-          customerId: customerId,
+          
+            idempotencyKey: refundTestIdempotencyKey(),customerId: customerId,
           amount: 60,
         ),
         throwsA(isA<CustomerRefundSettlementException>()),
@@ -319,7 +332,8 @@ void main() {
       final returnId = await seedLinkedReturn(returnTotal: 100);
       await expectLater(
         settlementService.settleCredit(
-          customerId: customerId,
+          
+            idempotencyKey: refundTestIdempotencyKey(),customerId: customerId,
           amount: 101,
           returnId: returnId,
         ),
@@ -355,11 +369,16 @@ void main() {
             'UPDATE customer_returns SET settled_amount = 100 WHERE id = ?',
             [returnId],
           );
+          final row = await db.customSelect(
+            'SELECT last_insert_rowid() AS id',
+          ).getSingle();
+          return row.read<int>('id');
         },
       );
 
       await expectLater(
         racingService.settleCredit(
+          idempotencyKey: refundTestIdempotencyKey(),
           customerId: customerId,
           amount: 50,
           returnId: returnId,
@@ -390,8 +409,8 @@ void main() {
             customerId: customerId,
             amount: 60,
           );
-          expect(first, isTrue);
-          expect(second, isFalse);
+          expect(first, isNotNull);
+          expect(second, isNull);
           throw StateError('rollback probe');
         });
       } on StateError catch (_) {
@@ -406,7 +425,8 @@ void main() {
       const generalCustomerId = 1;
       await expectLater(
         settlementService.settleCredit(
-          customerId: generalCustomerId,
+          
+            idempotencyKey: refundTestIdempotencyKey(),customerId: generalCustomerId,
           amount: 10,
         ),
         throwsA(
@@ -428,7 +448,8 @@ void main() {
     test('M) unlinked profile-style refund still works', () async {
       await seedAggregateCredit(100);
       await settlementService.settleCredit(
-        customerId: customerId,
+        
+            idempotencyKey: refundTestIdempotencyKey(),customerId: customerId,
         amount: 25,
         returnId: null,
       );
@@ -443,7 +464,8 @@ void main() {
     test('N) linked return detail refund still works', () async {
       final returnId = await seedLinkedReturn(returnTotal: 100);
       await settlementService.settleCredit(
-        customerId: customerId,
+        
+            idempotencyKey: refundTestIdempotencyKey(),customerId: customerId,
         amount: 30,
         returnId: returnId,
       );
@@ -461,7 +483,8 @@ void main() {
         () async {
       await seedAggregateCredit(80);
       await settlementService.settleCredit(
-        customerId: customerId,
+        
+            idempotencyKey: refundTestIdempotencyKey(),customerId: customerId,
         amount: 20,
       );
       expect(await refundTxnCount(), 1);

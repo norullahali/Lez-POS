@@ -2,6 +2,7 @@ import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'support/customer_refund_test_keys.dart';
 import 'package:lez_pos/core/database/app_database.dart';
 import 'package:lez_pos/core/services/customer_refund_settlement_service.dart';
 import 'package:lez_pos/core/services/partial_return_service.dart';
@@ -233,13 +234,17 @@ void main() {
           int? returnId,
           String? note,
         }) async {
-          capturedReturnId = returnId;
           await db.customerAccountsDao.recordRefundInTransaction(
             customerId: customerId,
             amount: amount,
             returnId: returnId,
             note: note ?? '',
           );
+          capturedReturnId = returnId;
+          final row = await db.customSelect(
+            'SELECT last_insert_rowid() AS id',
+          ).getSingle();
+          return row.read<int>('id');
         },
       );
       final container = containerWithService(service);
@@ -293,7 +298,8 @@ void main() {
       final service = CustomerRefundSettlementService(db);
       expect(
         () => service.settleCredit(
-          customerId: otherCustomerId,
+          
+            idempotencyKey: refundTestIdempotencyKey(),customerId: otherCustomerId,
           amount: 5,
           returnId: returnId,
         ),
@@ -321,7 +327,8 @@ void main() {
       final service = CustomerRefundSettlementService(db);
       expect(
         () => service.settleCredit(
-          customerId: customerId,
+          
+            idempotencyKey: refundTestIdempotencyKey(),customerId: customerId,
           amount: 5,
           returnId: returnId,
         ),
@@ -436,13 +443,17 @@ void main() {
           int? returnId,
           String? note,
         }) async {
-          serviceCalls++;
           await db.customerAccountsDao.recordRefundInTransaction(
             customerId: customerId,
             amount: amount,
             returnId: returnId,
             note: note ?? '',
           );
+          serviceCalls++;
+          final row = await db.customSelect(
+            'SELECT last_insert_rowid() AS id',
+          ).getSingle();
+          return row.read<int>('id');
         },
       );
       final container = containerWithService(service);

@@ -1,10 +1,7 @@
 // lib/core/services/customer_refund_settlement_service.dart
 //
 // Phase C Step 2.1 — Customer credit cash-refund settlement (customer accounting only).
-//
-// Records actual cash paid to a customer against aggregate customer credit.
-// Does NOT modify goods-return (RETURN) semantics.
-// Cash Ledger CUSTOMER_REFUND outflow is deferred to a separate step.
+// Phase C Step 3.0 — Persistent idempotency for REFUND settlement.
 
 import 'package:flutter/foundation.dart';
 
@@ -19,6 +16,7 @@ enum CustomerRefundSettlementFailure {
   amountExceedsReturnRefundableAmount,
   returnNotFound,
   returnCustomerMismatch,
+  idempotencyKeyConflict,
   unexpectedFailure,
 }
 
@@ -32,13 +30,25 @@ class CustomerRefundSettlementException implements Exception {
   String toString() => message;
 }
 
+class CustomerRefundSettlementResult {
+  const CustomerRefundSettlementResult({
+    required this.customerTransactionId,
+    required this.idempotentReplay,
+  });
+
+  final int customerTransactionId;
+  final bool idempotentReplay;
+}
+
 /// Low-level REFUND persistence hook used by [CustomerRefundSettlementService].
-typedef CustomerRefundInTransaction = Future<void> Function({
+typedef CustomerRefundInTransaction = Future<int> Function({
   required int customerId,
   required double amount,
   int? returnId,
   String? note,
 });
+
+class _IdempotencySealRace implements Exception {}
 
 /// Canonical service for settling customer credit via cash paid (REFUND txn).
 class CustomerRefundSettlementService {
@@ -55,164 +65,267 @@ class CustomerRefundSettlementService {
 
   /// Consumes [amount] of aggregate customer credit for [customerId].
   ///
-  /// When [returnId] is supplied, it is stored on the REFUND row for traceability
-  /// after validating the return exists and belongs to [customerId].
-  ///
-  /// Linked refunds also enforce per-return remaining refundable capacity
-  /// (Phase C Step 2.7B).
-  Future<void> settleCredit({
+  /// [idempotencyKey] identifies the operation. Retries with the same key and
+  /// identical parameters replay the original successful REFUND without mutation.
+  Future<CustomerRefundSettlementResult> settleCredit({
     required int customerId,
     required double amount,
+    required String idempotencyKey,
     int? returnId,
     String? note,
   }) async {
     const tolerance = 0.0001;
+    final normalizedNote = (note ?? '').trim();
 
-    try {
-      await _db.transaction(() async {
-        final customer = await _db.customersDao.getCustomerById(customerId);
-        if (customer == null) {
-          throw CustomerRefundSettlementException(
-            CustomerRefundSettlementFailure.customerNotFound,
-            'customer not found: $customerId',
-          );
-        }
-
-        if (amount <= 0) {
-          throw CustomerRefundSettlementException(
-            CustomerRefundSettlementFailure.invalidAmount,
-            'settlement amount must be positive',
-          );
-        }
-
-        double? returnCreditCap;
-        if (returnId != null) {
-          final returnCustomerId = await _resolveReturnCustomerId(returnId);
-          if (returnCustomerId == null) {
-            throw CustomerRefundSettlementException(
-              CustomerRefundSettlementFailure.returnNotFound,
-              'customer return not found: $returnId',
-            );
-          }
-          if (returnCustomerId != customerId) {
-            throw CustomerRefundSettlementException(
-              CustomerRefundSettlementFailure.returnCustomerMismatch,
-              'customer return $returnId does not belong to customer $customerId',
+    for (var attempt = 0; attempt < 8; attempt++) {
+      try {
+        return await _db.transaction(() async {
+          final existing = await _db.customerRefundIdempotencyDao
+              .findByIdempotencyKey(idempotencyKey);
+          if (existing != null) {
+            if (!_fingerprintMatches(
+              existing,
+              customerId: customerId,
+              amount: amount,
+              returnId: returnId,
+              normalizedNote: normalizedNote,
+              tolerance: tolerance,
+            )) {
+              throw const CustomerRefundSettlementException(
+                CustomerRefundSettlementFailure.idempotencyKeyConflict,
+                'idempotency key reused with different parameters',
+              );
+            }
+            return CustomerRefundSettlementResult(
+              customerTransactionId: existing.customerTransactionId,
+              idempotentReplay: true,
             );
           }
 
-          final header = await _db.returnsDao.getCustomerReturnById(returnId);
-          final originalInvoiceId = header!.originalInvoiceId!;
-
-          returnCreditCap = await _db.customerAccountsDao
-              .getCreditReversalTotalForSaleInvoice(
-            customerId: customerId,
-            invoiceId: originalInvoiceId,
-          );
-
-          final settledAmount = await _db.returnsDao
-                  .getSettledAmountForCustomerReturn(returnId) ??
-              0.0;
-          final remainingReturnRefund = returnCreditCap - settledAmount;
-
-          if (remainingReturnRefund <= tolerance) {
+          final customer = await _db.customersDao.getCustomerById(customerId);
+          if (customer == null) {
             throw CustomerRefundSettlementException(
-              CustomerRefundSettlementFailure.noReturnRefundableAmount,
-              'no return refundable amount remaining for return $returnId',
+              CustomerRefundSettlementFailure.customerNotFound,
+              'customer not found: $customerId',
             );
           }
 
-          if (amount > remainingReturnRefund + tolerance) {
-            throw CustomerRefundSettlementException(
-              CustomerRefundSettlementFailure
-                  .amountExceedsReturnRefundableAmount,
-              'settlement exceeds remaining return refundable amount',
+          if (amount <= 0) {
+            throw const CustomerRefundSettlementException(
+              CustomerRefundSettlementFailure.invalidAmount,
+              'settlement amount must be positive',
             );
           }
-        }
 
-        final balance =
-            await _db.customerAccountsDao.calculateBalanceFromTransactions(
-          customerId,
-        );
-        final availableCredit = balance < 0 ? -balance : 0.0;
+          double? returnCreditCap;
+          if (returnId != null) {
+            final returnCustomerId = await _resolveReturnCustomerId(returnId);
+            if (returnCustomerId == null) {
+              throw CustomerRefundSettlementException(
+                CustomerRefundSettlementFailure.returnNotFound,
+                'customer return not found: $returnId',
+              );
+            }
+            if (returnCustomerId != customerId) {
+              throw CustomerRefundSettlementException(
+                CustomerRefundSettlementFailure.returnCustomerMismatch,
+                'customer return $returnId does not belong to customer $customerId',
+              );
+            }
 
-        if (availableCredit <= 0) {
-          throw CustomerRefundSettlementException(
-            CustomerRefundSettlementFailure.noCustomerCredit,
-            'no customer credit available',
-          );
-        }
+            final header = await _db.returnsDao.getCustomerReturnById(returnId);
+            final originalInvoiceId = header!.originalInvoiceId!;
 
-        if (amount > availableCredit + tolerance) {
-          throw CustomerRefundSettlementException(
-            CustomerRefundSettlementFailure.amountExceedsCredit,
-            'settlement exceeds available credit',
-          );
-        }
+            returnCreditCap = await _db.customerAccountsDao
+                .getCreditReversalTotalForSaleInvoice(
+              customerId: customerId,
+              invoiceId: originalInvoiceId,
+            );
 
-        if (_refundInTransactionOverride != null) {
-          await _refundInTransactionOverride!(
-            customerId: customerId,
-            amount: amount,
-            returnId: returnId,
-            note: note,
+            final settledAmount = await _db.returnsDao
+                    .getSettledAmountForCustomerReturn(returnId) ??
+                0.0;
+            final remainingReturnRefund = returnCreditCap - settledAmount;
+
+            if (remainingReturnRefund <= tolerance) {
+              throw CustomerRefundSettlementException(
+                CustomerRefundSettlementFailure.noReturnRefundableAmount,
+                'no return refundable amount remaining for return $returnId',
+              );
+            }
+
+            if (amount > remainingReturnRefund + tolerance) {
+              throw const CustomerRefundSettlementException(
+                CustomerRefundSettlementFailure
+                    .amountExceedsReturnRefundableAmount,
+                'settlement exceeds remaining return refundable amount',
+              );
+            }
+          }
+
+          final balance =
+              await _db.customerAccountsDao.calculateBalanceFromTransactions(
+            customerId,
           );
-        } else {
-          final inserted = await _db.customerAccountsDao
-              .recordRefundInTransactionIfWithinAggregateCredit(
-            customerId: customerId,
-            amount: amount,
-            returnId: returnId,
-            note: note ?? '',
-            tolerance: tolerance,
-          );
-          if (!inserted) {
-            throw CustomerRefundSettlementException(
+          final availableCredit = balance < 0 ? -balance : 0.0;
+
+          if (availableCredit <= 0) {
+            throw const CustomerRefundSettlementException(
+              CustomerRefundSettlementFailure.noCustomerCredit,
+              'no customer credit available',
+            );
+          }
+
+          if (amount > availableCredit + tolerance) {
+            throw const CustomerRefundSettlementException(
               CustomerRefundSettlementFailure.amountExceedsCredit,
-              'settlement exceeds available credit (concurrent update)',
+              'settlement exceeds available credit',
             );
           }
-        }
 
-        if (returnId != null) {
-          final incremented =
-              await _db.returnsDao.incrementSettledAmountIfWithinCap(
-            returnId: returnId,
-            amount: amount,
-            creditCap: returnCreditCap!,
+          final int customerTransactionId;
+          if (_refundInTransactionOverride != null) {
+            customerTransactionId = await _refundInTransactionOverride!(
+              customerId: customerId,
+              amount: amount,
+              returnId: returnId,
+              note: note,
+            );
+          } else {
+            final insertedId = await _db.customerAccountsDao
+                .recordRefundInTransactionIfWithinAggregateCredit(
+              customerId: customerId,
+              amount: amount,
+              returnId: returnId,
+              note: normalizedNote,
+              tolerance: tolerance,
+            );
+            if (insertedId == null) {
+              throw const CustomerRefundSettlementException(
+                CustomerRefundSettlementFailure.amountExceedsCredit,
+                'settlement exceeds available credit (concurrent update)',
+              );
+            }
+            customerTransactionId = insertedId;
+          }
+
+          if (returnId != null) {
+            final incremented =
+                await _db.returnsDao.incrementSettledAmountIfWithinCap(
+              returnId: returnId,
+              amount: amount,
+              creditCap: returnCreditCap!,
+            );
+            if (!incremented) {
+              throw const CustomerRefundSettlementException(
+                CustomerRefundSettlementFailure
+                    .amountExceedsReturnRefundableAmount,
+                'settlement exceeds return refundable amount (concurrent update)',
+              );
+            }
+          }
+
+          if (_postRefundHook != null) {
+            await _postRefundHook!();
+          }
+
+          await _db.logsDao.insertLog(
+            userId: null,
+            actionType: 'CUSTOMER_REFUND',
+            details:
+                'Cash refund of $amount to customer ${customer.name} (Ref: $customerId${returnId != null ? ', return: $returnId' : ''})',
           );
-          if (!incremented) {
-            throw CustomerRefundSettlementException(
-              CustomerRefundSettlementFailure
-                  .amountExceedsReturnRefundableAmount,
-              'settlement exceeds return refundable amount (concurrent update)',
+
+          try {
+            await _db.customerRefundIdempotencyDao.insertCompletedRecord(
+              idempotencyKey: idempotencyKey,
+              customerId: customerId,
+              amount: amount,
+              returnId: returnId,
+              note: normalizedNote,
+              customerTransactionId: customerTransactionId,
             );
+          } catch (e) {
+            if (_isUniqueIdempotencyKeyViolation(e)) {
+              throw _IdempotencySealRace();
+            }
+            rethrow;
           }
-        }
 
-        if (_postRefundHook != null) {
-          await _postRefundHook!();
+          return CustomerRefundSettlementResult(
+            customerTransactionId: customerTransactionId,
+            idempotentReplay: false,
+          );
+        });
+      } on _IdempotencySealRace {
+        continue;
+      } on CustomerRefundSettlementException {
+        rethrow;
+      } catch (e, st) {
+        if (_isSqliteBusyOrLocked(e) && attempt < 7) {
+          await Future<void>.delayed(
+              Duration(milliseconds: 25 * (attempt + 1)));
+          continue;
         }
-
-        await _db.logsDao.insertLog(
-          userId: null,
-          actionType: 'CUSTOMER_REFUND',
-          details:
-              'Cash refund of $amount to customer ${customer.name} (Ref: $customerId${returnId != null ? ', return: $returnId' : ''})',
+        debugPrint(
+          '[CustomerRefundSettlementService] Error in settleCredit: $e\n$st',
         );
-      });
-    } on CustomerRefundSettlementException {
-      rethrow;
-    } catch (e, st) {
-      debugPrint(
-        '[CustomerRefundSettlementService] Error in settleCredit: $e\n$st',
-      );
-      throw const CustomerRefundSettlementException(
-        CustomerRefundSettlementFailure.unexpectedFailure,
-        'customer refund settlement failed',
-      );
+        throw const CustomerRefundSettlementException(
+          CustomerRefundSettlementFailure.unexpectedFailure,
+          'customer refund settlement failed',
+        );
+      }
     }
+
+    return _db.transaction(() async {
+      final existing = await _db.customerRefundIdempotencyDao
+          .findByIdempotencyKey(idempotencyKey);
+      if (existing != null &&
+          _fingerprintMatches(
+            existing,
+            customerId: customerId,
+            amount: amount,
+            returnId: returnId,
+            normalizedNote: normalizedNote,
+            tolerance: tolerance,
+          )) {
+        return CustomerRefundSettlementResult(
+          customerTransactionId: existing.customerTransactionId,
+          idempotentReplay: true,
+        );
+      }
+      throw const CustomerRefundSettlementException(
+        CustomerRefundSettlementFailure.idempotencyKeyConflict,
+        'idempotency key reused with different parameters',
+      );
+    });
+  }
+
+  bool _fingerprintMatches(
+    CustomerRefundIdempotencyData existing, {
+    required int customerId,
+    required double amount,
+    required int? returnId,
+    required String normalizedNote,
+    required double tolerance,
+  }) {
+    if (existing.customerId != customerId) return false;
+    if ((existing.amount - amount).abs() > tolerance) return false;
+    if (existing.returnId != returnId) return false;
+    if (existing.note != normalizedNote) return false;
+    return true;
+  }
+
+  bool _isUniqueIdempotencyKeyViolation(Object error) {
+    final message = error.toString();
+    return message.contains('UNIQUE constraint failed') &&
+        message.contains('customer_refund_idempotency');
+  }
+
+  bool _isSqliteBusyOrLocked(Object error) {
+    final message = error.toString();
+    return message.contains('database is locked') ||
+        message.contains('SqliteException(5)');
   }
 
   /// Derives the owning customer for a [customer_returns] row via invoice linkage.

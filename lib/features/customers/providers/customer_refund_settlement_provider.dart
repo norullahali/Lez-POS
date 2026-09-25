@@ -1,6 +1,7 @@
 // lib/features/customers/providers/customer_refund_settlement_provider.dart
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../../core/services/customer_refund_settlement_service.dart';
@@ -10,6 +11,7 @@ import '../providers/customer_accounts_provider.dart';
 import '../utils/customer_refund_settlement_messages.dart';
 
 const customerRefundDisplayTolerance = 0.0001;
+const _refundIdempotencyUuid = Uuid();
 
 /// Refreshes read-only customer credit/balance displays after successful refund.
 void invalidateCustomerRefundDisplays(
@@ -59,11 +61,13 @@ class CustomerRefundSettlementUiState {
   final double? maxReturnRefundable;
   final CustomerRefundSettlementUiStatus status;
   final String? errorMessage;
+  final String idempotencyKey;
 
   const CustomerRefundSettlementUiState({
     required this.customerId,
     required this.customerName,
     required this.availableCredit,
+    required this.idempotencyKey,
     this.amountText = '',
     this.note = '',
     this.returnId,
@@ -113,6 +117,7 @@ class CustomerRefundSettlementUiState {
       customerId: customerId,
       customerName: customerName,
       availableCredit: availableCredit,
+      idempotencyKey: idempotencyKey,
       amountText: amountText ?? this.amountText,
       note: note ?? this.note,
       returnId: returnId,
@@ -188,6 +193,7 @@ class CustomerRefundSettlementUiNotifier
       customerId: customerId,
       customerName: customerName,
       availableCredit: availableCredit,
+      idempotencyKey: _refundIdempotencyUuid.v4(),
       returnId: returnId,
       returnLabel: returnLabel,
       maxReturnRefundable: returnId != null ? maxReturnRefundable : null,
@@ -261,6 +267,7 @@ class CustomerRefundSettlementUiNotifier
       await ref.read(customerRefundSettlementServiceProvider).settleCredit(
             customerId: current.customerId,
             amount: amount,
+            idempotencyKey: current.idempotencyKey,
             returnId: current.returnId,
             note: current.note.trim().isEmpty ? null : current.note.trim(),
           );

@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart' hide isNotNull;
 import 'package:flutter_test/flutter_test.dart';
+import 'support/customer_refund_test_keys.dart';
 import 'package:lez_pos/core/database/app_database.dart';
 import 'package:lez_pos/core/services/customer_refund_settlement_service.dart';
 import 'package:lez_pos/core/services/partial_return_service.dart';
@@ -142,7 +143,8 @@ void main() {
       final returnId = await postReturnCredit100();
 
       await settlementService.settleCredit(
-        customerId: customerId,
+        
+            idempotencyKey: refundTestIdempotencyKey(),customerId: customerId,
         amount: 40,
         returnId: returnId,
       );
@@ -160,7 +162,8 @@ void main() {
       );
 
       await settlementService.settleCredit(
-        customerId: customerId,
+        
+            idempotencyKey: refundTestIdempotencyKey(),customerId: customerId,
         amount: 30,
         returnId: returnId,
       );
@@ -177,7 +180,8 @@ void main() {
 
       await expectLater(
         settlementService.settleCredit(
-          customerId: customerId,
+          
+            idempotencyKey: refundTestIdempotencyKey(),customerId: customerId,
           amount: 31,
           returnId: returnId,
         ),
@@ -198,12 +202,14 @@ void main() {
       final returnId = await postReturnCredit100();
 
       await settlementService.settleCredit(
-        customerId: customerId,
+        
+            idempotencyKey: refundTestIdempotencyKey(),customerId: customerId,
         amount: 20,
         returnId: returnId,
       );
       await settlementService.settleCredit(
-        customerId: customerId,
+        
+            idempotencyKey: refundTestIdempotencyKey(),customerId: customerId,
         amount: 30,
         returnId: returnId,
       );
@@ -221,7 +227,8 @@ void main() {
 
       await expectLater(
         settlementService.settleCredit(
-          customerId: customerId,
+          
+            idempotencyKey: refundTestIdempotencyKey(),customerId: customerId,
           amount: 1,
           returnId: returnId,
         ),
@@ -249,7 +256,8 @@ void main() {
 
       await expectLater(
         settlementService.settleCredit(
-          customerId: customerId,
+          
+            idempotencyKey: refundTestIdempotencyKey(),customerId: customerId,
           amount: 80,
         ),
         throwsA(
@@ -277,7 +285,8 @@ void main() {
 
       await expectLater(
         settlementService.settleCredit(
-          customerId: customerId,
+          
+            idempotencyKey: refundTestIdempotencyKey(),customerId: customerId,
           amount: 50,
           returnId: returnId,
         ),
@@ -295,7 +304,8 @@ void main() {
       final returnId = await postReturnCredit100();
 
       await settlementService.settleCredit(
-        customerId: customerId,
+        
+            idempotencyKey: refundTestIdempotencyKey(),customerId: customerId,
         amount: 25,
         returnId: returnId,
       );
@@ -312,7 +322,8 @@ void main() {
 
       await expectLater(
         settlementService.settleCredit(
-          customerId: customerId,
+          
+            idempotencyKey: refundTestIdempotencyKey(),customerId: customerId,
           amount: 20,
           returnId: returnId,
         ),
@@ -349,11 +360,16 @@ void main() {
             'UPDATE customer_returns SET settled_amount = 100 WHERE id = ?',
             [returnId],
           );
+          final row = await db.customSelect(
+            'SELECT last_insert_rowid() AS id',
+          ).getSingle();
+          return row.read<int>('id');
         },
       );
 
       await expectLater(
         racingService.settleCredit(
+          idempotencyKey: refundTestIdempotencyKey(),
           customerId: customerId,
           amount: 50,
           returnId: returnId,
@@ -390,6 +406,7 @@ void main() {
 
       await expectLater(
         failingService.settleCredit(
+          idempotencyKey: refundTestIdempotencyKey(),
           customerId: customerId,
           amount: 10,
           returnId: returnId,
@@ -406,7 +423,8 @@ void main() {
 
       await expectLater(
         settlementService.settleCredit(
-          customerId: otherCustomerId,
+          
+            idempotencyKey: refundTestIdempotencyKey(),customerId: otherCustomerId,
           amount: 10,
           returnId: returnId,
         ),
@@ -425,7 +443,8 @@ void main() {
 
       await expectLater(
         settlementService.settleCredit(
-          customerId: customerId,
+          
+            idempotencyKey: refundTestIdempotencyKey(),customerId: customerId,
           amount: 10,
           returnId: 999999,
         ),
@@ -460,7 +479,8 @@ void main() {
 
       await expectLater(
         settlementService.settleCredit(
-          customerId: customerId,
+          
+            idempotencyKey: refundTestIdempotencyKey(),customerId: customerId,
           amount: 10,
           returnId: returnId,
         ),
@@ -525,7 +545,8 @@ void main() {
 
       await expectLater(
         settlementService.settleCredit(
-          customerId: customerId,
+          
+            idempotencyKey: refundTestIdempotencyKey(),customerId: customerId,
           amount: 10,
           returnId: returnId,
         ),
@@ -552,11 +573,13 @@ void main() {
       );
 
       await settlementService.settleCredit(
-        customerId: customerId,
+        
+            idempotencyKey: refundTestIdempotencyKey(),customerId: customerId,
         amount: 40,
       );
       await settlementService.settleCredit(
-        customerId: customerId,
+        
+            idempotencyKey: refundTestIdempotencyKey(),customerId: customerId,
         amount: 60,
       );
 
@@ -589,7 +612,8 @@ void main() {
       expect(await settledAmount(returnId), 35);
 
       await settlementService.settleCredit(
-        customerId: customerId,
+        
+            idempotencyKey: refundTestIdempotencyKey(),customerId: customerId,
         amount: 65,
         returnId: returnId,
       );
@@ -625,12 +649,14 @@ void main() {
       );
 
       await settlementService.settleCredit(
-        customerId: customerId,
+        
+            idempotencyKey: refundTestIdempotencyKey(),customerId: customerId,
         amount: 60,
         returnId: returnA,
       );
       await settlementService.settleCredit(
-        customerId: customerId,
+        
+            idempotencyKey: refundTestIdempotencyKey(),customerId: customerId,
         amount: 25,
         returnId: returnB,
       );
@@ -643,14 +669,16 @@ void main() {
       final returnId = await postReturnCredit100();
 
       await settlementService.settleCredit(
-        customerId: customerId,
+        
+            idempotencyKey: refundTestIdempotencyKey(),customerId: customerId,
         amount: 100,
         returnId: returnId,
       );
 
       await expectLater(
         settlementService.settleCredit(
-          customerId: customerId,
+          
+            idempotencyKey: refundTestIdempotencyKey(),customerId: customerId,
           amount: 1,
           returnId: returnId,
         ),
@@ -671,7 +699,8 @@ void main() {
       final returnId = await postReturnCredit100();
 
       await settlementService.settleCredit(
-        customerId: customerId,
+        
+            idempotencyKey: refundTestIdempotencyKey(),customerId: customerId,
         amount: 15,
         returnId: returnId,
       );
@@ -723,7 +752,8 @@ void main() {
       final returnId = await postReturnCredit100();
 
       await settlementService.settleCredit(
-        customerId: customerId,
+        
+            idempotencyKey: refundTestIdempotencyKey(),customerId: customerId,
         amount: 12,
         returnId: returnId,
       );

@@ -214,15 +214,16 @@ class CustomerAccountsDao extends DatabaseAccessor<AppDatabase>
   /// Invariant: `current_sum + amount <= tolerance` (Phase C Step 2.8A).
   /// Must run inside an enclosing transaction.
   ///
-  /// Returns true when a REFUND row was inserted.
-  Future<bool> recordRefundInTransactionIfWithinAggregateCredit({
+  /// Returns the inserted [customer_transactions] row id, or null when no row
+  /// was inserted.
+  Future<int?> recordRefundInTransactionIfWithinAggregateCredit({
     required int customerId,
     required double amount,
     int? returnId,
     String note = '',
     double tolerance = 0.0001,
   }) async {
-    if (amount <= 0) return false;
+    if (amount <= 0) return null;
 
     await customStatement(
       '''
@@ -246,7 +247,11 @@ class CustomerAccountsDao extends DatabaseAccessor<AppDatabase>
 
     final changesRow =
         await customSelect('SELECT changes() AS inserted').getSingle();
-    if (changesRow.read<int>('inserted') != 1) return false;
+    if (changesRow.read<int>('inserted') != 1) return null;
+
+    final insertedIdRow =
+        await customSelect('SELECT last_insert_rowid() AS id').getSingle();
+    final insertedId = insertedIdRow.read<int>('id');
 
     final newBalance = await calculateBalanceFromTransactions(customerId);
     final existing = await (select(customerAccounts)
@@ -271,7 +276,7 @@ class CustomerAccountsDao extends DatabaseAccessor<AppDatabase>
       );
     }
 
-    return true;
+    return insertedId;
   }
 
   /// Total credit already reversed for [invoiceId] via RETURN rows linked to

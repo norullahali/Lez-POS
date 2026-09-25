@@ -22,6 +22,8 @@ String customerRefundSettlementFailureMessage(
       return 'مرتجع العميل غير موجود';
     case CustomerRefundSettlementFailure.returnCustomerMismatch:
       return 'المرتجع لا ينتمي إلى هذا العميل';
+    case CustomerRefundSettlementFailure.idempotencyKeyConflict:
+      return 'تعارض في مفتاح العملية — أعد فتح نافذة الاسترداد وحاول مرة أخرى';
     case CustomerRefundSettlementFailure.unexpectedFailure:
       return 'تعذر إتمام استرداد المبلغ';
   }

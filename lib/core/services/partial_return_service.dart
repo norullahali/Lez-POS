@@ -221,8 +221,9 @@ class PartialReturnService {
           saleItemId: line.saleItemId,
         );
 
-        // 2. Insert return line record
-        final returnLineId = await _db.saleItemReturnsDao.insertReturnLine(
+        // 2. Insert return line record (atomic quantity cap guard)
+        final returnLineId = await _db.saleItemReturnsDao
+            .insertSaleItemReturnIfWithinSaleLineCap(
           saleInvoiceId: saleInvoiceId,
           saleItemId: line.saleItemId,
           productId: line.productId,
@@ -232,6 +233,14 @@ class PartialReturnService {
           returnedByUserId: returnedByUserId,
           returnReasonNote: note,
         );
+        if (returnLineId == null) {
+          final alreadyReturnedNow = await _db.saleItemReturnsDao
+              .getReturnedQuantityForSaleItem(line.saleItemId);
+          final availableNow = soldQty - alreadyReturnedNow;
+          throw StateError(
+            'كمية الإرجاع (${line.quantity}) تتجاوز الكمية المتاحة (${availableNow < 0 ? 0 : availableNow}) للصنف #${line.saleItemId}',
+          );
+        }
         firstReturnLineId ??= returnLineId;
         returnedQtyBySaleItemId[line.saleItemId] = line.quantity;
 

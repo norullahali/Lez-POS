@@ -16,6 +16,14 @@ import '../../constants/movement_types.dart';
 
 part 'sale_item_returns_dao.g.dart';
 
+/// Thrown when the atomic sale-line quantity guard rejects an insert.
+class SaleItemReturnQuantityCapExceededException implements Exception {
+  const SaleItemReturnQuantityCapExceededException();
+
+  @override
+  String toString() => 'sale item return quantity exceeds sale line cap';
+}
+
 @DriftAccessor(tables: [
   SaleItemReturns,
   StockLedger,
@@ -87,6 +95,76 @@ class SaleItemReturnsDao extends DatabaseAccessor<AppDatabase>
   }
 
   // -- Writes (called from PartialReturnService inside a transaction) --------
+
+  /// Atomically inserts a partial return line when the aggregate returned
+  /// quantity for [saleItemId] would not exceed [sale_items.quantity].
+  ///
+  /// Must run inside an enclosing transaction.
+  ///
+  /// Returns the inserted row id, or null when the guard rejected the insert.
+  Future<int?> insertSaleItemReturnIfWithinSaleLineCap({
+    required int saleInvoiceId,
+    required int saleItemId,
+    required int productId,
+    required double returnedQuantity,
+    required double unitPriceAtReturn,
+    required double returnTotal,
+    required int returnedByUserId,
+    String? returnReasonNote,
+    double tolerance = 0.0001,
+  }) async {
+    if (returnedQuantity <= 0) return null;
+
+    await customStatement(
+      '''
+      INSERT INTO sale_item_returns (
+        sale_invoice_id,
+        sale_item_id,
+        product_id,
+        returned_quantity,
+        unit_price_at_return,
+        return_total,
+        return_reason_note,
+        returned_by_user_id
+      )
+      SELECT ?, ?, ?, ?, ?, ?, ?, ?
+      WHERE COALESCE(
+        (
+          SELECT SUM(returned_quantity)
+          FROM sale_item_returns
+          WHERE sale_item_id = ?
+        ),
+        0
+      ) + ? <= (
+        SELECT quantity
+        FROM sale_items
+        WHERE id = ?
+      ) + ?
+      ''',
+      [
+        saleInvoiceId,
+        saleItemId,
+        productId,
+        returnedQuantity,
+        unitPriceAtReturn,
+        returnTotal,
+        returnReasonNote,
+        returnedByUserId,
+        saleItemId,
+        returnedQuantity,
+        saleItemId,
+        tolerance,
+      ],
+    );
+
+    final changesRow =
+        await customSelect('SELECT changes() AS inserted').getSingle();
+    if (changesRow.read<int>('inserted') != 1) return null;
+
+    final insertedIdRow =
+        await customSelect('SELECT last_insert_rowid() AS id').getSingle();
+    return insertedIdRow.read<int>('id');
+  }
 
   // Insert a single return line record. Returns the new row id.
   Future<int> insertReturnLine({

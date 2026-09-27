@@ -46,6 +46,14 @@ class SupplierReturnDirectPostingForbiddenException implements Exception {
   String toString() => message;
 }
 
+/// Thrown when the atomic purchase-line quantity guard rejects an insert.
+class SupplierReturnQuantityCapExceededException implements Exception {
+  const SupplierReturnQuantityCapExceededException();
+
+  @override
+  String toString() => 'supplier return quantity exceeds purchase line cap';
+}
+
 @DriftAccessor(tables: [
   CustomerReturns,
   CustomerReturnItems,
@@ -564,11 +572,79 @@ class ReturnsDao extends DatabaseAccessor<AppDatabase> with _$ReturnsDaoMixin {
     return remaining < 0 ? 0.0 : remaining;
   }
 
+  /// Atomically inserts a purchase-linked [supplier_return_items] row only when
+  /// the aggregate returned quantity for [purchaseItemId] would not exceed
+  /// [purchase_items.quantity] + [tolerance].
+  ///
+  /// Must run inside an enclosing transaction.
+  ///
+  /// Returns the inserted row id, or null when the guard rejected the insert.
+  Future<int?> insertSupplierReturnItemIfWithinPurchaseLineCap({
+    required int returnId,
+    required int purchaseItemId,
+    required int productId,
+    required String productName,
+    required double quantity,
+    required double unitCost,
+    required double total,
+    double tolerance = 0.0001,
+  }) async {
+    if (quantity <= 0) return null;
+
+    await customStatement(
+      '''
+      INSERT INTO supplier_return_items (
+        return_id,
+        purchase_item_id,
+        product_id,
+        product_name,
+        quantity,
+        unit_cost,
+        total
+      )
+      SELECT ?, ?, ?, ?, ?, ?, ?
+      WHERE COALESCE(
+        (
+          SELECT SUM(quantity)
+          FROM supplier_return_items
+          WHERE purchase_item_id = ?
+        ),
+        0
+      ) + ? <= (
+        SELECT quantity
+        FROM purchase_items
+        WHERE id = ?
+      ) + ?
+      ''',
+      [
+        returnId,
+        purchaseItemId,
+        productId,
+        productName,
+        quantity,
+        unitCost,
+        total,
+        purchaseItemId,
+        quantity,
+        purchaseItemId,
+        tolerance,
+      ],
+    );
+
+    final changesRow =
+        await customSelect('SELECT changes() AS inserted').getSingle();
+    if (changesRow.read<int>('inserted') != 1) return null;
+
+    final insertedIdRow =
+        await customSelect('SELECT last_insert_rowid() AS id').getSingle();
+    return insertedIdRow.read<int>('id');
+  }
+
   /// Low-level persistence primitive for supplier returns.
   ///
   /// Contract (SR.2 hardening):
   /// - Does NOT own business orchestration or open a transaction.
-  /// - Does NOT enforce returnable quantity or supplier accounting.
+  /// - Enforces purchase-line quantity caps atomically for linked items (SR 2.3).
   /// - Expects caller-validated header/items inside a caller-owned transaction.
   /// - Performs canonical insert + RETURN_OUT + [StockGuard.deductStock].
   /// - Not a UI-facing or production entry point — use
@@ -583,20 +659,37 @@ class ReturnsDao extends DatabaseAccessor<AppDatabase> with _$ReturnsDaoMixin {
       final qty = (item['qty'] as num).toDouble();
       final cost = (item['cost'] as num).toDouble();
       final purchaseItemId = item['purchaseItemId'] as int?;
+      final productName = item['productName'] as String;
+      final lineTotal = qty * cost;
 
-      final itemId = await into(supplierReturnItems).insert(
-        SupplierReturnItemsCompanion(
-          returnId: Value(returnId),
-          purchaseItemId: purchaseItemId != null
-              ? Value(purchaseItemId)
-              : const Value.absent(),
-          productId: Value(productId),
-          productName: Value(item['productName'] as String),
-          quantity: Value(qty),
-          unitCost: Value(cost),
-          total: Value(qty * cost),
-        ),
-      );
+      final int itemId;
+      if (purchaseItemId != null) {
+        final insertedId = await insertSupplierReturnItemIfWithinPurchaseLineCap(
+          returnId: returnId,
+          purchaseItemId: purchaseItemId,
+          productId: productId,
+          productName: productName,
+          quantity: qty,
+          unitCost: cost,
+          total: lineTotal,
+        );
+        if (insertedId == null) {
+          throw const SupplierReturnQuantityCapExceededException();
+        }
+        itemId = insertedId;
+      } else {
+        itemId = await into(supplierReturnItems).insert(
+          SupplierReturnItemsCompanion(
+            returnId: Value(returnId),
+            purchaseItemId: const Value.absent(),
+            productId: Value(productId),
+            productName: Value(productName),
+            quantity: Value(qty),
+            unitCost: Value(cost),
+            total: Value(lineTotal),
+          ),
+        );
+      }
 
       await into(stockLedger).insert(
         StockLedgerCompanion(

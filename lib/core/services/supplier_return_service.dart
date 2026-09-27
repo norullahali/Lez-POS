@@ -14,6 +14,7 @@ import 'package:drift/drift.dart' show Value;
 import 'package:meta/meta.dart';
 
 import '../database/app_database.dart';
+import '../database/daos/returns_dao.dart';
 import '../services/stock_guard.dart';
 
 class SupplierReturnPostingLine {
@@ -247,6 +248,11 @@ class SupplierReturnService {
         throw SupplierReturnPostingException(
           SupplierReturnPostingFailure.stockInsufficient,
           e.localizedMessage,
+        );
+      } on SupplierReturnQuantityCapExceededException catch (_) {
+        throw const SupplierReturnPostingException(
+          SupplierReturnPostingFailure.quantityExceedsReturnable,
+          'quantity exceeds returnable for purchase item',
         );
       }
     });

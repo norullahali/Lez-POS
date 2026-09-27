@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'support/supplier_refund_test_keys.dart';
 import 'package:lez_pos/core/database/app_database.dart';
 import 'package:lez_pos/core/services/supplier_account_service.dart';
 import 'package:lez_pos/core/services/supplier_refund_settlement_service.dart';
@@ -118,6 +119,7 @@ void main() {
       final summaryBefore = await ledger.getSummary(ledgerFilter);
 
       await settlementService.settleCredit(
+        idempotencyKey: supplierRefundTestIdempotencyKey(),
         supplierId: supplierId,
         amount: 20,
       );
@@ -141,6 +143,7 @@ void main() {
       await seedCredit20();
 
       await settlementService.settleCredit(
+        idempotencyKey: supplierRefundTestIdempotencyKey(),
         supplierId: supplierId,
         amount: 10,
       );
@@ -158,6 +161,7 @@ void main() {
 
       await expectLater(
         settlementService.settleCredit(
+          idempotencyKey: supplierRefundTestIdempotencyKey(),
           supplierId: supplierId,
           amount: 30,
         ),
@@ -184,6 +188,7 @@ void main() {
 
       await expectLater(
         settlementService.settleCredit(
+          idempotencyKey: supplierRefundTestIdempotencyKey(),
           supplierId: supplierId,
           amount: 10,
         ),
@@ -205,6 +210,7 @@ void main() {
 
       await expectLater(
         settlementService.settleCredit(
+          idempotencyKey: supplierRefundTestIdempotencyKey(),
           supplierId: supplierId,
           amount: 0,
         ),
@@ -224,6 +230,7 @@ void main() {
     test('F) missing supplier rejected with zero ledger events', () async {
       await expectLater(
         settlementService.settleCredit(
+          idempotencyKey: supplierRefundTestIdempotencyKey(),
           supplierId: 999999,
           amount: 10,
         ),
@@ -249,6 +256,7 @@ void main() {
 
       await expectLater(
         settlementService.settleCredit(
+          idempotencyKey: supplierRefundTestIdempotencyKey(),
           supplierId: otherSupplierId,
           amount: 10,
           returnId: returnId,
@@ -271,6 +279,7 @@ void main() {
 
       await expectLater(
         settlementService.settleCredit(
+          idempotencyKey: supplierRefundTestIdempotencyKey(),
           supplierId: supplierId,
           amount: 10,
           returnId: 999999,
@@ -323,6 +332,7 @@ void main() {
           (await ledger.getEntries(ledgerFilter)).entries.length;
 
       await settlementService.settleCredit(
+        idempotencyKey: supplierRefundTestIdempotencyKey(),
         supplierId: supplierId,
         amount: 20,
       );
@@ -345,6 +355,7 @@ void main() {
 
       await expectLater(
         failingService.settleCredit(
+          idempotencyKey: supplierRefundTestIdempotencyKey(),
           supplierId: supplierId,
           amount: 20,
         ),
@@ -373,6 +384,7 @@ void main() {
 
       await expectLater(
         failingService.settleCredit(
+          idempotencyKey: supplierRefundTestIdempotencyKey(),
           supplierId: supplierId,
           amount: 20,
         ),
@@ -390,6 +402,7 @@ void main() {
       await seedCredit20();
 
       await settlementService.settleCredit(
+        idempotencyKey: supplierRefundTestIdempotencyKey(),
         supplierId: supplierId,
         amount: 15,
       );
@@ -403,6 +416,7 @@ void main() {
       final returnId = await postReturnCredit20();
 
       await settlementService.settleCredit(
+        idempotencyKey: supplierRefundTestIdempotencyKey(),
         supplierId: supplierId,
         amount: 10,
         returnId: returnId,

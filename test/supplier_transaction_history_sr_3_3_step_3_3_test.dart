@@ -2,6 +2,7 @@ import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'support/supplier_refund_test_keys.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 import 'package:lez_pos/core/database/app_database.dart';
 import 'package:lez_pos/core/services/supplier_refund_settlement_service.dart';
@@ -300,6 +301,7 @@ void main() {
       );
 
       await SupplierRefundSettlementService(db).settleCredit(
+        idempotencyKey: supplierRefundTestIdempotencyKey(),
         supplierId: supplierId,
         amount: 20,
       );

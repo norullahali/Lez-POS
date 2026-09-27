@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'support/supplier_refund_test_keys.dart';
 import 'package:lez_pos/core/database/app_database.dart';
 import 'package:lez_pos/core/services/supplier_account_service.dart';
 import 'package:lez_pos/core/services/supplier_refund_settlement_service.dart';
@@ -99,6 +100,7 @@ void main() {
       final before = await balance();
 
       await settlementService.settleCredit(
+        idempotencyKey: supplierRefundTestIdempotencyKey(),
         supplierId: supplierId,
         amount: 20,
       );
@@ -115,6 +117,7 @@ void main() {
       await seedCredit20();
 
       await settlementService.settleCredit(
+        idempotencyKey: supplierRefundTestIdempotencyKey(),
         supplierId: supplierId,
         amount: 10,
       );
@@ -129,6 +132,7 @@ void main() {
 
       await expectLater(
         settlementService.settleCredit(
+          idempotencyKey: supplierRefundTestIdempotencyKey(),
           supplierId: supplierId,
           amount: 30,
         ),
@@ -150,6 +154,7 @@ void main() {
 
       await expectLater(
         settlementService.settleCredit(
+          idempotencyKey: supplierRefundTestIdempotencyKey(),
           supplierId: supplierId,
           amount: 0,
         ),
@@ -170,6 +175,7 @@ void main() {
 
       await expectLater(
         settlementService.settleCredit(
+          idempotencyKey: supplierRefundTestIdempotencyKey(),
           supplierId: supplierId,
           amount: -5,
         ),
@@ -194,6 +200,7 @@ void main() {
 
       await expectLater(
         settlementService.settleCredit(
+          idempotencyKey: supplierRefundTestIdempotencyKey(),
           supplierId: supplierId,
           amount: 10,
         ),
@@ -214,6 +221,7 @@ void main() {
 
       await expectLater(
         settlementService.settleCredit(
+          idempotencyKey: supplierRefundTestIdempotencyKey(),
           supplierId: supplierId,
           amount: 10,
         ),
@@ -232,6 +240,7 @@ void main() {
     test('H) supplier not found', () async {
       await expectLater(
         settlementService.settleCredit(
+          idempotencyKey: supplierRefundTestIdempotencyKey(),
           supplierId: 999999,
           amount: 10,
         ),
@@ -251,6 +260,7 @@ void main() {
       final returnId = await postReturnCredit20();
 
       await settlementService.settleCredit(
+        idempotencyKey: supplierRefundTestIdempotencyKey(),
         supplierId: supplierId,
         amount: 10,
         returnId: returnId,
@@ -270,6 +280,7 @@ void main() {
 
       await expectLater(
         settlementService.settleCredit(
+          idempotencyKey: supplierRefundTestIdempotencyKey(),
           supplierId: otherSupplierId,
           amount: 10,
           returnId: returnId,
@@ -291,6 +302,7 @@ void main() {
 
       await expectLater(
         settlementService.settleCredit(
+          idempotencyKey: supplierRefundTestIdempotencyKey(),
           supplierId: supplierId,
           amount: 10,
           returnId: 999999,

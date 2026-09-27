@@ -146,7 +146,7 @@ void main() {
         }) async {
           callCount++;
           capturedAmount = amount;
-          await db.supplierAccountsDao.recordRefundInTransaction(
+          return await db.supplierAccountsDao.recordRefundInTransaction(
             supplierId: supplierId,
             amount: amount,
             returnId: returnId,
@@ -185,7 +185,7 @@ void main() {
           callCount++;
           if (!entered.isCompleted) entered.complete();
           await gate.future;
-          await db.supplierAccountsDao.recordRefundInTransaction(
+          return await db.supplierAccountsDao.recordRefundInTransaction(
             supplierId: supplierId,
             amount: amount,
             returnId: returnId,
@@ -295,7 +295,7 @@ void main() {
           String? note,
         }) async {
           serviceCalls++;
-          await db.supplierAccountsDao.recordRefundInTransaction(
+          return await db.supplierAccountsDao.recordRefundInTransaction(
             supplierId: supplierId,
             amount: amount,
             returnId: returnId,
@@ -350,7 +350,7 @@ void main() {
           String? note,
         }) async {
           capturedReturnId = returnId;
-          await db.supplierAccountsDao.recordRefundInTransaction(
+          return await db.supplierAccountsDao.recordRefundInTransaction(
             supplierId: supplierId,
             amount: amount,
             returnId: returnId,

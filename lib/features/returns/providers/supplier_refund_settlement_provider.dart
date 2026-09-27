@@ -1,12 +1,15 @@
 // lib/features/returns/providers/supplier_refund_settlement_provider.dart
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../../core/services/supplier_refund_settlement_service.dart';
 import '../../suppliers/providers/supplier_accounts_provider.dart';
 import '../utils/supplier_refund_settlement_messages.dart';
 import 'supplier_return_service_provider.dart';
+
+const _refundIdempotencyUuid = Uuid();
 
 /// Refreshes read-only supplier credit/balance displays after successful refund.
 void invalidateSupplierRefundDisplays(Ref ref, int supplierId) {
@@ -41,11 +44,13 @@ class SupplierRefundSettlementUiState {
   final String? returnLabel;
   final SupplierRefundSettlementUiStatus status;
   final String? errorMessage;
+  final String idempotencyKey;
 
   const SupplierRefundSettlementUiState({
     required this.supplierId,
     required this.supplierName,
     required this.availableCredit,
+    required this.idempotencyKey,
     this.amountText = '',
     this.note = '',
     this.returnId,
@@ -84,6 +89,7 @@ class SupplierRefundSettlementUiState {
       supplierId: supplierId,
       supplierName: supplierName,
       availableCredit: availableCredit,
+      idempotencyKey: idempotencyKey,
       amountText: amountText ?? this.amountText,
       note: note ?? this.note,
       returnId: returnId,
@@ -139,6 +145,7 @@ class SupplierRefundSettlementUiNotifier
       supplierId: supplierId,
       supplierName: supplierName,
       availableCredit: availableCredit,
+      idempotencyKey: _refundIdempotencyUuid.v4(),
       returnId: returnId,
       returnLabel: returnLabel,
     );
@@ -205,6 +212,7 @@ class SupplierRefundSettlementUiNotifier
       await ref.read(supplierRefundSettlementServiceProvider).settleCredit(
             supplierId: current.supplierId,
             amount: amount,
+            idempotencyKey: current.idempotencyKey,
             returnId: current.returnId,
             note: current.note.trim().isEmpty ? null : current.note.trim(),
           );

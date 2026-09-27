@@ -18,6 +18,8 @@ String supplierRefundSettlementFailureMessage(
       return 'مرتجع المورد غير موجود';
     case SupplierRefundSettlementFailure.returnSupplierMismatch:
       return 'المرتجع لا ينتمي إلى هذا المورد';
+    case SupplierRefundSettlementFailure.idempotencyKeyConflict:
+      return 'تعارض في عملية الاسترداد — يرجى إعادة المحاولة';
     case SupplierRefundSettlementFailure.unexpectedFailure:
       return 'تعذر إتمام استرداد المبلغ';
   }

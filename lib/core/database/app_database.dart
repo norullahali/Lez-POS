@@ -13,6 +13,7 @@ import 'tables/customers_table.dart';
 import 'tables/customer_accounts_table.dart';
 import 'tables/customer_transactions_table.dart';
 import 'tables/customer_refund_idempotency_table.dart';
+import 'tables/supplier_refund_idempotency_table.dart';
 import 'tables/products_table.dart';
 import 'tables/product_batches_table.dart';
 import 'tables/stock_ledger_table.dart';
@@ -54,6 +55,7 @@ import 'daos/suppliers_dao.dart';
 import 'daos/customers_dao.dart';
 import 'daos/customer_accounts_dao.dart';
 import 'daos/customer_refund_idempotency_dao.dart';
+import 'daos/supplier_refund_idempotency_dao.dart';
 import 'daos/supplier_accounts_dao.dart';
 import 'daos/products_dao.dart';
 import 'daos/stock_dao.dart';
@@ -73,6 +75,7 @@ part 'app_database.g.dart';
     CustomerAccounts,
     CustomerTransactions,
     CustomerRefundIdempotency,
+    SupplierRefundIdempotency,
     SupplierAccounts,
     SupplierTransactions,
     Products,
@@ -114,6 +117,7 @@ part 'app_database.g.dart';
     CustomersDao,
     CustomerAccountsDao,
     CustomerRefundIdempotencyDao,
+    SupplierRefundIdempotencyDao,
     SupplierAccountsDao,
     ProductsDao,
     StockDao,
@@ -148,7 +152,7 @@ class AppDatabase extends _$AppDatabase {
   late final pricingDao = PricingDao(this);
 
   @override
-  int get schemaVersion => 34;
+  int get schemaVersion => 35;
 
   @override
   MigrationStrategy get migration {
@@ -163,6 +167,10 @@ class AppDatabase extends _$AppDatabase {
         await customStatement(
           'CREATE INDEX IF NOT EXISTS cri_customer_created_idx '
           'ON customer_refund_idempotency (customer_id, created_at)',
+        );
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS sri_supplier_created_idx '
+          'ON supplier_refund_idempotency (supplier_id, created_at)',
         );
         // Enable foreign keys
         await customStatement('PRAGMA foreign_keys = ON');
@@ -892,6 +900,20 @@ class AppDatabase extends _$AppDatabase {
             rethrow;
           }
           debugPrint('[Migration v34] customer_refund_idempotency ready');
+        }
+        if (from < 35) {
+          debugPrint('[Migration v35] supplier_refund_idempotency table...');
+          await m.createTable(supplierRefundIdempotency);
+          try {
+            await customStatement(
+              'CREATE INDEX IF NOT EXISTS sri_supplier_created_idx '
+              'ON supplier_refund_idempotency (supplier_id, created_at)',
+            );
+          } catch (e) {
+            debugPrint('[Migration v35] idempotency index skip/error: $e');
+            rethrow;
+          }
+          debugPrint('[Migration v35] supplier_refund_idempotency ready');
         }
       },
       beforeOpen: (details) async {

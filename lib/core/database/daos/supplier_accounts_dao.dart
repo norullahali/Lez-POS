@@ -145,19 +145,50 @@ class SupplierAccountsDao extends DatabaseAccessor<AppDatabase>
   /// [amount] is the positive settlement value stored as a positive ledger amount,
   /// consuming credit (balance moves toward zero). Must run inside an enclosing
   /// transaction — business validation belongs in the service layer.
-  Future<void> recordRefundInTransaction({
+  ///
+  /// Returns the inserted [supplier_transactions] row id.
+  Future<int> recordRefundInTransaction({
     required int supplierId,
     required double amount,
     int? returnId,
     String note = '',
-  }) =>
-      applyTransaction(
-        supplierId: supplierId,
-        type: 'REFUND',
-        amount: amount,
-        referenceId: returnId,
-        note: note,
+  }) async {
+    final supplierTransactionId = await into(supplierTransactions).insert(
+      SupplierTransactionsCompanion(
+        supplierId: Value(supplierId),
+        type: const Value('REFUND'),
+        amount: Value(amount),
+        referenceId: Value(returnId),
+        note: Value(note),
+      ),
+    );
+
+    final newBalance = await calculateBalanceFromTransactions(supplierId);
+
+    final existing = await (select(supplierAccounts)
+          ..where((a) => a.supplierId.equals(supplierId)))
+        .getSingleOrNull();
+
+    if (existing != null) {
+      await (update(supplierAccounts)..where((a) => a.id.equals(existing.id)))
+          .write(
+        SupplierAccountsCompanion(
+          currentBalance: Value(newBalance),
+          updatedAt: Value(DateTime.now()),
+        ),
       );
+    } else {
+      await into(supplierAccounts).insert(
+        SupplierAccountsCompanion(
+          supplierId: Value(supplierId),
+          currentBalance: Value(newBalance),
+          updatedAt: Value(DateTime.now()),
+        ),
+      );
+    }
+
+    return supplierTransactionId;
+  }
 
   // -----------------------------------------------------
   // History queries

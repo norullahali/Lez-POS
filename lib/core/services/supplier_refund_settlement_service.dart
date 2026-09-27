@@ -163,13 +163,21 @@ class SupplierRefundSettlementService {
               note: note,
             );
           } else {
-            supplierTransactionId =
-                await _db.supplierAccountsDao.recordRefundInTransaction(
+            final insertedId = await _db.supplierAccountsDao
+                .recordRefundInTransactionIfWithinAggregateCredit(
               supplierId: supplierId,
               amount: amount,
               returnId: returnId,
               note: normalizedNote,
+              tolerance: tolerance,
             );
+            if (insertedId == null) {
+              throw const SupplierRefundSettlementException(
+                SupplierRefundSettlementFailure.amountExceedsCredit,
+                'settlement exceeds available credit (concurrent update)',
+              );
+            }
+            supplierTransactionId = insertedId;
           }
 
           if (_postRefundHook != null) {

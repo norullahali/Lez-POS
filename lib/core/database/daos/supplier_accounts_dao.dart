@@ -146,6 +146,9 @@ class SupplierAccountsDao extends DatabaseAccessor<AppDatabase>
   /// consuming credit (balance moves toward zero). Must run inside an enclosing
   /// transaction — business validation belongs in the service layer.
   ///
+  /// Prefer [recordRefundInTransactionIfWithinAggregateCredit] from
+  /// [SupplierRefundSettlementService] for authoritative concurrency safety.
+  ///
   /// Returns the inserted [supplier_transactions] row id.
   Future<int> recordRefundInTransaction({
     required int supplierId,
@@ -188,6 +191,81 @@ class SupplierAccountsDao extends DatabaseAccessor<AppDatabase>
     }
 
     return supplierTransactionId;
+  }
+
+  /// Atomically inserts a REFUND row only when aggregate supplier credit can
+  /// absorb [amount] without driving the transaction balance above [tolerance].
+  ///
+  /// Uses the same authoritative balance source as
+  /// [calculateBalanceFromTransactions]: `SUM(supplier_transactions.amount)`.
+  ///
+  /// Invariant: `current_sum + amount <= tolerance` (SR Step 2.2).
+  /// Must run inside an enclosing transaction.
+  ///
+  /// Returns the inserted [supplier_transactions] row id, or null when no row
+  /// was inserted.
+  Future<int?> recordRefundInTransactionIfWithinAggregateCredit({
+    required int supplierId,
+    required double amount,
+    int? returnId,
+    String note = '',
+    double tolerance = 0.0001,
+  }) async {
+    if (amount <= 0) return null;
+
+    await customStatement(
+      '''
+      INSERT INTO supplier_transactions (supplier_id, type, amount, reference_id, note)
+      SELECT ?, 'REFUND', ?, ?, ?
+      WHERE COALESCE(
+        (SELECT SUM(amount) FROM supplier_transactions WHERE supplier_id = ?),
+        0
+      ) + ? <= ?
+      ''',
+      [
+        supplierId,
+        amount,
+        returnId,
+        note,
+        supplierId,
+        amount,
+        tolerance,
+      ],
+    );
+
+    final changesRow =
+        await customSelect('SELECT changes() AS inserted').getSingle();
+    if (changesRow.read<int>('inserted') != 1) return null;
+
+    final insertedIdRow =
+        await customSelect('SELECT last_insert_rowid() AS id').getSingle();
+    final insertedId = insertedIdRow.read<int>('id');
+
+    final newBalance = await calculateBalanceFromTransactions(supplierId);
+
+    final existing = await (select(supplierAccounts)
+          ..where((a) => a.supplierId.equals(supplierId)))
+        .getSingleOrNull();
+
+    if (existing != null) {
+      await (update(supplierAccounts)..where((a) => a.id.equals(existing.id)))
+          .write(
+        SupplierAccountsCompanion(
+          currentBalance: Value(newBalance),
+          updatedAt: Value(DateTime.now()),
+        ),
+      );
+    } else {
+      await into(supplierAccounts).insert(
+        SupplierAccountsCompanion(
+          supplierId: Value(supplierId),
+          currentBalance: Value(newBalance),
+          updatedAt: Value(DateTime.now()),
+        ),
+      );
+    }
+
+    return insertedId;
   }
 
   // -----------------------------------------------------

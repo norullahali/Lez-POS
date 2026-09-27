@@ -61,6 +61,12 @@ void main() {
               .get())
           .length;
 
+  Future<int> paymentTxnCount() async =>
+      (await (db.select(db.supplierTransactions)
+                ..where((t) => t.type.equals('PAYMENT')))
+              .get())
+          .length;
+
   Future<void> seedCredit20() async {
     await SupplierAccountService(db).processPayment(
       supplierId: supplierId,
@@ -311,6 +317,23 @@ void main() {
         ),
         throwsA(isA<Exception>()),
       );
+    });
+
+    test('N) processPayment rejects overpayment when balance is positive',
+        () async {
+      expect(await balance(), 50);
+      expect(await paymentTxnCount(), 0);
+
+      await expectLater(
+        SupplierAccountService(db).processPayment(
+          supplierId: supplierId,
+          amount: 60,
+        ),
+        throwsA(isA<Exception>()),
+      );
+
+      expect(await paymentTxnCount(), 0);
+      expect(await balance(), 50);
     });
 
     test('M) goods return regression unchanged', () async {

@@ -33,7 +33,7 @@ class _SupplierPaymentsScreenState
     super.dispose();
   }
 
-  Future<void> _submitPayment(double currentBalance) async {
+  Future<void> _submitPayment() async {
     final amt = double.tryParse(_amountCtrl.text);
 
     if (amt == null || amt <= 0) {
@@ -49,14 +49,11 @@ class _SupplierPaymentsScreenState
     setState(() => _isLoading = true);
 
     try {
-      final dao = ref.read(supplierAccountsDaoProvider);
-
-      await dao.addTransaction(
-        supplierId: widget.supplierId,
-        type: 'PAYMENT',
-        amount: -amt,
-        note: _noteCtrl.text,
-      );
+      await ref.read(supplierAccountServiceProvider).processPayment(
+            supplierId: widget.supplierId,
+            amount: amt,
+            note: _noteCtrl.text,
+          );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -129,11 +126,7 @@ class _SupplierPaymentsScreenState
                 ),
                 const SizedBox(height: 24),
                 ElevatedButton(
-                  onPressed: _isLoading
-                      ? null
-                      : () => _submitPayment(
-                            balanceAsync.valueOrNull ?? 0,
-                          ),
+                  onPressed: _isLoading ? null : _submitPayment,
                   child: const Text('حفظ'),
                 ),
               ],

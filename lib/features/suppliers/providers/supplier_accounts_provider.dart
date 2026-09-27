@@ -2,32 +2,42 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/database/daos/supplier_accounts_dao.dart';
+import '../../../core/services/supplier_account_service.dart';
 
 // Provides the DAO instance
 final supplierAccountsDaoProvider = Provider<SupplierAccountsDao>((ref) {
   return AppDatabase.instance.supplierAccountsDao;
 });
 
+/// Canonical supplier payment mutation boundary for UI and orchestration.
+final supplierAccountServiceProvider = Provider<SupplierAccountService>((ref) {
+  return SupplierAccountService(AppDatabase.instance);
+});
+
 // Watch current balance for a supplier
-final supplierBalanceProvider = StreamProvider.family<double, int>((ref, supplierId) {
+final supplierBalanceProvider =
+    StreamProvider.family<double, int>((ref, supplierId) {
   final dao = ref.watch(supplierAccountsDaoProvider);
   return dao.watchBalance(supplierId);
 });
 
 // Watch transaction history for a supplier
-final supplierHistoryProvider = StreamProvider.family<List<SupplierTransaction>, int>((ref, supplierId) {
+final supplierHistoryProvider =
+    StreamProvider.family<List<SupplierTransaction>, int>((ref, supplierId) {
   final dao = ref.watch(supplierAccountsDaoProvider);
   return dao.watchHistory(supplierId);
 });
 
 // Watch aging buckets for a supplier
-final supplierAgingProvider = FutureProvider.family<Map<String, double>, int>((ref, supplierId) async {
+final supplierAgingProvider =
+    FutureProvider.family<Map<String, double>, int>((ref, supplierId) async {
   final dao = ref.watch(supplierAccountsDaoProvider);
   return dao.getAgingBuckets(supplierId);
 });
 
 // Provider for all creditors (lists top debtors logic but reversed internally for payables)
-final topCreditorsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
+final topCreditorsProvider =
+    FutureProvider<List<Map<String, dynamic>>>((ref) async {
   final dao = ref.watch(supplierAccountsDaoProvider);
   return dao.getTopCreditors();
 });

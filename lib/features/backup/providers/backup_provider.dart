@@ -67,6 +67,12 @@ class BackupSettingsNotifier extends AsyncNotifier<BackupSettings> {
 
   // --- Auto Backup Logic ---
   Future<void> checkAndPerformAutoBackup() async {
+    if (!ref
+        .read(permissionServiceProvider)
+        .hasPermissionSync(PermissionKeys.backupDatabase)) {
+      return;
+    }
+
     final settings = state.valueOrNull;
     if (settings == null || !settings.isAutoBackupEnabled) return;
 

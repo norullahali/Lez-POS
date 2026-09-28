@@ -52,7 +52,7 @@ const _routePermissionEntries = [
   _RoutePermission('/activity/timeline', PermissionKeys.auditView),
   _RoutePermission('/users', PermissionKeys.usersManage),
   _RoutePermission('/roles', PermissionKeys.usersManage),
-  _RoutePermission('/backup', PermissionKeys.settingsEdit),
+  _RoutePermission('/backup', PermissionKeys.backupDatabase),
   _RoutePermission('/pricing', PermissionKeys.settingsEdit),
   _RoutePermission('/loyalty-settings', PermissionKeys.settingsEdit),
   _RoutePermission('/settings', PermissionKeys.settingsEdit),

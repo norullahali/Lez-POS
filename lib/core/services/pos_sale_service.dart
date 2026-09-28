@@ -4,6 +4,7 @@ import '../database/app_database.dart';
 import '../constants/movement_types.dart';
 import '../services/settings_service.dart';
 import '../services/stock_guard.dart';
+import '../services/credit_limit_exception.dart';
 import '../../features/loyalty/services/loyalty_service.dart';
 import '../activity/activity_categories.dart';
 import '../activity/activity_types.dart';
@@ -122,12 +123,27 @@ class PosSaleService {
         if (debtAmount != null && debtAmount > 0) {
           final customerId = invoice.customerId.value;
           if (customerId != null && customerId != 1) { // 1 = General Customer
-            await db.customerAccountsDao.recordSale(
+            final saleNote = 'فاتورة رقم ${invoice.invoiceNumber.value}';
+            final insertedId = await db.customerAccountsDao
+                .recordSaleInTransactionIfWithinCreditLimit(
               customerId: customerId,
               amount: debtAmount,
               invoiceId: invoiceId,
-              note: 'فاتورة رقم ${invoice.invoiceNumber.value}',
+              note: saleNote,
             );
+            if (insertedId == null) {
+              final currentBalance = await db.customerAccountsDao
+                  .calculateBalanceFromTransactions(customerId);
+              final customerRow = await (db.select(db.customers)
+                    ..where((c) => c.id.equals(customerId)))
+                  .getSingleOrNull();
+              throw CreditLimitExceededException(
+                customerId: customerId,
+                currentBalance: currentBalance,
+                creditLimit: customerRow?.creditLimit ?? 0,
+                requestedAmount: debtAmount,
+              );
+            }
           }
         }
 
@@ -158,6 +174,7 @@ class PosSaleService {
       });
     } catch (e, st) {
       debugPrint('[PosSaleService] Error in processSale: $e\n$st');
+      if (e is CreditLimitExceededException) rethrow;
       if (e is Exception) rethrow;
       throw Exception('فشل في إتمام عملية البيع: ${e.toString()}');
     }

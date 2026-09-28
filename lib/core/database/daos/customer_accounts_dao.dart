@@ -279,6 +279,82 @@ class CustomerAccountsDao extends DatabaseAccessor<AppDatabase>
     return insertedId;
   }
 
+  /// Atomically inserts a SALE row only when aggregate customer exposure stays
+  /// within [customers.credit_limit].
+  ///
+  /// Uses `SUM(customer_transactions.amount)` as the authoritative balance.
+  /// When `credit_limit <= 0`, credit is unlimited (no cap applied).
+  ///
+  /// Invariant when limit > 0: `current_sum + amount <= credit_limit`.
+  /// Must run inside an enclosing transaction.
+  ///
+  /// Returns the inserted [customer_transactions] row id, or null when blocked.
+  Future<int?> recordSaleInTransactionIfWithinCreditLimit({
+    required int customerId,
+    required double amount,
+    required int invoiceId,
+    String note = '',
+  }) async {
+    if (amount <= 0) return null;
+
+    await customStatement(
+      '''
+      INSERT INTO customer_transactions (customer_id, type, amount, reference_id, note)
+      SELECT ?, 'SALE', ?, ?, ?
+      WHERE (
+        (SELECT credit_limit FROM customers WHERE id = ?) <= 0
+        OR COALESCE(
+          (SELECT SUM(amount) FROM customer_transactions WHERE customer_id = ?),
+          0
+        ) + ? <= (SELECT credit_limit FROM customers WHERE id = ?)
+      )
+      ''',
+      [
+        customerId,
+        amount,
+        invoiceId,
+        note,
+        customerId,
+        customerId,
+        amount,
+        customerId,
+      ],
+    );
+
+    final changesRow =
+        await customSelect('SELECT changes() AS inserted').getSingle();
+    if (changesRow.read<int>('inserted') != 1) return null;
+
+    final insertedIdRow =
+        await customSelect('SELECT last_insert_rowid() AS id').getSingle();
+    final insertedId = insertedIdRow.read<int>('id');
+
+    final newBalance = await calculateBalanceFromTransactions(customerId);
+    final existing = await (select(customerAccounts)
+          ..where((a) => a.customerId.equals(customerId)))
+        .getSingleOrNull();
+
+    if (existing != null) {
+      await (update(customerAccounts)..where((a) => a.id.equals(existing.id)))
+          .write(
+        CustomerAccountsCompanion(
+          currentBalance: Value(newBalance),
+          updatedAt: Value(DateTime.now()),
+        ),
+      );
+    } else {
+      await into(customerAccounts).insert(
+        CustomerAccountsCompanion(
+          customerId: Value(customerId),
+          currentBalance: Value(newBalance),
+          updatedAt: Value(DateTime.now()),
+        ),
+      );
+    }
+
+    return insertedId;
+  }
+
   /// Total credit already reversed for [invoiceId] via RETURN rows linked to
   /// customer_returns or sale_item_returns on that invoice.
   Future<double> getCreditReversalTotalForSaleInvoice({

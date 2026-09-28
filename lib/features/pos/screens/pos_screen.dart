@@ -23,6 +23,7 @@ import 'widgets/session_dialog.dart';
 import 'widgets/customer_selection_modal.dart';
 import 'widgets/smart_search_bar.dart';
 import 'package:lez_pos/core/services/receipt_service.dart';
+import '../../../core/services/credit_limit_exception.dart';
 
 import '../models/invoice_models.dart';
 
@@ -892,8 +893,11 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
       // Roll back loyalty points application on error
       ref.read(cartProvider.notifier).clearLoyaltyPoints();
       if (!mounted) return;
+      final message = e is CreditLimitExceededException
+          ? e.localizedMessage
+          : 'خطأ: $e';
       ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطأ: $e'), backgroundColor: AppColors.error));
+          SnackBar(content: Text(message), backgroundColor: AppColors.error));
     }
   }
 

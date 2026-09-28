@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import '../database/app_database.dart';
+import 'supplier_payment_exceeds_payable_exception.dart';
 
 /// Service to handle supplier accounts and supplier debt transactions.
 class SupplierAccountService {
@@ -23,22 +24,22 @@ class SupplierAccountService {
           throw Exception('Supplier with ID $supplierId does not exist.');
         }
 
-        final currentBalance = await db.supplierAccountsDao.getBalance(supplierId);
-        
-        // Prevent overpayment: check if payment exceeds current debt
-        if (amount > currentBalance) {
-          throw Exception(
-            'Overpayment not allowed. Current debt: $currentBalance, Payment: $amount',
-          );
-        }
-
-        // 2. Database Operations & Financial Update
-        await db.supplierAccountsDao.addTransaction(
+        // 2. Atomic payment guard (authoritative SUM, not cached balance)
+        final insertedId = await db.supplierAccountsDao
+            .recordPaymentInTransactionIfWithinPayable(
           supplierId: supplierId,
-          type: 'PAYMENT',
-          amount: -amount, // Negative decreases the debt
+          amount: amount,
           note: note ?? 'Payment to supplier',
         );
+        if (insertedId == null) {
+          final currentPayable = await db.supplierAccountsDao
+              .calculateBalanceFromTransactions(supplierId);
+          throw SupplierPaymentExceedsPayableException(
+            supplierId: supplierId,
+            currentPayable: currentPayable,
+            requestedAmount: amount,
+          );
+        }
 
         // 3. Logging
         await db.logsDao.insertLog(
@@ -49,6 +50,7 @@ class SupplierAccountService {
       });
     } catch (e, st) {
       debugPrint('[SupplierAccountService] Error in processPayment: $e\n$st');
+      if (e is SupplierPaymentExceedsPayableException) rethrow;
       if (e is Exception) rethrow;
       throw Exception('فشل في معالجة دفعة المورد: ${e.toString()}');
     }

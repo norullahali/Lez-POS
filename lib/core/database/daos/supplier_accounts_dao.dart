@@ -268,6 +268,82 @@ class SupplierAccountsDao extends DatabaseAccessor<AppDatabase>
     return insertedId;
   }
 
+  /// Atomically inserts a PAYMENT row only when aggregate supplier payable can
+  /// absorb [amount] without driving the transaction balance below zero.
+  ///
+  /// Uses the same authoritative balance source as
+  /// [calculateBalanceFromTransactions]: `SUM(supplier_transactions.amount)`.
+  ///
+  /// [amount] is the positive payment value; stored as negative ledger amount.
+  /// Invariant: `current_sum >= amount` (B3).
+  /// Must run inside an enclosing transaction.
+  ///
+  /// Returns the inserted [supplier_transactions] row id, or null when no row
+  /// was inserted.
+  Future<int?> recordPaymentInTransactionIfWithinPayable({
+    required int supplierId,
+    required double amount,
+    int? referenceId,
+    String note = '',
+    double tolerance = 0.0001,
+  }) async {
+    if (amount <= 0) return null;
+
+    await customStatement(
+      '''
+      INSERT INTO supplier_transactions (supplier_id, type, amount, reference_id, note)
+      SELECT ?, 'PAYMENT', ?, ?, ?
+      WHERE COALESCE(
+        (SELECT SUM(amount) FROM supplier_transactions WHERE supplier_id = ?),
+        0
+      ) + ? >= ?
+      ''',
+      [
+        supplierId,
+        -amount,
+        referenceId,
+        note,
+        supplierId,
+        tolerance,
+        amount,
+      ],
+    );
+
+    final changesRow =
+        await customSelect('SELECT changes() AS inserted').getSingle();
+    if (changesRow.read<int>('inserted') != 1) return null;
+
+    final insertedIdRow =
+        await customSelect('SELECT last_insert_rowid() AS id').getSingle();
+    final insertedId = insertedIdRow.read<int>('id');
+
+    final newBalance = await calculateBalanceFromTransactions(supplierId);
+
+    final existing = await (select(supplierAccounts)
+          ..where((a) => a.supplierId.equals(supplierId)))
+        .getSingleOrNull();
+
+    if (existing != null) {
+      await (update(supplierAccounts)..where((a) => a.id.equals(existing.id)))
+          .write(
+        SupplierAccountsCompanion(
+          currentBalance: Value(newBalance),
+          updatedAt: Value(DateTime.now()),
+        ),
+      );
+    } else {
+      await into(supplierAccounts).insert(
+        SupplierAccountsCompanion(
+          supplierId: Value(supplierId),
+          currentBalance: Value(newBalance),
+          updatedAt: Value(DateTime.now()),
+        ),
+      );
+    }
+
+    return insertedId;
+  }
+
   // -----------------------------------------------------
   // History queries
   // -----------------------------------------------------

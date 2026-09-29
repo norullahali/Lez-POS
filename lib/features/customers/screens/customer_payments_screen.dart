@@ -2,7 +2,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart' hide TextDirection;
+import 'package:uuid/uuid.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/services/customer_payment_idempotency_conflict_exception.dart';
 
 import '../providers/customers_provider.dart';
 import '../providers/customer_accounts_provider.dart';
@@ -16,12 +18,16 @@ class CustomerPaymentsScreen extends ConsumerStatefulWidget {
       _CustomerPaymentsScreenState();
 }
 
+const _customerPaymentUuid = Uuid();
+
 class _CustomerPaymentsScreenState
     extends ConsumerState<CustomerPaymentsScreen> {
   int? _selectedCustomerId;
   final _amountCtrl = TextEditingController();
   final _noteCtrl = TextEditingController();
   final _nf = NumberFormat('#,##0.##');
+  String? _idempotencyKey;
+  bool _submitting = false;
 
   @override
   void initState() {
@@ -49,8 +55,15 @@ class _CustomerPaymentsScreenState
   double get _amount =>
       double.tryParse(_normalizeNumber(_amountCtrl.text.trim())) ?? 0;
 
+  String _paymentNote() =>
+      _noteCtrl.text.trim().isEmpty ? 'دفعة نقدية' : _noteCtrl.text.trim();
+
+  void _resetPaymentAttempt() {
+    _idempotencyKey = null;
+  }
+
   Future<void> _savePayment() async {
-    if (_selectedCustomerId == null) return;
+    if (_selectedCustomerId == null || _submitting) return;
     if (_amount <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
         content: Text('الرجاء إدخال مبلغ صحيح أكبر من صفر'),
@@ -59,13 +72,14 @@ class _CustomerPaymentsScreenState
       return;
     }
 
+    _idempotencyKey ??= _customerPaymentUuid.v4();
+    setState(() => _submitting = true);
     try {
-      await ref.read(customerAccountsDaoProvider).recordPayment(
+      await ref.read(customerAccountServiceProvider).processPayment(
+            idempotencyKey: _idempotencyKey!,
             customerId: _selectedCustomerId!,
             amount: _amount,
-            note: _noteCtrl.text.trim().isEmpty
-                ? 'دفعة نقدية'
-                : _noteCtrl.text.trim(),
+            note: _paymentNote(),
           );
 
       if (mounted) {
@@ -75,6 +89,14 @@ class _CustomerPaymentsScreenState
         ));
         _amountCtrl.clear();
         _noteCtrl.clear();
+        _resetPaymentAttempt();
+      }
+    } on CustomerPaymentIdempotencyConflictException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('تعذر تنفيذ الدفعة: $e'),
+          backgroundColor: AppColors.error,
+        ));
       }
     } catch (e) {
       if (mounted) {
@@ -83,6 +105,8 @@ class _CustomerPaymentsScreenState
           backgroundColor: AppColors.error,
         ));
       }
+    } finally {
+      if (mounted) setState(() => _submitting = false);
     }
   }
 
@@ -148,7 +172,8 @@ class _CustomerPaymentsScreenState
                         }).toList(),
                         onChanged: (val) => setState(() {
                           _selectedCustomerId = val;
-                          _amountCtrl.clear(); // reset amount on switch
+                          _amountCtrl.clear();
+                          _resetPaymentAttempt();
                         }),
                       );
                     },
@@ -286,7 +311,8 @@ class _CustomerPaymentsScreenState
                       label: const Text('حفظ الدفعة',
                           style: TextStyle(
                               fontSize: 16, fontWeight: FontWeight.w700)),
-                      onPressed: _amount > 0 ? _savePayment : null,
+                      onPressed:
+                          _amount > 0 && !_submitting ? _savePayment : null,
                     ),
                   ),
                 ],

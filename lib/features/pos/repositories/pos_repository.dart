@@ -1,11 +1,15 @@
 // lib/features/pos/repositories/pos_repository.dart
 import 'package:drift/drift.dart';
 import '../../../core/database/app_database.dart';
+import '../../../core/services/customer_account_service.dart';
+import '../../../core/services/customer_payment_result.dart';
 import '../models/cart_item.dart';
 
 class PosRepository {
   final AppDatabase _db;
-  PosRepository(this._db);
+  final CustomerAccountService _customerAccountService;
+
+  PosRepository(this._db, this._customerAccountService);
 
   Future<PosSession?> getOpenSession() => _db.salesDao.getOpenSession();
 
@@ -97,17 +101,18 @@ class PosRepository {
   }
 
   /// Settle a previous debt directly from POS (no new sale).
-  Future<void> settleDebt({
+  Future<CustomerPaymentResult> settleDebt({
+    required String idempotencyKey,
     required int customerId,
     required double amount,
     String note = 'تسوية دين من POS',
-  }) async {
-    await _db.customerAccountsDao.recordPayment(
-      customerId: customerId,
-      amount: amount,
-      note: note,
-    );
-  }
+  }) =>
+      _customerAccountService.processPayment(
+        idempotencyKey: idempotencyKey,
+        customerId: customerId,
+        amount: amount,
+        note: note,
+      );
 
   Future<Map<String, dynamic>> getDailyTotals(DateTime date) =>
       _db.salesDao.getDailyTotals(date);

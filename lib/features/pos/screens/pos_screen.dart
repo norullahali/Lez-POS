@@ -25,6 +25,8 @@ import 'widgets/smart_search_bar.dart';
 import 'package:lez_pos/core/services/receipt_service.dart';
 import '../../../core/services/credit_limit_exception.dart';
 import '../../../core/services/pos_sale_idempotency_conflict_exception.dart';
+import '../../../core/services/customer_payment_idempotency_conflict_exception.dart';
+import 'package:uuid/uuid.dart';
 
 import '../models/invoice_models.dart';
 
@@ -598,6 +600,9 @@ class _CartPanel extends ConsumerStatefulWidget {
 class _CartPanelState extends ConsumerState<_CartPanel> {
   final _invoiceDiscountCtrl = TextEditingController(text: '0');
   bool _checkoutInFlight = false;
+  bool _settleDebtInFlight = false;
+
+  static const _settleDebtUuid = Uuid();
 
   @override
   void initState() {
@@ -658,6 +663,8 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
   /// Opens a quick settle-debt dialog — allows paying previous balance from POS.
   Future<void> _settleDebt(
       int customerId, double currentBalance, String customerName) async {
+    if (_settleDebtInFlight) return;
+
     final amtCtrl =
         TextEditingController(text: currentBalance.toStringAsFixed(0));
     try {
@@ -711,17 +718,39 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
       if (result == true && mounted) {
         final amt = double.tryParse(amtCtrl.text.trim()) ?? 0;
         if (amt <= 0) return;
-        await ref.read(posRepositoryProvider).settleDebt(
-              customerId: customerId,
-              amount: amt,
-              note: 'تسوية دين من POS',
-            );
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text(
-                'تم تسجيل دفعة ${NumberFormat('#,##0.##').format(amt)} د.ع'),
-            backgroundColor: AppColors.success,
-          ));
+
+        final idempotencyKey = _settleDebtUuid.v4();
+        setState(() => _settleDebtInFlight = true);
+        try {
+          await ref.read(posRepositoryProvider).settleDebt(
+                idempotencyKey: idempotencyKey,
+                customerId: customerId,
+                amount: amt,
+                note: 'تسوية دين من POS',
+              );
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: Text(
+                  'تم تسجيل دفعة ${NumberFormat('#,##0.##').format(amt)} د.ع'),
+              backgroundColor: AppColors.success,
+            ));
+          }
+        } on CustomerPaymentIdempotencyConflictException catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: Text('تعذر تنفيذ الدفعة: $e'),
+              backgroundColor: AppColors.error,
+            ));
+          }
+        } catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: Text('حدث خطأ: $e'),
+              backgroundColor: AppColors.error,
+            ));
+          }
+        } finally {
+          if (mounted) setState(() => _settleDebtInFlight = false);
         }
       }
     } finally {

@@ -410,7 +410,7 @@ void main() {
       final migrated = AppDatabase.test(NativeDatabase.opened(rawDb));
       addTearDown(() async => migrated.close());
 
-      expect(migrated.schemaVersion, 37);
+      expect(migrated.schemaVersion, 38);
       expect(await sequencesTableExists(migrated), isTrue);
       expect(await uniqueIndexExists(migrated), isTrue);
 
@@ -556,8 +556,8 @@ void main() {
       expect(number, '${expectedDayPrefix()}-0001');
     });
 
-    test('schema v37 includes B4 sequences and B5 idempotency table', () async {
-      expect(db.schemaVersion, 37);
+    test('schema v38 includes B4 sequences and idempotency tables', () async {
+      expect(db.schemaVersion, 38);
       expect(await uniqueIndexExists(), isTrue);
 
       final tables = await db.customSelect(
@@ -571,6 +571,12 @@ void main() {
         "AND name = 'pos_sale_idempotency'",
       ).get();
       expect(idempotencyTables.length, 1);
+
+      final paymentIdempotencyTables = await db.customSelect(
+        "SELECT name FROM sqlite_master WHERE type = 'table' "
+        "AND name = 'customer_payment_idempotency'",
+      ).get();
+      expect(paymentIdempotencyTables.length, 1);
     });
 
   });

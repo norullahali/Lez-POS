@@ -13,6 +13,7 @@ import 'tables/customers_table.dart';
 import 'tables/customer_accounts_table.dart';
 import 'tables/customer_transactions_table.dart';
 import 'tables/customer_refund_idempotency_table.dart';
+import 'tables/customer_payment_idempotency_table.dart';
 import 'tables/supplier_refund_idempotency_table.dart';
 import 'tables/pos_sale_idempotency_table.dart';
 import 'tables/products_table.dart';
@@ -57,6 +58,7 @@ import 'daos/suppliers_dao.dart';
 import 'daos/customers_dao.dart';
 import 'daos/customer_accounts_dao.dart';
 import 'daos/customer_refund_idempotency_dao.dart';
+import 'daos/customer_payment_idempotency_dao.dart';
 import 'daos/supplier_refund_idempotency_dao.dart';
 import 'daos/pos_sale_idempotency_dao.dart';
 import 'daos/supplier_accounts_dao.dart';
@@ -78,6 +80,7 @@ part 'app_database.g.dart';
     CustomerAccounts,
     CustomerTransactions,
     CustomerRefundIdempotency,
+    CustomerPaymentIdempotency,
     SupplierRefundIdempotency,
     PosSaleIdempotency,
     SupplierAccounts,
@@ -122,6 +125,7 @@ part 'app_database.g.dart';
     CustomersDao,
     CustomerAccountsDao,
     CustomerRefundIdempotencyDao,
+    CustomerPaymentIdempotencyDao,
     SupplierRefundIdempotencyDao,
     PosSaleIdempotencyDao,
     SupplierAccountsDao,
@@ -158,7 +162,7 @@ class AppDatabase extends _$AppDatabase {
   late final pricingDao = PricingDao(this);
 
   @override
-  int get schemaVersion => 37;
+  int get schemaVersion => 38;
 
   @override
   MigrationStrategy get migration {
@@ -173,6 +177,10 @@ class AppDatabase extends _$AppDatabase {
         await customStatement(
           'CREATE INDEX IF NOT EXISTS cri_customer_created_idx '
           'ON customer_refund_idempotency (customer_id, created_at)',
+        );
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS cpi_customer_created_idx '
+          'ON customer_payment_idempotency (customer_id, created_at)',
         );
         await customStatement(
           'CREATE INDEX IF NOT EXISTS sri_supplier_created_idx '
@@ -941,6 +949,20 @@ class AppDatabase extends _$AppDatabase {
             rethrow;
           }
           debugPrint('[Migration v37] pos_sale_idempotency ready');
+        }
+        if (from < 38) {
+          debugPrint('[Migration v38] customer_payment_idempotency table...');
+          await m.createTable(customerPaymentIdempotency);
+          try {
+            await customStatement(
+              'CREATE INDEX IF NOT EXISTS cpi_customer_created_idx '
+              'ON customer_payment_idempotency (customer_id, created_at)',
+            );
+          } catch (e) {
+            debugPrint('[Migration v38] idempotency index skip/error: $e');
+            rethrow;
+          }
+          debugPrint('[Migration v38] customer_payment_idempotency ready');
         }
       },
       beforeOpen: (details) async {

@@ -2332,6 +2332,380 @@ class CustomerRefundIdempotencyCompanion
   }
 }
 
+class $CustomerPaymentIdempotencyTable extends CustomerPaymentIdempotency
+    with
+        TableInfo<$CustomerPaymentIdempotencyTable,
+            CustomerPaymentIdempotencyData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CustomerPaymentIdempotencyTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idempotencyKeyMeta =
+      const VerificationMeta('idempotencyKey');
+  @override
+  late final GeneratedColumn<String> idempotencyKey = GeneratedColumn<String>(
+      'idempotency_key', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _customerIdMeta =
+      const VerificationMeta('customerId');
+  @override
+  late final GeneratedColumn<int> customerId = GeneratedColumn<int>(
+      'customer_id', aliasedName, false,
+      type: DriftSqlType.int, requiredDuringInsert: true);
+  static const VerificationMeta _amountMeta = const VerificationMeta('amount');
+  @override
+  late final GeneratedColumn<double> amount = GeneratedColumn<double>(
+      'amount', aliasedName, false,
+      type: DriftSqlType.double, requiredDuringInsert: true);
+  static const VerificationMeta _noteMeta = const VerificationMeta('note');
+  @override
+  late final GeneratedColumn<String> note = GeneratedColumn<String>(
+      'note', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(''));
+  static const VerificationMeta _customerTransactionIdMeta =
+      const VerificationMeta('customerTransactionId');
+  @override
+  late final GeneratedColumn<int> customerTransactionId = GeneratedColumn<int>(
+      'customer_transaction_id', aliasedName, false,
+      type: DriftSqlType.int, requiredDuringInsert: true);
+  static const VerificationMeta _createdAtMeta =
+      const VerificationMeta('createdAt');
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+      'created_at', aliasedName, false,
+      type: DriftSqlType.dateTime,
+      requiredDuringInsert: false,
+      defaultValue: currentDateAndTime);
+  @override
+  List<GeneratedColumn> get $columns => [
+        idempotencyKey,
+        customerId,
+        amount,
+        note,
+        customerTransactionId,
+        createdAt
+      ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'customer_payment_idempotency';
+  @override
+  VerificationContext validateIntegrity(
+      Insertable<CustomerPaymentIdempotencyData> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('idempotency_key')) {
+      context.handle(
+          _idempotencyKeyMeta,
+          idempotencyKey.isAcceptableOrUnknown(
+              data['idempotency_key']!, _idempotencyKeyMeta));
+    } else if (isInserting) {
+      context.missing(_idempotencyKeyMeta);
+    }
+    if (data.containsKey('customer_id')) {
+      context.handle(
+          _customerIdMeta,
+          customerId.isAcceptableOrUnknown(
+              data['customer_id']!, _customerIdMeta));
+    } else if (isInserting) {
+      context.missing(_customerIdMeta);
+    }
+    if (data.containsKey('amount')) {
+      context.handle(_amountMeta,
+          amount.isAcceptableOrUnknown(data['amount']!, _amountMeta));
+    } else if (isInserting) {
+      context.missing(_amountMeta);
+    }
+    if (data.containsKey('note')) {
+      context.handle(
+          _noteMeta, note.isAcceptableOrUnknown(data['note']!, _noteMeta));
+    }
+    if (data.containsKey('customer_transaction_id')) {
+      context.handle(
+          _customerTransactionIdMeta,
+          customerTransactionId.isAcceptableOrUnknown(
+              data['customer_transaction_id']!, _customerTransactionIdMeta));
+    } else if (isInserting) {
+      context.missing(_customerTransactionIdMeta);
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(_createdAtMeta,
+          createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {idempotencyKey};
+  @override
+  CustomerPaymentIdempotencyData map(Map<String, dynamic> data,
+      {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return CustomerPaymentIdempotencyData(
+      idempotencyKey: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}idempotency_key'])!,
+      customerId: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}customer_id'])!,
+      amount: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}amount'])!,
+      note: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}note'])!,
+      customerTransactionId: attachedDatabase.typeMapping.read(
+          DriftSqlType.int, data['${effectivePrefix}customer_transaction_id'])!,
+      createdAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
+    );
+  }
+
+  @override
+  $CustomerPaymentIdempotencyTable createAlias(String alias) {
+    return $CustomerPaymentIdempotencyTable(attachedDatabase, alias);
+  }
+}
+
+class CustomerPaymentIdempotencyData extends DataClass
+    implements Insertable<CustomerPaymentIdempotencyData> {
+  final String idempotencyKey;
+  final int customerId;
+  final double amount;
+  final String note;
+  final int customerTransactionId;
+  final DateTime createdAt;
+  const CustomerPaymentIdempotencyData(
+      {required this.idempotencyKey,
+      required this.customerId,
+      required this.amount,
+      required this.note,
+      required this.customerTransactionId,
+      required this.createdAt});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['idempotency_key'] = Variable<String>(idempotencyKey);
+    map['customer_id'] = Variable<int>(customerId);
+    map['amount'] = Variable<double>(amount);
+    map['note'] = Variable<String>(note);
+    map['customer_transaction_id'] = Variable<int>(customerTransactionId);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    return map;
+  }
+
+  CustomerPaymentIdempotencyCompanion toCompanion(bool nullToAbsent) {
+    return CustomerPaymentIdempotencyCompanion(
+      idempotencyKey: Value(idempotencyKey),
+      customerId: Value(customerId),
+      amount: Value(amount),
+      note: Value(note),
+      customerTransactionId: Value(customerTransactionId),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory CustomerPaymentIdempotencyData.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return CustomerPaymentIdempotencyData(
+      idempotencyKey: serializer.fromJson<String>(json['idempotencyKey']),
+      customerId: serializer.fromJson<int>(json['customerId']),
+      amount: serializer.fromJson<double>(json['amount']),
+      note: serializer.fromJson<String>(json['note']),
+      customerTransactionId:
+          serializer.fromJson<int>(json['customerTransactionId']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'idempotencyKey': serializer.toJson<String>(idempotencyKey),
+      'customerId': serializer.toJson<int>(customerId),
+      'amount': serializer.toJson<double>(amount),
+      'note': serializer.toJson<String>(note),
+      'customerTransactionId': serializer.toJson<int>(customerTransactionId),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+    };
+  }
+
+  CustomerPaymentIdempotencyData copyWith(
+          {String? idempotencyKey,
+          int? customerId,
+          double? amount,
+          String? note,
+          int? customerTransactionId,
+          DateTime? createdAt}) =>
+      CustomerPaymentIdempotencyData(
+        idempotencyKey: idempotencyKey ?? this.idempotencyKey,
+        customerId: customerId ?? this.customerId,
+        amount: amount ?? this.amount,
+        note: note ?? this.note,
+        customerTransactionId:
+            customerTransactionId ?? this.customerTransactionId,
+        createdAt: createdAt ?? this.createdAt,
+      );
+  CustomerPaymentIdempotencyData copyWithCompanion(
+      CustomerPaymentIdempotencyCompanion data) {
+    return CustomerPaymentIdempotencyData(
+      idempotencyKey: data.idempotencyKey.present
+          ? data.idempotencyKey.value
+          : this.idempotencyKey,
+      customerId:
+          data.customerId.present ? data.customerId.value : this.customerId,
+      amount: data.amount.present ? data.amount.value : this.amount,
+      note: data.note.present ? data.note.value : this.note,
+      customerTransactionId: data.customerTransactionId.present
+          ? data.customerTransactionId.value
+          : this.customerTransactionId,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CustomerPaymentIdempotencyData(')
+          ..write('idempotencyKey: $idempotencyKey, ')
+          ..write('customerId: $customerId, ')
+          ..write('amount: $amount, ')
+          ..write('note: $note, ')
+          ..write('customerTransactionId: $customerTransactionId, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(idempotencyKey, customerId, amount, note,
+      customerTransactionId, createdAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is CustomerPaymentIdempotencyData &&
+          other.idempotencyKey == this.idempotencyKey &&
+          other.customerId == this.customerId &&
+          other.amount == this.amount &&
+          other.note == this.note &&
+          other.customerTransactionId == this.customerTransactionId &&
+          other.createdAt == this.createdAt);
+}
+
+class CustomerPaymentIdempotencyCompanion
+    extends UpdateCompanion<CustomerPaymentIdempotencyData> {
+  final Value<String> idempotencyKey;
+  final Value<int> customerId;
+  final Value<double> amount;
+  final Value<String> note;
+  final Value<int> customerTransactionId;
+  final Value<DateTime> createdAt;
+  final Value<int> rowid;
+  const CustomerPaymentIdempotencyCompanion({
+    this.idempotencyKey = const Value.absent(),
+    this.customerId = const Value.absent(),
+    this.amount = const Value.absent(),
+    this.note = const Value.absent(),
+    this.customerTransactionId = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  CustomerPaymentIdempotencyCompanion.insert({
+    required String idempotencyKey,
+    required int customerId,
+    required double amount,
+    this.note = const Value.absent(),
+    required int customerTransactionId,
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  })  : idempotencyKey = Value(idempotencyKey),
+        customerId = Value(customerId),
+        amount = Value(amount),
+        customerTransactionId = Value(customerTransactionId);
+  static Insertable<CustomerPaymentIdempotencyData> custom({
+    Expression<String>? idempotencyKey,
+    Expression<int>? customerId,
+    Expression<double>? amount,
+    Expression<String>? note,
+    Expression<int>? customerTransactionId,
+    Expression<DateTime>? createdAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (idempotencyKey != null) 'idempotency_key': idempotencyKey,
+      if (customerId != null) 'customer_id': customerId,
+      if (amount != null) 'amount': amount,
+      if (note != null) 'note': note,
+      if (customerTransactionId != null)
+        'customer_transaction_id': customerTransactionId,
+      if (createdAt != null) 'created_at': createdAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  CustomerPaymentIdempotencyCompanion copyWith(
+      {Value<String>? idempotencyKey,
+      Value<int>? customerId,
+      Value<double>? amount,
+      Value<String>? note,
+      Value<int>? customerTransactionId,
+      Value<DateTime>? createdAt,
+      Value<int>? rowid}) {
+    return CustomerPaymentIdempotencyCompanion(
+      idempotencyKey: idempotencyKey ?? this.idempotencyKey,
+      customerId: customerId ?? this.customerId,
+      amount: amount ?? this.amount,
+      note: note ?? this.note,
+      customerTransactionId:
+          customerTransactionId ?? this.customerTransactionId,
+      createdAt: createdAt ?? this.createdAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (idempotencyKey.present) {
+      map['idempotency_key'] = Variable<String>(idempotencyKey.value);
+    }
+    if (customerId.present) {
+      map['customer_id'] = Variable<int>(customerId.value);
+    }
+    if (amount.present) {
+      map['amount'] = Variable<double>(amount.value);
+    }
+    if (note.present) {
+      map['note'] = Variable<String>(note.value);
+    }
+    if (customerTransactionId.present) {
+      map['customer_transaction_id'] =
+          Variable<int>(customerTransactionId.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CustomerPaymentIdempotencyCompanion(')
+          ..write('idempotencyKey: $idempotencyKey, ')
+          ..write('customerId: $customerId, ')
+          ..write('amount: $amount, ')
+          ..write('note: $note, ')
+          ..write('customerTransactionId: $customerTransactionId, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $SupplierRefundIdempotencyTable extends SupplierRefundIdempotency
     with
         TableInfo<$SupplierRefundIdempotencyTable,
@@ -19352,6 +19726,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       $CustomerTransactionsTable(this);
   late final $CustomerRefundIdempotencyTable customerRefundIdempotency =
       $CustomerRefundIdempotencyTable(this);
+  late final $CustomerPaymentIdempotencyTable customerPaymentIdempotency =
+      $CustomerPaymentIdempotencyTable(this);
   late final $SupplierRefundIdempotencyTable supplierRefundIdempotency =
       $SupplierRefundIdempotencyTable(this);
   late final $PosSaleIdempotencyTable posSaleIdempotency =
@@ -19416,6 +19792,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       CustomerAccountsDao(this as AppDatabase);
   late final CustomerRefundIdempotencyDao customerRefundIdempotencyDao =
       CustomerRefundIdempotencyDao(this as AppDatabase);
+  late final CustomerPaymentIdempotencyDao customerPaymentIdempotencyDao =
+      CustomerPaymentIdempotencyDao(this as AppDatabase);
   late final SupplierRefundIdempotencyDao supplierRefundIdempotencyDao =
       SupplierRefundIdempotencyDao(this as AppDatabase);
   late final PosSaleIdempotencyDao posSaleIdempotencyDao =
@@ -19452,6 +19830,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         customerAccounts,
         customerTransactions,
         customerRefundIdempotency,
+        customerPaymentIdempotency,
         supplierRefundIdempotency,
         posSaleIdempotency,
         supplierAccounts,
@@ -21761,6 +22140,205 @@ typedef $$CustomerRefundIdempotencyTableProcessedTableManager
               CustomerRefundIdempotencyData>
         ),
         CustomerRefundIdempotencyData,
+        PrefetchHooks Function()>;
+typedef $$CustomerPaymentIdempotencyTableCreateCompanionBuilder
+    = CustomerPaymentIdempotencyCompanion Function({
+  required String idempotencyKey,
+  required int customerId,
+  required double amount,
+  Value<String> note,
+  required int customerTransactionId,
+  Value<DateTime> createdAt,
+  Value<int> rowid,
+});
+typedef $$CustomerPaymentIdempotencyTableUpdateCompanionBuilder
+    = CustomerPaymentIdempotencyCompanion Function({
+  Value<String> idempotencyKey,
+  Value<int> customerId,
+  Value<double> amount,
+  Value<String> note,
+  Value<int> customerTransactionId,
+  Value<DateTime> createdAt,
+  Value<int> rowid,
+});
+
+class $$CustomerPaymentIdempotencyTableFilterComposer
+    extends Composer<_$AppDatabase, $CustomerPaymentIdempotencyTable> {
+  $$CustomerPaymentIdempotencyTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get idempotencyKey => $composableBuilder(
+      column: $table.idempotencyKey,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get customerId => $composableBuilder(
+      column: $table.customerId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get amount => $composableBuilder(
+      column: $table.amount, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get note => $composableBuilder(
+      column: $table.note, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get customerTransactionId => $composableBuilder(
+      column: $table.customerTransactionId,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnFilters(column));
+}
+
+class $$CustomerPaymentIdempotencyTableOrderingComposer
+    extends Composer<_$AppDatabase, $CustomerPaymentIdempotencyTable> {
+  $$CustomerPaymentIdempotencyTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get idempotencyKey => $composableBuilder(
+      column: $table.idempotencyKey,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get customerId => $composableBuilder(
+      column: $table.customerId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get amount => $composableBuilder(
+      column: $table.amount, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get note => $composableBuilder(
+      column: $table.note, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get customerTransactionId => $composableBuilder(
+      column: $table.customerTransactionId,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnOrderings(column));
+}
+
+class $$CustomerPaymentIdempotencyTableAnnotationComposer
+    extends Composer<_$AppDatabase, $CustomerPaymentIdempotencyTable> {
+  $$CustomerPaymentIdempotencyTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get idempotencyKey => $composableBuilder(
+      column: $table.idempotencyKey, builder: (column) => column);
+
+  GeneratedColumn<int> get customerId => $composableBuilder(
+      column: $table.customerId, builder: (column) => column);
+
+  GeneratedColumn<double> get amount =>
+      $composableBuilder(column: $table.amount, builder: (column) => column);
+
+  GeneratedColumn<String> get note =>
+      $composableBuilder(column: $table.note, builder: (column) => column);
+
+  GeneratedColumn<int> get customerTransactionId => $composableBuilder(
+      column: $table.customerTransactionId, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+}
+
+class $$CustomerPaymentIdempotencyTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $CustomerPaymentIdempotencyTable,
+    CustomerPaymentIdempotencyData,
+    $$CustomerPaymentIdempotencyTableFilterComposer,
+    $$CustomerPaymentIdempotencyTableOrderingComposer,
+    $$CustomerPaymentIdempotencyTableAnnotationComposer,
+    $$CustomerPaymentIdempotencyTableCreateCompanionBuilder,
+    $$CustomerPaymentIdempotencyTableUpdateCompanionBuilder,
+    (
+      CustomerPaymentIdempotencyData,
+      BaseReferences<_$AppDatabase, $CustomerPaymentIdempotencyTable,
+          CustomerPaymentIdempotencyData>
+    ),
+    CustomerPaymentIdempotencyData,
+    PrefetchHooks Function()> {
+  $$CustomerPaymentIdempotencyTableTableManager(
+      _$AppDatabase db, $CustomerPaymentIdempotencyTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CustomerPaymentIdempotencyTableFilterComposer(
+                  $db: db, $table: table),
+          createOrderingComposer: () =>
+              $$CustomerPaymentIdempotencyTableOrderingComposer(
+                  $db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$CustomerPaymentIdempotencyTableAnnotationComposer(
+                  $db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<String> idempotencyKey = const Value.absent(),
+            Value<int> customerId = const Value.absent(),
+            Value<double> amount = const Value.absent(),
+            Value<String> note = const Value.absent(),
+            Value<int> customerTransactionId = const Value.absent(),
+            Value<DateTime> createdAt = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              CustomerPaymentIdempotencyCompanion(
+            idempotencyKey: idempotencyKey,
+            customerId: customerId,
+            amount: amount,
+            note: note,
+            customerTransactionId: customerTransactionId,
+            createdAt: createdAt,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            required String idempotencyKey,
+            required int customerId,
+            required double amount,
+            Value<String> note = const Value.absent(),
+            required int customerTransactionId,
+            Value<DateTime> createdAt = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              CustomerPaymentIdempotencyCompanion.insert(
+            idempotencyKey: idempotencyKey,
+            customerId: customerId,
+            amount: amount,
+            note: note,
+            customerTransactionId: customerTransactionId,
+            createdAt: createdAt,
+            rowid: rowid,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$CustomerPaymentIdempotencyTableProcessedTableManager
+    = ProcessedTableManager<
+        _$AppDatabase,
+        $CustomerPaymentIdempotencyTable,
+        CustomerPaymentIdempotencyData,
+        $$CustomerPaymentIdempotencyTableFilterComposer,
+        $$CustomerPaymentIdempotencyTableOrderingComposer,
+        $$CustomerPaymentIdempotencyTableAnnotationComposer,
+        $$CustomerPaymentIdempotencyTableCreateCompanionBuilder,
+        $$CustomerPaymentIdempotencyTableUpdateCompanionBuilder,
+        (
+          CustomerPaymentIdempotencyData,
+          BaseReferences<_$AppDatabase, $CustomerPaymentIdempotencyTable,
+              CustomerPaymentIdempotencyData>
+        ),
+        CustomerPaymentIdempotencyData,
         PrefetchHooks Function()>;
 typedef $$SupplierRefundIdempotencyTableCreateCompanionBuilder
     = SupplierRefundIdempotencyCompanion Function({
@@ -35358,6 +35936,10 @@ class $AppDatabaseManager {
   $$CustomerRefundIdempotencyTableTableManager get customerRefundIdempotency =>
       $$CustomerRefundIdempotencyTableTableManager(
           _db, _db.customerRefundIdempotency);
+  $$CustomerPaymentIdempotencyTableTableManager
+      get customerPaymentIdempotency =>
+          $$CustomerPaymentIdempotencyTableTableManager(
+              _db, _db.customerPaymentIdempotency);
   $$SupplierRefundIdempotencyTableTableManager get supplierRefundIdempotency =>
       $$SupplierRefundIdempotencyTableTableManager(
           _db, _db.supplierRefundIdempotency);

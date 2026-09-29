@@ -2,9 +2,14 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/database/daos/customer_accounts_dao.dart';
+import '../../../core/services/customer_account_service.dart';
 
 final customerAccountsDaoProvider = Provider<CustomerAccountsDao>((ref) {
   return AppDatabase.instance.customerAccountsDao;
+});
+
+final customerAccountServiceProvider = Provider<CustomerAccountService>((ref) {
+  return CustomerAccountService(AppDatabase.instance);
 });
 
 /// Stream of current balance for a customer — live.

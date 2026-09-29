@@ -15,10 +15,14 @@ import '../../../core/services/pos_sale_fingerprint.dart';
 import '../../../core/activity/activity_categories.dart';
 import '../../../core/activity/activity_types.dart';
 import '../../../core/services/activity_logger_service.dart';
+import '../../customers/providers/customer_accounts_provider.dart';
 
 import 'package:drift/drift.dart' show Value;
 final posRepositoryProvider = Provider<PosRepository>((ref) {
-  return PosRepository(AppDatabase.instance);
+  return PosRepository(
+    AppDatabase.instance,
+    ref.watch(customerAccountServiceProvider),
+  );
 });
 
 final posSaleServiceProvider = Provider<PosSaleService>((ref) {

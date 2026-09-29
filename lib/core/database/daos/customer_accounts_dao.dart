@@ -140,6 +140,49 @@ class CustomerAccountsDao extends DatabaseAccessor<AppDatabase>
         note: note,
       );
 
+  /// Same as [recordPayment] but must run inside an enclosing transaction.
+  /// Returns the inserted [customer_transactions] row id.
+  Future<int> recordPaymentInTransaction({
+    required int customerId,
+    required double amount,
+    String note = '',
+  }) async {
+    final insertedId = await into(customerTransactions).insert(
+      CustomerTransactionsCompanion(
+        customerId: Value(customerId),
+        type: const Value('PAYMENT'),
+        amount: Value(-amount),
+        note: Value(note),
+      ),
+    );
+
+    final newBalance = await calculateBalanceFromTransactions(customerId);
+
+    final existing = await (select(customerAccounts)
+          ..where((a) => a.customerId.equals(customerId)))
+        .getSingleOrNull();
+
+    if (existing != null) {
+      await (update(customerAccounts)..where((a) => a.id.equals(existing.id)))
+          .write(
+        CustomerAccountsCompanion(
+          currentBalance: Value(newBalance),
+          updatedAt: Value(DateTime.now()),
+        ),
+      );
+    } else {
+      await into(customerAccounts).insert(
+        CustomerAccountsCompanion(
+          customerId: Value(customerId),
+          currentBalance: Value(newBalance),
+          updatedAt: Value(DateTime.now()),
+        ),
+      );
+    }
+
+    return insertedId;
+  }
+
   /// Record an ADJUSTMENT with mandatory reason (can be + or -).
   Future<void> adjustBalance({
     required int customerId,

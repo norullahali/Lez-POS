@@ -10,6 +10,8 @@ import '../../products/models/product_model.dart';
 import '../../pricing/services/pricing_engine.dart';
 import '../../pricing/providers/pricing_provider.dart';
 import '../../../core/services/pos_sale_service.dart';
+import '../../../core/services/process_sale_result.dart';
+import '../../../core/services/pos_sale_fingerprint.dart';
 import '../../../core/activity/activity_categories.dart';
 import '../../../core/activity/activity_types.dart';
 import '../../../core/services/activity_logger_service.dart';
@@ -484,32 +486,51 @@ class CartNotifier extends Notifier<CartState> {
   }
 
   // -- Checkout -------------------------------------------------------------
-  Future<String> checkout({
+  Future<ProcessSaleResult> checkout({
+    required CartSession cart,
     required int? sessionId,
     required PaymentInfo payment,
     required int? userId,
     int? approvedByUserId,
   }) async {
     final saleService = ref.read(posSaleServiceProvider);
-    final active = state.activeCart;
-    //final authUser = ref.read(authProvider).valueOrNull?.user;
+
+    final loyaltyPointsUsed = payment.pointsUsed > 0
+        ? payment.pointsUsed
+        : cart.loyaltyPointsUsed;
+    final loyaltyDiscount = payment.loyaltyDiscount > 0
+        ? payment.loyaltyDiscount
+        : cart.loyaltyDiscount;
+    final checkoutTotal = cart.subtotal - cart.invoiceDiscount - loyaltyDiscount;
+
+    final fingerprintHash = PosSaleFingerprint.compute(
+      sessionId: sessionId,
+      cartSlotId: cart.id,
+      items: cart.items,
+      invoiceDiscount: cart.invoiceDiscount,
+      loyaltyPointsUsed: loyaltyPointsUsed,
+      loyaltyDiscount: loyaltyDiscount,
+      customerId: cart.selectedCustomer?.id,
+      payment: payment,
+      approvedByUserId: approvedByUserId,
+    );
 
     final sale = SalesInvoicesCompanion(
       sessionId: Value(sessionId),
-      subtotal: Value(active.subtotal),
-      discountAmount: Value(active.invoiceDiscount + active.loyaltyDiscount),
-      total: Value(active.total),
+      subtotal: Value(cart.subtotal),
+      discountAmount: Value(cart.invoiceDiscount + loyaltyDiscount),
+      total: Value(checkoutTotal),
       paymentMethod: Value(payment.method),
       cashPaid: Value(payment.cashPaid),
       cardPaid: Value(payment.cardPaid),
       changeAmount: Value(payment.change),
-      debtAmount: Value(payment.debtAmount.clamp(0.0, active.total)),
+      debtAmount: Value(payment.debtAmount.clamp(0.0, checkoutTotal)),
       createdByUserId: Value(userId),
       processedByUserId: Value(userId),
-      customerId: Value(active.selectedCustomer?.id),
+      customerId: Value(cart.selectedCustomer?.id),
     );
 
-    final itemCompanions = active.items
+    final itemCompanions = cart.items
         .map((item) => SaleItemsCompanion(
               productId: Value(item.product.id!),
               quantity: Value(item.effectiveQuantity),
@@ -520,17 +541,16 @@ class CartNotifier extends Notifier<CartState> {
             ))
         .toList();
 
-    final result = await saleService.processSale(
+    return saleService.processSale(
+      idempotencyKey: payment.idempotencyKey,
+      fingerprintHash: fingerprintHash,
       invoice: sale,
       items: itemCompanions,
       debtAmount: payment.debtAmount,
-      // Loyalty: pass the redeemed points and the net amount paid to earn from.
-      pointsUsed: active.loyaltyPointsUsed,
-      netSaleTotal: active.total,
+      pointsUsed: loyaltyPointsUsed,
+      netSaleTotal: checkoutTotal,
       approvedByUserId: approvedByUserId,
     );
-
-    return result.invoiceNumber;
   } // نهاية checkout
 } // نهاية CartNotifier
 

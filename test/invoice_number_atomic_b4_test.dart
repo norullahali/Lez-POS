@@ -10,6 +10,11 @@ import 'package:lez_pos/core/services/pos_sale_service.dart';
 import 'package:lez_pos/core/services/stock_guard.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite3;
 import 'package:sqlite3/sqlite3.dart' show Database, SqliteException;
+import 'package:uuid/uuid.dart';
+
+const _b4TestUuid = Uuid();
+String b4IdempotencyKey() => _b4TestUuid.v4();
+const b4Fingerprint = 'b4-test-fingerprint';
 
 /// Bootstraps a full schema, then removes v36-only artifacts and sets user_version=35.
 ///
@@ -110,6 +115,8 @@ void main() {
     for (var attempt = 0; attempt < maxAttempts; attempt++) {
       try {
         final result = await service.processSale(
+          idempotencyKey: b4IdempotencyKey(),
+          fingerprintHash: b4Fingerprint,
           invoice: cashSaleHeader(amount: amount),
           items: [
             SaleItemsCompanion(
@@ -134,6 +141,8 @@ void main() {
 
   Future<String> runCashSale({double amount = 10, double qty = 1}) async {
     final result = await saleService.processSale(
+      idempotencyKey: b4IdempotencyKey(),
+      fingerprintHash: b4Fingerprint,
       invoice: cashSaleHeader(amount: amount),
       items: cashSaleItems(qty: qty, price: amount / qty),
       debtAmount: 0,
@@ -290,6 +299,8 @@ void main() {
 
       await expectLater(
         saleService.processSale(
+          idempotencyKey: b4IdempotencyKey(),
+          fingerprintHash: b4Fingerprint,
           invoice: cashSaleHeader(amount: 10),
           items: cashSaleItems(),
           debtAmount: 0,
@@ -322,6 +333,8 @@ void main() {
 
       await expectLater(
         saleService.processSale(
+          idempotencyKey: b4IdempotencyKey(),
+          fingerprintHash: b4Fingerprint,
           invoice: SalesInvoicesCompanion(
             subtotal: const Value(60),
             total: const Value(60),
@@ -361,6 +374,8 @@ void main() {
     test('9) receipt/display compatibility returns allocated number from processSale',
         () async {
       final result = await saleService.processSale(
+        idempotencyKey: b4IdempotencyKey(),
+        fingerprintHash: b4Fingerprint,
         invoice: cashSaleHeader(amount: 15),
         items: cashSaleItems(qty: 1, price: 15),
         debtAmount: 0,
@@ -395,7 +410,7 @@ void main() {
       final migrated = AppDatabase.test(NativeDatabase.opened(rawDb));
       addTearDown(() async => migrated.close());
 
-      expect(migrated.schemaVersion, 36);
+      expect(migrated.schemaVersion, 37);
       expect(await sequencesTableExists(migrated), isTrue);
       expect(await uniqueIndexExists(migrated), isTrue);
 
@@ -541,8 +556,8 @@ void main() {
       expect(number, '${expectedDayPrefix()}-0001');
     });
 
-    test('schema v36 includes sequences table and unique index', () async {
-      expect(db.schemaVersion, 36);
+    test('schema v37 includes B4 sequences and B5 idempotency table', () async {
+      expect(db.schemaVersion, 37);
       expect(await uniqueIndexExists(), isTrue);
 
       final tables = await db.customSelect(
@@ -550,6 +565,12 @@ void main() {
         "AND name = 'sales_invoice_daily_sequences'",
       ).get();
       expect(tables.length, 1);
+
+      final idempotencyTables = await db.customSelect(
+        "SELECT name FROM sqlite_master WHERE type = 'table' "
+        "AND name = 'pos_sale_idempotency'",
+      ).get();
+      expect(idempotencyTables.length, 1);
     });
 
   });

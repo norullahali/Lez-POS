@@ -14,6 +14,7 @@ import 'tables/customer_accounts_table.dart';
 import 'tables/customer_transactions_table.dart';
 import 'tables/customer_refund_idempotency_table.dart';
 import 'tables/supplier_refund_idempotency_table.dart';
+import 'tables/pos_sale_idempotency_table.dart';
 import 'tables/products_table.dart';
 import 'tables/product_batches_table.dart';
 import 'tables/stock_ledger_table.dart';
@@ -57,6 +58,7 @@ import 'daos/customers_dao.dart';
 import 'daos/customer_accounts_dao.dart';
 import 'daos/customer_refund_idempotency_dao.dart';
 import 'daos/supplier_refund_idempotency_dao.dart';
+import 'daos/pos_sale_idempotency_dao.dart';
 import 'daos/supplier_accounts_dao.dart';
 import 'daos/products_dao.dart';
 import 'daos/stock_dao.dart';
@@ -77,6 +79,7 @@ part 'app_database.g.dart';
     CustomerTransactions,
     CustomerRefundIdempotency,
     SupplierRefundIdempotency,
+    PosSaleIdempotency,
     SupplierAccounts,
     SupplierTransactions,
     Products,
@@ -120,6 +123,7 @@ part 'app_database.g.dart';
     CustomerAccountsDao,
     CustomerRefundIdempotencyDao,
     SupplierRefundIdempotencyDao,
+    PosSaleIdempotencyDao,
     SupplierAccountsDao,
     ProductsDao,
     StockDao,
@@ -154,7 +158,7 @@ class AppDatabase extends _$AppDatabase {
   late final pricingDao = PricingDao(this);
 
   @override
-  int get schemaVersion => 36;
+  int get schemaVersion => 37;
 
   @override
   MigrationStrategy get migration {
@@ -923,6 +927,20 @@ class AppDatabase extends _$AppDatabase {
         }
         if (from < 36) {
           await _migrateB4InvoiceAtomicAllocation(m);
+        }
+        if (from < 37) {
+          debugPrint('[Migration v37] pos_sale_idempotency table...');
+          await m.createTable(posSaleIdempotency);
+          try {
+            await customStatement(
+              'CREATE INDEX IF NOT EXISTS psi_sales_invoice_idx '
+              'ON pos_sale_idempotency (sales_invoice_id)',
+            );
+          } catch (e) {
+            debugPrint('[Migration v37] idempotency index skip/error: $e');
+            rethrow;
+          }
+          debugPrint('[Migration v37] pos_sale_idempotency ready');
         }
       },
       beforeOpen: (details) async {

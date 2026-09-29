@@ -7,10 +7,13 @@ import '../services/stock_guard.dart';
 import '../services/credit_limit_exception.dart';
 import '../services/invoice_number_service.dart';
 import '../services/process_sale_result.dart';
+import '../services/pos_sale_idempotency_conflict_exception.dart';
 import '../../features/loyalty/services/loyalty_service.dart';
 import '../activity/activity_categories.dart';
 import '../activity/activity_types.dart';
 import 'activity_logger_service.dart';
+
+class _IdempotencySealRace implements Exception {}
 
 /// Service to handle POS sales and returns orchestration.
 class PosSaleService {
@@ -23,10 +26,15 @@ class PosSaleService {
   /// Processes a complete sale transaction.
   /// This method is the single source of truth for POS sales.
   ///
+  /// [idempotencyKey] identifies the checkout attempt. Retries with the same key
+  /// and identical [fingerprintHash] replay the original sale without mutation.
+  ///
   /// Loyalty parameters (optional):
   ///   [pointsUsed]   – points the customer chose to redeem (deducted).
   ///   [netSaleTotal] – the net amount actually paid (used to compute earned pts).
   Future<ProcessSaleResult> processSale({
+    required String idempotencyKey,
+    required String fingerprintHash,
     required SalesInvoicesCompanion invoice,
     required List<SaleItemsCompanion> items,
     double? debtAmount,
@@ -35,7 +43,103 @@ class PosSaleService {
     int? approvedByUserId,
   }) async {
     try {
+      for (var attempt = 0; attempt < 8; attempt++) {
+        try {
+          return await db.transaction(() async {
+            final existing = await db.posSaleIdempotencyDao
+                .findByIdempotencyKey(idempotencyKey);
+            if (existing != null) {
+              if (existing.fingerprintHash != fingerprintHash) {
+                throw const PosSaleIdempotencyConflictException();
+              }
+              return ProcessSaleResult(
+                invoiceId: existing.salesInvoiceId,
+                invoiceNumber: existing.invoiceNumber,
+                idempotentReplay: true,
+              );
+            }
+
+            final result = await _executeNewSaleInTransaction(
+              invoice: invoice,
+              items: items,
+              debtAmount: debtAmount,
+              pointsUsed: pointsUsed,
+              netSaleTotal: netSaleTotal,
+              approvedByUserId: approvedByUserId,
+            );
+
+            try {
+              await db.posSaleIdempotencyDao.insertCompletedRecord(
+                idempotencyKey: idempotencyKey,
+                sessionId: invoice.sessionId.present
+                    ? invoice.sessionId.value
+                    : null,
+                fingerprintHash: fingerprintHash,
+                salesInvoiceId: result.invoiceId,
+                invoiceNumber: result.invoiceNumber,
+              );
+            } catch (e) {
+              if (_isUniqueIdempotencyKeyViolation(e)) {
+                throw _IdempotencySealRace();
+              }
+              rethrow;
+            }
+
+            return ProcessSaleResult(
+              invoiceId: result.invoiceId,
+              invoiceNumber: result.invoiceNumber,
+              idempotentReplay: false,
+            );
+          });
+        } on _IdempotencySealRace {
+          continue;
+        } on PosSaleIdempotencyConflictException {
+          rethrow;
+        } on CreditLimitExceededException {
+          rethrow;
+        } catch (e, st) {
+          if (_isSqliteBusyOrLocked(e) && attempt < 7) {
+            await Future<void>.delayed(
+                Duration(milliseconds: 25 * (attempt + 1)));
+            continue;
+          }
+          debugPrint('[PosSaleService] Error in processSale: $e\n$st');
+          if (e is CreditLimitExceededException) rethrow;
+          if (e is Exception) rethrow;
+          throw Exception('فشل في إتمام عملية البيع: ${e.toString()}');
+        }
+      }
+
       return await db.transaction(() async {
+        final existing = await db.posSaleIdempotencyDao
+            .findByIdempotencyKey(idempotencyKey);
+        if (existing != null &&
+            existing.fingerprintHash == fingerprintHash) {
+          return ProcessSaleResult(
+            invoiceId: existing.salesInvoiceId,
+            invoiceNumber: existing.invoiceNumber,
+            idempotentReplay: true,
+          );
+        }
+        throw const PosSaleIdempotencyConflictException();
+      });
+    } catch (e, st) {
+      debugPrint('[PosSaleService] Error in processSale: $e\n$st');
+      if (e is CreditLimitExceededException) rethrow;
+      if (e is PosSaleIdempotencyConflictException) rethrow;
+      if (e is Exception) rethrow;
+      throw Exception('فشل في إتمام عملية البيع: ${e.toString()}');
+    }
+  }
+
+  Future<ProcessSaleResult> _executeNewSaleInTransaction({
+    required SalesInvoicesCompanion invoice,
+    required List<SaleItemsCompanion> items,
+    double? debtAmount,
+    required double pointsUsed,
+    required double netSaleTotal,
+    int? approvedByUserId,
+  }) async {
         // 0. Validate Returns and Refund Limits
         final hasReturns = items.any((i) => i.quantity.present && i.quantity.value < 0);
         double totalReturnAmount = 0;
@@ -182,13 +286,18 @@ class PosSaleService {
           invoiceId: invoiceId,
           invoiceNumber: allocatedInvoiceNumber,
         );
-      });
-    } catch (e, st) {
-      debugPrint('[PosSaleService] Error in processSale: $e\n$st');
-      if (e is CreditLimitExceededException) rethrow;
-      if (e is Exception) rethrow;
-      throw Exception('فشل في إتمام عملية البيع: ${e.toString()}');
-    }
+  }
+
+  bool _isUniqueIdempotencyKeyViolation(Object error) {
+    final message = error.toString();
+    return message.contains('UNIQUE constraint failed') &&
+        message.contains('pos_sale_idempotency');
+  }
+
+  bool _isSqliteBusyOrLocked(Object error) {
+    final message = error.toString();
+    return message.contains('database is locked') ||
+        message.contains('SqliteException(5)');
   }
 
   /// Processes a quick return without an original invoice.

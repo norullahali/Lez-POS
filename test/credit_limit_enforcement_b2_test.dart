@@ -8,6 +8,11 @@ import 'package:lez_pos/core/services/credit_limit_exception.dart';
 import 'package:lez_pos/core/services/pos_sale_service.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite3;
 import 'package:sqlite3/sqlite3.dart' show SqliteException;
+import 'package:uuid/uuid.dart';
+
+const _b2TestUuid = Uuid();
+String b2IdempotencyKey() => _b2TestUuid.v4();
+const b2Fingerprint = 'b2-test-fingerprint';
 
 void main() {
   late AppDatabase db;
@@ -77,6 +82,8 @@ void main() {
   }) async {
     final targetCustomer = cid ?? customerId;
     final result = await saleService.processSale(
+      idempotencyKey: b2IdempotencyKey(),
+      fingerprintHash: b2Fingerprint,
       invoice: SalesInvoicesCompanion(
         subtotal: Value(debtAmount),
         total: Value(debtAmount),
@@ -102,6 +109,8 @@ void main() {
 
   Future<int> runCashSale(double amount, {int? cid}) async {
     final result = await saleService.processSale(
+      idempotencyKey: b2IdempotencyKey(),
+      fingerprintHash: b2Fingerprint,
       invoice: SalesInvoicesCompanion(
         subtotal: Value(amount),
         total: Value(amount),
@@ -258,6 +267,8 @@ void main() {
         for (var attempt = 0; attempt < 20; attempt++) {
           try {
             final result = await service.processSale(
+              idempotencyKey: b2IdempotencyKey(),
+              fingerprintHash: b2Fingerprint,
               invoice: SalesInvoicesCompanion(
                 subtotal: const Value(60),
                 total: const Value(60),

@@ -24,6 +24,7 @@ import 'widgets/customer_selection_modal.dart';
 import 'widgets/smart_search_bar.dart';
 import 'package:lez_pos/core/services/receipt_service.dart';
 import '../../../core/services/credit_limit_exception.dart';
+import '../../../core/services/pos_sale_idempotency_conflict_exception.dart';
 
 import '../models/invoice_models.dart';
 
@@ -596,6 +597,7 @@ class _CartPanel extends ConsumerStatefulWidget {
 
 class _CartPanelState extends ConsumerState<_CartPanel> {
   final _invoiceDiscountCtrl = TextEditingController(text: '0');
+  bool _checkoutInFlight = false;
 
   @override
   void initState() {
@@ -728,6 +730,8 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
   }
 
   Future<void> _checkout() async {
+    if (_checkoutInFlight) return;
+
     final session = ref.read(posSessionProvider).valueOrNull;
     if (session == null) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
@@ -794,8 +798,14 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
     );
     if (payment == null) return;
 
-    // Apply loyalty discount to cart state BEFORE calling checkout
-    // so that pos_provider.checkout uses the updated total.
+    final checkoutCart = payment.pointsUsed > 0
+        ? activeCartSnapshot.copyWith(
+            loyaltyPointsUsed: payment.pointsUsed,
+            loyaltyDiscount: payment.loyaltyDiscount,
+          )
+        : activeCartSnapshot;
+
+    // Keep live cart UI in sync with the confirmed payment snapshot.
     if (payment.pointsUsed > 0) {
       ref.read(cartProvider.notifier).setLoyaltyPoints(
             payment.pointsUsed,
@@ -803,19 +813,22 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
           );
     }
 
+    _checkoutInFlight = true;
     try {
       final user = ref.read(authProvider).valueOrNull?.user;
 
       final userId = user?.id;
 
       // ✅ تنفيذ عملية البيع (invoice number allocated inside processSale)
-      final invoiceNumber =
+      final saleResult =
           await ref.read(cartProvider.notifier).checkout(
+                cart: checkoutCart,
                 sessionId: session.id,
                 payment: payment,
                 userId: userId,
                 approvedByUserId: approvedByUserId,
               );
+      final invoiceNumber = saleResult.invoiceNumber;
 
       final items = activeCartSnapshot.items;
 
@@ -894,9 +907,13 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
       if (!mounted) return;
       final message = e is CreditLimitExceededException
           ? e.localizedMessage
-          : 'خطأ: $e';
+          : e is PosSaleIdempotencyConflictException
+              ? 'تعارض في عملية الدفع. أعد فتح نافذة الدفع وحاول مرة أخرى.'
+              : 'خطأ: $e';
       ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(message), backgroundColor: AppColors.error));
+    } finally {
+      _checkoutInFlight = false;
     }
   }
 

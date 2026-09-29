@@ -133,9 +133,11 @@ class PaymentInfo {
   final double debtAmount; // portion charged on credit
   final double pointsUsed; // loyalty points redeemed
   final double loyaltyDiscount; // cash value of redeemed points
+  final String idempotencyKey;
 
   const PaymentInfo({
     required this.method,
+    required this.idempotencyKey,
     this.cashPaid = 0,
     this.cardPaid = 0,
     this.change = 0,

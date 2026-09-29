@@ -8038,6 +8038,211 @@ class SalesInvoicesCompanion extends UpdateCompanion<SalesInvoice> {
   }
 }
 
+class $SalesInvoiceDailySequencesTable extends SalesInvoiceDailySequences
+    with
+        TableInfo<$SalesInvoiceDailySequencesTable, SalesInvoiceDailySequence> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $SalesInvoiceDailySequencesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _dayPrefixMeta =
+      const VerificationMeta('dayPrefix');
+  @override
+  late final GeneratedColumn<String> dayPrefix = GeneratedColumn<String>(
+      'day_prefix', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _lastNumberMeta =
+      const VerificationMeta('lastNumber');
+  @override
+  late final GeneratedColumn<int> lastNumber = GeneratedColumn<int>(
+      'last_number', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0));
+  @override
+  List<GeneratedColumn> get $columns => [dayPrefix, lastNumber];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'sales_invoice_daily_sequences';
+  @override
+  VerificationContext validateIntegrity(
+      Insertable<SalesInvoiceDailySequence> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('day_prefix')) {
+      context.handle(_dayPrefixMeta,
+          dayPrefix.isAcceptableOrUnknown(data['day_prefix']!, _dayPrefixMeta));
+    } else if (isInserting) {
+      context.missing(_dayPrefixMeta);
+    }
+    if (data.containsKey('last_number')) {
+      context.handle(
+          _lastNumberMeta,
+          lastNumber.isAcceptableOrUnknown(
+              data['last_number']!, _lastNumberMeta));
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {dayPrefix};
+  @override
+  SalesInvoiceDailySequence map(Map<String, dynamic> data,
+      {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return SalesInvoiceDailySequence(
+      dayPrefix: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}day_prefix'])!,
+      lastNumber: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}last_number'])!,
+    );
+  }
+
+  @override
+  $SalesInvoiceDailySequencesTable createAlias(String alias) {
+    return $SalesInvoiceDailySequencesTable(attachedDatabase, alias);
+  }
+}
+
+class SalesInvoiceDailySequence extends DataClass
+    implements Insertable<SalesInvoiceDailySequence> {
+  /// Calendar day key in `YYYYMMDD` form.
+  final String dayPrefix;
+
+  /// Last allocated numeric suffix for [dayPrefix].
+  final int lastNumber;
+  const SalesInvoiceDailySequence(
+      {required this.dayPrefix, required this.lastNumber});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['day_prefix'] = Variable<String>(dayPrefix);
+    map['last_number'] = Variable<int>(lastNumber);
+    return map;
+  }
+
+  SalesInvoiceDailySequencesCompanion toCompanion(bool nullToAbsent) {
+    return SalesInvoiceDailySequencesCompanion(
+      dayPrefix: Value(dayPrefix),
+      lastNumber: Value(lastNumber),
+    );
+  }
+
+  factory SalesInvoiceDailySequence.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return SalesInvoiceDailySequence(
+      dayPrefix: serializer.fromJson<String>(json['dayPrefix']),
+      lastNumber: serializer.fromJson<int>(json['lastNumber']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'dayPrefix': serializer.toJson<String>(dayPrefix),
+      'lastNumber': serializer.toJson<int>(lastNumber),
+    };
+  }
+
+  SalesInvoiceDailySequence copyWith({String? dayPrefix, int? lastNumber}) =>
+      SalesInvoiceDailySequence(
+        dayPrefix: dayPrefix ?? this.dayPrefix,
+        lastNumber: lastNumber ?? this.lastNumber,
+      );
+  SalesInvoiceDailySequence copyWithCompanion(
+      SalesInvoiceDailySequencesCompanion data) {
+    return SalesInvoiceDailySequence(
+      dayPrefix: data.dayPrefix.present ? data.dayPrefix.value : this.dayPrefix,
+      lastNumber:
+          data.lastNumber.present ? data.lastNumber.value : this.lastNumber,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SalesInvoiceDailySequence(')
+          ..write('dayPrefix: $dayPrefix, ')
+          ..write('lastNumber: $lastNumber')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(dayPrefix, lastNumber);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is SalesInvoiceDailySequence &&
+          other.dayPrefix == this.dayPrefix &&
+          other.lastNumber == this.lastNumber);
+}
+
+class SalesInvoiceDailySequencesCompanion
+    extends UpdateCompanion<SalesInvoiceDailySequence> {
+  final Value<String> dayPrefix;
+  final Value<int> lastNumber;
+  final Value<int> rowid;
+  const SalesInvoiceDailySequencesCompanion({
+    this.dayPrefix = const Value.absent(),
+    this.lastNumber = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  SalesInvoiceDailySequencesCompanion.insert({
+    required String dayPrefix,
+    this.lastNumber = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : dayPrefix = Value(dayPrefix);
+  static Insertable<SalesInvoiceDailySequence> custom({
+    Expression<String>? dayPrefix,
+    Expression<int>? lastNumber,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (dayPrefix != null) 'day_prefix': dayPrefix,
+      if (lastNumber != null) 'last_number': lastNumber,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  SalesInvoiceDailySequencesCompanion copyWith(
+      {Value<String>? dayPrefix, Value<int>? lastNumber, Value<int>? rowid}) {
+    return SalesInvoiceDailySequencesCompanion(
+      dayPrefix: dayPrefix ?? this.dayPrefix,
+      lastNumber: lastNumber ?? this.lastNumber,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (dayPrefix.present) {
+      map['day_prefix'] = Variable<String>(dayPrefix.value);
+    }
+    if (lastNumber.present) {
+      map['last_number'] = Variable<int>(lastNumber.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SalesInvoiceDailySequencesCompanion(')
+          ..write('dayPrefix: $dayPrefix, ')
+          ..write('lastNumber: $lastNumber, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $SaleItemsTable extends SaleItems
     with TableInfo<$SaleItemsTable, SaleItem> {
   @override
@@ -18789,6 +18994,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $PurchaseItemsTable purchaseItems = $PurchaseItemsTable(this);
   late final $PosSessionsTable posSessions = $PosSessionsTable(this);
   late final $SalesInvoicesTable salesInvoices = $SalesInvoicesTable(this);
+  late final $SalesInvoiceDailySequencesTable salesInvoiceDailySequences =
+      $SalesInvoiceDailySequencesTable(this);
   late final $SaleItemsTable saleItems = $SaleItemsTable(this);
   late final $CustomerReturnsTable customerReturns =
       $CustomerReturnsTable(this);
@@ -18878,6 +19085,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         purchaseItems,
         posSessions,
         salesInvoices,
+        salesInvoiceDailySequences,
         saleItems,
         customerReturns,
         customerReturnItems,
@@ -26258,6 +26466,141 @@ typedef $$SalesInvoicesTableProcessedTableManager = ProcessedTableManager<
         bool customerId,
         bool saleItemsRefs,
         bool customerReturnsRefs})>;
+typedef $$SalesInvoiceDailySequencesTableCreateCompanionBuilder
+    = SalesInvoiceDailySequencesCompanion Function({
+  required String dayPrefix,
+  Value<int> lastNumber,
+  Value<int> rowid,
+});
+typedef $$SalesInvoiceDailySequencesTableUpdateCompanionBuilder
+    = SalesInvoiceDailySequencesCompanion Function({
+  Value<String> dayPrefix,
+  Value<int> lastNumber,
+  Value<int> rowid,
+});
+
+class $$SalesInvoiceDailySequencesTableFilterComposer
+    extends Composer<_$AppDatabase, $SalesInvoiceDailySequencesTable> {
+  $$SalesInvoiceDailySequencesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get dayPrefix => $composableBuilder(
+      column: $table.dayPrefix, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get lastNumber => $composableBuilder(
+      column: $table.lastNumber, builder: (column) => ColumnFilters(column));
+}
+
+class $$SalesInvoiceDailySequencesTableOrderingComposer
+    extends Composer<_$AppDatabase, $SalesInvoiceDailySequencesTable> {
+  $$SalesInvoiceDailySequencesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get dayPrefix => $composableBuilder(
+      column: $table.dayPrefix, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get lastNumber => $composableBuilder(
+      column: $table.lastNumber, builder: (column) => ColumnOrderings(column));
+}
+
+class $$SalesInvoiceDailySequencesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $SalesInvoiceDailySequencesTable> {
+  $$SalesInvoiceDailySequencesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get dayPrefix =>
+      $composableBuilder(column: $table.dayPrefix, builder: (column) => column);
+
+  GeneratedColumn<int> get lastNumber => $composableBuilder(
+      column: $table.lastNumber, builder: (column) => column);
+}
+
+class $$SalesInvoiceDailySequencesTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $SalesInvoiceDailySequencesTable,
+    SalesInvoiceDailySequence,
+    $$SalesInvoiceDailySequencesTableFilterComposer,
+    $$SalesInvoiceDailySequencesTableOrderingComposer,
+    $$SalesInvoiceDailySequencesTableAnnotationComposer,
+    $$SalesInvoiceDailySequencesTableCreateCompanionBuilder,
+    $$SalesInvoiceDailySequencesTableUpdateCompanionBuilder,
+    (
+      SalesInvoiceDailySequence,
+      BaseReferences<_$AppDatabase, $SalesInvoiceDailySequencesTable,
+          SalesInvoiceDailySequence>
+    ),
+    SalesInvoiceDailySequence,
+    PrefetchHooks Function()> {
+  $$SalesInvoiceDailySequencesTableTableManager(
+      _$AppDatabase db, $SalesInvoiceDailySequencesTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$SalesInvoiceDailySequencesTableFilterComposer(
+                  $db: db, $table: table),
+          createOrderingComposer: () =>
+              $$SalesInvoiceDailySequencesTableOrderingComposer(
+                  $db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$SalesInvoiceDailySequencesTableAnnotationComposer(
+                  $db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<String> dayPrefix = const Value.absent(),
+            Value<int> lastNumber = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              SalesInvoiceDailySequencesCompanion(
+            dayPrefix: dayPrefix,
+            lastNumber: lastNumber,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            required String dayPrefix,
+            Value<int> lastNumber = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              SalesInvoiceDailySequencesCompanion.insert(
+            dayPrefix: dayPrefix,
+            lastNumber: lastNumber,
+            rowid: rowid,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$SalesInvoiceDailySequencesTableProcessedTableManager
+    = ProcessedTableManager<
+        _$AppDatabase,
+        $SalesInvoiceDailySequencesTable,
+        SalesInvoiceDailySequence,
+        $$SalesInvoiceDailySequencesTableFilterComposer,
+        $$SalesInvoiceDailySequencesTableOrderingComposer,
+        $$SalesInvoiceDailySequencesTableAnnotationComposer,
+        $$SalesInvoiceDailySequencesTableCreateCompanionBuilder,
+        $$SalesInvoiceDailySequencesTableUpdateCompanionBuilder,
+        (
+          SalesInvoiceDailySequence,
+          BaseReferences<_$AppDatabase, $SalesInvoiceDailySequencesTable,
+              SalesInvoiceDailySequence>
+        ),
+        SalesInvoiceDailySequence,
+        PrefetchHooks Function()>;
 typedef $$SaleItemsTableCreateCompanionBuilder = SaleItemsCompanion Function({
   Value<int> id,
   required int invoiceId,
@@ -34460,6 +34803,10 @@ class $AppDatabaseManager {
       $$PosSessionsTableTableManager(_db, _db.posSessions);
   $$SalesInvoicesTableTableManager get salesInvoices =>
       $$SalesInvoicesTableTableManager(_db, _db.salesInvoices);
+  $$SalesInvoiceDailySequencesTableTableManager
+      get salesInvoiceDailySequences =>
+          $$SalesInvoiceDailySequencesTableTableManager(
+              _db, _db.salesInvoiceDailySequences);
   $$SaleItemsTableTableManager get saleItems =>
       $$SaleItemsTableTableManager(_db, _db.saleItems);
   $$CustomerReturnsTableTableManager get customerReturns =>

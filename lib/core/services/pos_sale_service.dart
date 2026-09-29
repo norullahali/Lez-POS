@@ -5,6 +5,8 @@ import '../constants/movement_types.dart';
 import '../services/settings_service.dart';
 import '../services/stock_guard.dart';
 import '../services/credit_limit_exception.dart';
+import '../services/invoice_number_service.dart';
+import '../services/process_sale_result.dart';
 import '../../features/loyalty/services/loyalty_service.dart';
 import '../activity/activity_categories.dart';
 import '../activity/activity_types.dart';
@@ -24,7 +26,7 @@ class PosSaleService {
   /// Loyalty parameters (optional):
   ///   [pointsUsed]   – points the customer chose to redeem (deducted).
   ///   [netSaleTotal] – the net amount actually paid (used to compute earned pts).
-  Future<int> processSale({
+  Future<ProcessSaleResult> processSale({
     required SalesInvoicesCompanion invoice,
     required List<SaleItemsCompanion> items,
     double? debtAmount,
@@ -59,8 +61,14 @@ class PosSaleService {
           }
         }
 
-        // 1. Insert SalesInvoice record
-        final invoiceId = await db.into(db.salesInvoices).insert(invoice);
+        // 1. Allocate invoice number atomically, then insert SalesInvoice record.
+        final allocatedInvoiceNumber =
+            await InvoiceNumberService(db).allocateNextInTransaction();
+        final invoiceToInsert = invoice.copyWith(
+          invoiceNumber: Value(allocatedInvoiceNumber),
+        );
+        final invoiceId =
+            await db.into(db.salesInvoices).insert(invoiceToInsert);
 
         await ActivityLoggerService(db).logInfo(
           activityType: ActivityTypes.invoiceCreated,
@@ -70,7 +78,7 @@ class PosSaleService {
           entityType: 'invoice',
           entityId: invoiceId,
           metadata: {
-            'invoiceNumber': invoice.invoiceNumber.value,
+            'invoiceNumber': allocatedInvoiceNumber,
             'total': invoice.total.value,
           },
         );
@@ -123,7 +131,7 @@ class PosSaleService {
         if (debtAmount != null && debtAmount > 0) {
           final customerId = invoice.customerId.value;
           if (customerId != null && customerId != 1) { // 1 = General Customer
-            final saleNote = 'فاتورة رقم ${invoice.invoiceNumber.value}';
+            final saleNote = 'فاتورة رقم $allocatedInvoiceNumber';
             final insertedId = await db.customerAccountsDao
                 .recordSaleInTransactionIfWithinCreditLimit(
               customerId: customerId,
@@ -170,7 +178,10 @@ class PosSaleService {
           )
         );
 
-        return invoiceId;
+        return ProcessSaleResult(
+          invoiceId: invoiceId,
+          invoiceNumber: allocatedInvoiceNumber,
+        );
       });
     } catch (e, st) {
       debugPrint('[PosSaleService] Error in processSale: $e\n$st');

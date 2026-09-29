@@ -7,6 +7,7 @@ import 'package:lez_pos/core/database/app_database.dart';
 import 'package:lez_pos/core/services/credit_limit_exception.dart';
 import 'package:lez_pos/core/services/pos_sale_service.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite3;
+import 'package:sqlite3/sqlite3.dart' show SqliteException;
 
 void main() {
   late AppDatabase db;
@@ -73,14 +74,10 @@ void main() {
   Future<int> runCreditSale(
     double debtAmount, {
     int? cid,
-    String? invoiceNumber,
-  }) {
+  }) async {
     final targetCustomer = cid ?? customerId;
-    return saleService.processSale(
+    final result = await saleService.processSale(
       invoice: SalesInvoicesCompanion(
-        invoiceNumber: Value(
-          invoiceNumber ?? 'B2-${DateTime.now().microsecondsSinceEpoch}',
-        ),
         subtotal: Value(debtAmount),
         total: Value(debtAmount),
         paymentMethod: const Value('DEBT'),
@@ -100,12 +97,12 @@ void main() {
       debtAmount: debtAmount,
       netSaleTotal: debtAmount,
     );
+    return result.invoiceId;
   }
 
-  Future<int> runCashSale(double amount, {int? cid}) {
-    return saleService.processSale(
+  Future<int> runCashSale(double amount, {int? cid}) async {
+    final result = await saleService.processSale(
       invoice: SalesInvoicesCompanion(
-        invoiceNumber: Value('B2-CASH-${DateTime.now().microsecondsSinceEpoch}'),
         subtotal: Value(amount),
         total: Value(amount),
         paymentMethod: const Value('CASH'),
@@ -125,6 +122,7 @@ void main() {
       debtAmount: 0,
       netSaleTotal: amount,
     );
+    return result.invoiceId;
   }
 
   group('B2 credit limit enforcement', () {
@@ -256,45 +254,53 @@ void main() {
             ),
           );
 
-      Future<int> concurrentSale(PosSaleService service, String suffix) {
-        return service.processSale(
-          invoice: SalesInvoicesCompanion(
-            invoiceNumber: Value('B2-CONC-$suffix'),
-            subtotal: const Value(60),
-            total: const Value(60),
-            paymentMethod: const Value('DEBT'),
-            cashPaid: const Value(0),
-            debtAmount: const Value(60),
-            customerId: Value(cid),
-          ),
-          items: [
-            SaleItemsCompanion(
-              productId: Value(pid),
-              quantity: const Value(1),
-              unitPrice: const Value(60),
-              unitCost: const Value(5),
-              total: const Value(60),
-            ),
-          ],
-          debtAmount: 60,
-          netSaleTotal: 60,
-        );
+      Future<int> concurrentSale(PosSaleService service) async {
+        for (var attempt = 0; attempt < 20; attempt++) {
+          try {
+            final result = await service.processSale(
+              invoice: SalesInvoicesCompanion(
+                subtotal: const Value(60),
+                total: const Value(60),
+                paymentMethod: const Value('DEBT'),
+                cashPaid: const Value(0),
+                debtAmount: const Value(60),
+                customerId: Value(cid),
+              ),
+              items: [
+                SaleItemsCompanion(
+                  productId: Value(pid),
+                  quantity: const Value(1),
+                  unitPrice: const Value(60),
+                  unitCost: const Value(5),
+                  total: const Value(60),
+                ),
+              ],
+              debtAmount: 60,
+              netSaleTotal: 60,
+            );
+            return result.invoiceId;
+          } on SqliteException catch (e) {
+            if (e.resultCode != 5) rethrow;
+            await Future<void>.delayed(const Duration(milliseconds: 25));
+          }
+        }
+        throw StateError('concurrent credit sale remained locked');
       }
 
       final results = await Future.wait<bool>([
         () async {
           try {
-            await concurrentSale(serviceA, 'A');
+            await concurrentSale(serviceA);
             return true;
-          } catch (_) {
+          } on CreditLimitExceededException {
             return false;
           }
         }(),
         () async {
           try {
-            await concurrentSale(serviceB, 'B');
+            await concurrentSale(serviceB);
             return true;
-          } catch (_) {
+          } on CreditLimitExceededException {
             return false;
           }
         }(),

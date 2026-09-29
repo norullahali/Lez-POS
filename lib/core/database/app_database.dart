@@ -22,6 +22,7 @@ import 'tables/purchase_invoices_table.dart';
 import 'tables/purchase_items_table.dart';
 import 'tables/pos_sessions_table.dart';
 import 'tables/sales_invoices_table.dart';
+import 'tables/sales_invoice_daily_sequences_table.dart';
 import 'tables/sale_items_table.dart';
 import 'tables/customer_returns_table.dart';
 import 'tables/supplier_returns_table.dart';
@@ -86,6 +87,7 @@ part 'app_database.g.dart';
     PurchaseItems,
     PosSessions,
     SalesInvoices,
+    SalesInvoiceDailySequences,
     SaleItems,
     CustomerReturns,
     CustomerReturnItems,
@@ -152,7 +154,7 @@ class AppDatabase extends _$AppDatabase {
   late final pricingDao = PricingDao(this);
 
   @override
-  int get schemaVersion => 35;
+  int get schemaVersion => 36;
 
   @override
   MigrationStrategy get migration {
@@ -171,6 +173,10 @@ class AppDatabase extends _$AppDatabase {
         await customStatement(
           'CREATE INDEX IF NOT EXISTS sri_supplier_created_idx '
           'ON supplier_refund_idempotency (supplier_id, created_at)',
+        );
+        await customStatement(
+          'CREATE UNIQUE INDEX IF NOT EXISTS uq_sales_invoices_invoice_number '
+          'ON sales_invoices (invoice_number)',
         );
         // Enable foreign keys
         await customStatement('PRAGMA foreign_keys = ON');
@@ -915,12 +921,67 @@ class AppDatabase extends _$AppDatabase {
           }
           debugPrint('[Migration v35] supplier_refund_idempotency ready');
         }
+        if (from < 36) {
+          await _migrateB4InvoiceAtomicAllocation(m);
+        }
       },
       beforeOpen: (details) async {
         await customStatement('PRAGMA foreign_keys = ON');
         await customStatement('PRAGMA journal_mode = WAL');
+        await customStatement('PRAGMA busy_timeout = 10000');
       },
     );
+  }
+
+  /// B4: daily invoice counter + UNIQUE(invoice_number) with duplicate audit.
+  Future<void> _migrateB4InvoiceAtomicAllocation(Migrator m) async {
+    debugPrint('[Migration v36] B4 invoice atomic allocation...');
+
+    final duplicates = await customSelect(
+      '''
+      SELECT invoice_number, COUNT(*) AS cnt
+      FROM sales_invoices
+      GROUP BY invoice_number
+      HAVING COUNT(*) > 1
+      ''',
+      readsFrom: {salesInvoices},
+    ).get();
+
+    if (duplicates.isNotEmpty) {
+      final sample = duplicates
+          .take(5)
+          .map((r) => r.data['invoice_number'] as String)
+          .join(', ');
+      throw StateError(
+        'B4 migration blocked: duplicate sales_invoices.invoice_number values '
+        'exist (${duplicates.length} duplicate group(s); sample: $sample). '
+        'Manual remediation is required before upgrading to schema v36.',
+      );
+    }
+
+    await m.createTable(salesInvoiceDailySequences);
+
+    await customStatement(
+      '''
+      INSERT INTO sales_invoice_daily_sequences (day_prefix, last_number)
+      SELECT
+        substr(invoice_number, 1, 8) AS day_prefix,
+        MAX(CAST(substr(invoice_number, 10) AS INTEGER)) AS last_number
+      FROM sales_invoices
+      WHERE length(invoice_number) >= 10
+        AND substr(invoice_number, 9, 1) = '-'
+        AND substr(invoice_number, 1, 8) GLOB '[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]'
+        AND substr(invoice_number, 10) GLOB '[0-9]*'
+      GROUP BY day_prefix
+      ''',
+    );
+
+    await customStatement(
+      'CREATE UNIQUE INDEX IF NOT EXISTS uq_sales_invoices_invoice_number '
+      'ON sales_invoices (invoice_number)',
+    );
+
+    debugPrint('[Migration v36] B4 invoice atomic allocation ready');
   }
 
   Future<void> _seedDefaultRoles(Migrator m) async {

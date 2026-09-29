@@ -33,6 +33,11 @@ class SalesInvoices extends Table {
   List<Index> get indexes => [
         Index('sales_date_idx', 'CREATE INDEX IF NOT EXISTS sales_date_idx ON sales_invoices (sale_date)'),
         Index('sales_number_idx', 'CREATE INDEX IF NOT EXISTS sales_number_idx ON sales_invoices (invoice_number)'),
+        Index(
+          'uq_sales_invoices_invoice_number',
+          'CREATE UNIQUE INDEX IF NOT EXISTS uq_sales_invoices_invoice_number '
+              'ON sales_invoices (invoice_number)',
+        ),
       ];
 }
 

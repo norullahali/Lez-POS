@@ -807,16 +807,15 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
       final user = ref.read(authProvider).valueOrNull?.user;
 
       final userId = user?.id;
-      final invoiceNumber = await generateInvoiceNumber();
 
-      // ✅ تنفيذ عملية البيع
-      await ref.read(cartProvider.notifier).checkout(
-            sessionId: session.id,
-            invoiceNumber: invoiceNumber,
-            payment: payment,
-            userId: userId,
-            approvedByUserId: approvedByUserId,
-          );
+      // ✅ تنفيذ عملية البيع (invoice number allocated inside processSale)
+      final invoiceNumber =
+          await ref.read(cartProvider.notifier).checkout(
+                sessionId: session.id,
+                payment: payment,
+                userId: userId,
+                approvedByUserId: approvedByUserId,
+              );
 
       final items = activeCartSnapshot.items;
 

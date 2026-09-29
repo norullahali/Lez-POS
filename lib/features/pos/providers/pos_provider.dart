@@ -15,8 +15,6 @@ import '../../../core/activity/activity_types.dart';
 import '../../../core/services/activity_logger_service.dart';
 
 import 'package:drift/drift.dart' show Value;
-import '../../../core/services/invoice_number_service.dart';
-
 final posRepositoryProvider = Provider<PosRepository>((ref) {
   return PosRepository(AppDatabase.instance);
 });
@@ -486,9 +484,8 @@ class CartNotifier extends Notifier<CartState> {
   }
 
   // -- Checkout -------------------------------------------------------------
-  Future<void> checkout({
+  Future<String> checkout({
     required int? sessionId,
-    required String invoiceNumber,
     required PaymentInfo payment,
     required int? userId,
     int? approvedByUserId,
@@ -499,7 +496,6 @@ class CartNotifier extends Notifier<CartState> {
 
     final sale = SalesInvoicesCompanion(
       sessionId: Value(sessionId),
-      invoiceNumber: Value(invoiceNumber),
       subtotal: Value(active.subtotal),
       discountAmount: Value(active.invoiceDiscount + active.loyaltyDiscount),
       total: Value(active.total),
@@ -524,7 +520,7 @@ class CartNotifier extends Notifier<CartState> {
             ))
         .toList();
 
-    await saleService.processSale(
+    final result = await saleService.processSale(
       invoice: sale,
       items: itemCompanions,
       debtAmount: payment.debtAmount,
@@ -534,8 +530,7 @@ class CartNotifier extends Notifier<CartState> {
       approvedByUserId: approvedByUserId,
     );
 
-    //final paidAmount = (active.total - payment.debtAmount).clamp(0.0, active.total);
-    // ---- Clean PDF Printing ----
+    return result.invoiceNumber;
   } // نهاية checkout
 } // نهاية CartNotifier
 
@@ -543,8 +538,3 @@ final cartProvider = NotifierProvider<CartNotifier, CartState>(
   CartNotifier.new,
 );
 
-Future<String> generateInvoiceNumber() async {
-  final invoiceNumberService = InvoiceNumberService(AppDatabase.instance);
-
-  return await invoiceNumberService.next();
-}

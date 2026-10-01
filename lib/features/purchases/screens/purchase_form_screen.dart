@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart' hide TextDirection;
+import 'package:uuid/uuid.dart';
+import '../../../core/services/purchase_fingerprint.dart';
+import '../../../core/services/purchase_idempotency_conflict_exception.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/number_parser.dart';
 import '../../../core/widgets/loading_overlay.dart';
@@ -11,6 +14,8 @@ import '../../suppliers/providers/suppliers_provider.dart';
 import '../../suppliers/providers/supplier_accounts_provider.dart';
 import '../models/purchase_invoice_model.dart';
 import '../providers/purchases_provider.dart';
+
+const _purchaseUuid = Uuid();
 
 class PurchaseFormScreen extends ConsumerStatefulWidget {
   final int? editId;
@@ -29,8 +34,13 @@ class _PurchaseFormScreenState extends ConsumerState<PurchaseFormScreen> {
   final _barcodeCtrl = TextEditingController();
   final _barcodeFocus = FocusNode();
   bool _isLoading = false;
+  String? _idempotencyKey;
+  bool _submitting = false;
+
   /// Guard: prevents two concurrent barcode lookups from racing each other.
   bool _isBarcodeProcessing = false;
+
+  void _clearIdempotencyKey() => _idempotencyKey = null;
 
   @override
   void initState() {
@@ -80,7 +90,9 @@ class _PurchaseFormScreenState extends ConsumerState<PurchaseFormScreen> {
                       size: 18, color: Colors.white),
                   label: const Text('حفظ الفاتورة',
                       style: TextStyle(color: Colors.white)),
-                  onPressed: formState.items.isEmpty ? null : _saveInvoice,
+                  onPressed: formState.items.isNotEmpty && !_submitting
+                      ? _saveInvoice
+                      : null,
                 ),
               ],
             ),
@@ -123,15 +135,19 @@ class _PurchaseFormScreenState extends ConsumerState<PurchaseFormScreen> {
                                                 value: s.id,
                                                 child: Text(s.name)))
                                       ],
-                                      onChanged: (v) => ref
-                                          .read(purchaseFormProvider.notifier)
-                                          .setSupplier(
-                                              v,
-                                              suppliers
-                                                  .firstWhere((s) => s.id == v,
-                                                      orElse: () =>
-                                                          suppliers.first)
-                                                  .name),
+                                      onChanged: (v) {
+                                        _clearIdempotencyKey();
+                                        ref
+                                            .read(purchaseFormProvider.notifier)
+                                            .setSupplier(
+                                                v,
+                                                suppliers
+                                                    .firstWhere(
+                                                        (s) => s.id == v,
+                                                        orElse: () =>
+                                                            suppliers.first)
+                                                    .name);
+                                      },
                                     ),
                                   ),
                                   const SizedBox(width: 12),
@@ -141,10 +157,13 @@ class _PurchaseFormScreenState extends ConsumerState<PurchaseFormScreen> {
                                           textDirection: TextDirection.rtl,
                                           decoration: const InputDecoration(
                                               labelText: 'رقم الفاتورة'),
-                                          onChanged: (v) => ref
-                                              .read(
-                                                  purchaseFormProvider.notifier)
-                                              .setInvoiceNumber(v))),
+                                          onChanged: (v) {
+                                            _clearIdempotencyKey();
+                                            ref
+                                                .read(purchaseFormProvider
+                                                    .notifier)
+                                                .setInvoiceNumber(v);
+                                          })),
                                 ]),
                                 const SizedBox(height: 12),
                                 Row(children: [
@@ -159,6 +178,7 @@ class _PurchaseFormScreenState extends ConsumerState<PurchaseFormScreen> {
                                               .add(const Duration(days: 1)),
                                         );
                                         if (picked != null) {
+                                          _clearIdempotencyKey();
                                           ref
                                               .read(
                                                   purchaseFormProvider.notifier)
@@ -189,6 +209,7 @@ class _PurchaseFormScreenState extends ConsumerState<PurchaseFormScreen> {
                                               const Duration(days: 365 * 5)),
                                         );
                                         if (picked != null) {
+                                          _clearIdempotencyKey();
                                           ref
                                               .read(
                                                   purchaseFormProvider.notifier)
@@ -215,9 +236,12 @@ class _PurchaseFormScreenState extends ConsumerState<PurchaseFormScreen> {
                                     decoration: const InputDecoration(
                                         labelText: 'خصم الفاتورة'),
                                     keyboardType: TextInputType.number,
-                                    onChanged: (v) => ref
-                                        .read(purchaseFormProvider.notifier)
-                                        .setDiscount(double.tryParse(v) ?? 0)),
+                                    onChanged: (v) {
+                                      _clearIdempotencyKey();
+                                      ref
+                                          .read(purchaseFormProvider.notifier)
+                                          .setDiscount(double.tryParse(v) ?? 0);
+                                    }),
                                 if (supplierBalanceAsync.valueOrNull != null &&
                                     supplierBalanceAsync.valueOrNull! > 0)
                                   Padding(
@@ -293,8 +317,8 @@ class _PurchaseFormScreenState extends ConsumerState<PurchaseFormScreen> {
                                         data: (products) {
                                           // Normalize digits for comparison:
                                           // '٤٥٦' and '456' both find the same product.
-                                          final query = textValue.text
-                                              .normalizeBarcode();
+                                          final query =
+                                              textValue.text.normalizeBarcode();
                                           final filtered = products
                                               .where((p) =>
                                                   p.name.contains(query) ||
@@ -328,8 +352,7 @@ class _PurchaseFormScreenState extends ConsumerState<PurchaseFormScreen> {
                                             ),
                                           );
                                         },
-                                        loading: () =>
-                                            const SizedBox.shrink(),
+                                        loading: () => const SizedBox.shrink(),
                                         error: (_, __) =>
                                             const SizedBox.shrink(),
                                       );
@@ -405,10 +428,13 @@ class _PurchaseFormScreenState extends ConsumerState<PurchaseFormScreen> {
                                                         .delete_outline_rounded,
                                                     color: AppColors.error,
                                                     size: 18),
-                                                onPressed: () => ref
-                                                    .read(purchaseFormProvider
-                                                        .notifier)
-                                                    .removeItem(i)),
+                                                onPressed: () {
+                                                  _clearIdempotencyKey();
+                                                  ref
+                                                      .read(purchaseFormProvider
+                                                          .notifier)
+                                                      .removeItem(i);
+                                                }),
                                           ],
                                         ),
                                       );
@@ -450,9 +476,13 @@ class _PurchaseFormScreenState extends ConsumerState<PurchaseFormScreen> {
                                             'الواصل / المدفوع للمورد (د.ع)',
                                         filled: true),
                                     keyboardType: TextInputType.number,
-                                    onChanged: (v) => ref
-                                        .read(purchaseFormProvider.notifier)
-                                        .setPaidAmount(double.tryParse(v) ?? 0),
+                                    onChanged: (v) {
+                                      _clearIdempotencyKey();
+                                      ref
+                                          .read(purchaseFormProvider.notifier)
+                                          .setPaidAmount(
+                                              double.tryParse(v) ?? 0);
+                                    },
                                   ),
                                   const SizedBox(height: 8),
                                   _TotalRow(
@@ -505,7 +535,8 @@ class _PurchaseFormScreenState extends ConsumerState<PurchaseFormScreen> {
       if (!mounted) return;
 
       if (product != null) {
-        debugPrint('[Purchase] Product found: "${product.name}" (id=${product.id})');
+        debugPrint(
+            '[Purchase] Product found: "${product.name}" (id=${product.id})');
         // await ensures dialog is fully closed before field is cleared and
         // focus restored — prevents concurrent-scan race conditions.
         await _showAddItemDialog(
@@ -599,6 +630,7 @@ class _PurchaseFormScreenState extends ConsumerState<PurchaseFormScreen> {
             defaultCost;
         final disc =
             double.tryParse(_normalizeNumber(discCtrl.text.trim())) ?? 0;
+        _clearIdempotencyKey();
         ref.read(purchaseFormProvider.notifier).addItem(PurchaseItemModel(
               productId: productId,
               productName: productName,
@@ -619,15 +651,41 @@ class _PurchaseFormScreenState extends ConsumerState<PurchaseFormScreen> {
 
   Future<void> _saveInvoice() async {
     final formState = ref.read(purchaseFormProvider);
-    if (formState.items.isEmpty) return;
+    if (formState.items.isEmpty || _submitting) return;
 
-    setState(() => _isLoading = true);
+    _idempotencyKey ??= _purchaseUuid.v4();
+    final operatorInvoiceNumber = formState.invoiceNumber.trim();
+    final fingerprintHash = PurchaseFingerprint.compute(
+      supplierId: formState.supplierId,
+      operatorInvoiceNumber:
+          operatorInvoiceNumber.isEmpty ? null : operatorInvoiceNumber,
+      purchaseDate: formState.date,
+      invoiceDiscount: formState.invoiceDiscount,
+      total: formState.total,
+      paidAmount: formState.paidAmount,
+      dueDate: formState.dueDate,
+      notes: formState.notes,
+      items: formState.items
+          .map(
+            (item) => PurchaseFingerprintLine(
+              productId: item.productId,
+              quantity: item.quantity,
+              unitCost: item.unitCost,
+              discountAmount: item.discountAmount,
+              expiryDate: item.expiryDate,
+            ),
+          )
+          .toList(),
+    );
+
+    setState(() {
+      _isLoading = true;
+      _submitting = true;
+    });
     try {
       final invoice = PurchaseInvoiceModel(
         supplierId: formState.supplierId,
-        invoiceNumber: formState.invoiceNumber.isEmpty
-            ? 'PUR-${DateTime.now().millisecondsSinceEpoch}'
-            : formState.invoiceNumber,
+        invoiceNumber: operatorInvoiceNumber,
         purchaseDate: formState.date,
         subtotal: formState.subtotal,
         discountAmount: formState.invoiceDiscount,
@@ -639,7 +697,12 @@ class _PurchaseFormScreenState extends ConsumerState<PurchaseFormScreen> {
         items: formState.items,
       );
 
-      await ref.read(purchasesNotifierProvider.notifier).save(invoice);
+      await ref.read(purchasesNotifierProvider.notifier).save(
+            invoice,
+            idempotencyKey: _idempotencyKey!,
+            fingerprintHash: fingerprintHash,
+          );
+      _clearIdempotencyKey();
       ref.read(purchaseFormProvider.notifier).reset();
       ref.invalidate(productsNotifierProvider);
 
@@ -649,13 +712,26 @@ class _PurchaseFormScreenState extends ConsumerState<PurchaseFormScreen> {
             backgroundColor: AppColors.success));
         context.go('/purchases');
       }
+    } on PurchaseIdempotencyConflictException {
+      _clearIdempotencyKey();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content:
+                Text('تعارض: تم تغيير بيانات الفاتورة أثناء إعادة المحاولة'),
+            backgroundColor: AppColors.error));
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
             content: Text('خطأ: $e'), backgroundColor: AppColors.error));
       }
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _submitting = false;
+        });
+      }
     }
   }
 }

@@ -65,79 +65,84 @@ class PurchasesDao extends DatabaseAccessor<AppDatabase>
     return rows.map((r) => r.data).toList();
   }
 
-  /// Save full purchase invoice: header + items + stock ledger entries in one transaction
+  /// Save purchase invoice inside an enclosing transaction (B7 canonical path).
+  Future<int> savePurchaseInvoiceInTransaction({
+    required PurchaseInvoicesCompanion header,
+    required List<Map<String, dynamic>>
+        items, // {productId, qty, cost, discount, expiry}
+  }) async {
+    final invoiceId = await into(purchaseInvoices).insert(header);
+
+    for (final item in items) {
+      final productId = item['productId'] as int;
+      final qty = (item['qty'] as num).toDouble();
+      final cost = (item['cost'] as num).toDouble();
+      final discount = (item['discount'] as num?)?.toDouble() ?? 0.0;
+      final itemTotal = (qty * cost) - discount;
+      final expiryDate = item['expiryDate'] as DateTime?;
+
+      final itemId = await into(purchaseItems).insert(
+        PurchaseItemsCompanion(
+          invoiceId: Value(invoiceId),
+          productId: Value(productId),
+          quantity: Value(qty),
+          unitCost: Value(cost),
+          discountAmount: Value(discount),
+          total: Value(itemTotal),
+          expiryDate: Value(expiryDate),
+        ),
+      );
+
+      await customUpdate(
+        'UPDATE products SET cost_price = ?, current_stock = current_stock + ?, updated_at = ? WHERE id = ?',
+        variables: [
+          Variable.withReal(cost),
+          Variable.withReal(qty),
+          Variable(DateTime.now()),
+          Variable.withInt(productId),
+        ],
+        updates: {products},
+      );
+
+      await into(stockLedger).insert(
+        StockLedgerCompanion(
+          productId: Value(productId),
+          movementType: Value(StockMovementType.purchase.code),
+          referenceId: Value(itemId),
+          referenceType: const Value('purchase_items'),
+          quantityChange: Value(qty),
+        ),
+      );
+    }
+
+    if (header.supplierId.present && header.supplierId.value != null) {
+      final supplierId = header.supplierId.value!;
+      final debtAmt = header.debtAmount.present ? header.debtAmount.value : 0.0;
+
+      if (debtAmt > 0) {
+        await db.supplierAccountsDao.applyTransaction(
+          supplierId: supplierId,
+          type: 'PURCHASE',
+          amount: debtAmt,
+          referenceId: invoiceId,
+          note:
+              'فاتورة مشتريات #${header.invoiceNumber.present ? header.invoiceNumber.value : invoiceId}',
+        );
+      }
+    }
+
+    return invoiceId;
+  }
+
+  /// Save full purchase invoice: header + items + stock ledger entries in one transaction.
+  /// Legacy wrapper for tests and non-idempotent callers.
   Future<int> savePurchaseInvoice({
     required PurchaseInvoicesCompanion header,
     required List<Map<String, dynamic>>
         items, // {productId, qty, cost, discount, expiry}
   }) async {
     return transaction(() async {
-      final invoiceId = await into(purchaseInvoices).insert(header);
-
-      for (final item in items) {
-        final productId = item['productId'] as int;
-        final qty = (item['qty'] as num).toDouble();
-        final cost = (item['cost'] as num).toDouble();
-        final discount = (item['discount'] as num?)?.toDouble() ?? 0.0;
-        final itemTotal = (qty * cost) - discount;
-        final expiryDate = item['expiryDate'] as DateTime?;
-
-        // Insert purchase item
-        final itemId = await into(purchaseItems).insert(
-          PurchaseItemsCompanion(
-            invoiceId: Value(invoiceId),
-            productId: Value(productId),
-            quantity: Value(qty),
-            unitCost: Value(cost),
-            discountAmount: Value(discount),
-            total: Value(itemTotal),
-            expiryDate: Value(expiryDate),
-          ),
-        );
-
-        // Update cost price and increment current stock atomically
-        await customUpdate(
-          'UPDATE products SET cost_price = ?, current_stock = current_stock + ?, updated_at = ? WHERE id = ?',
-          variables: [
-            Variable.withReal(cost),
-            Variable.withReal(qty),
-            Variable(DateTime.now()),
-            Variable.withInt(productId),
-          ],
-          updates: {products},
-        );
-
-        // Add stock ledger entry (audit trail)
-        await into(stockLedger).insert(
-          StockLedgerCompanion(
-            productId: Value(productId),
-            movementType: Value(StockMovementType.purchase.code),
-            referenceId: Value(itemId),
-            referenceType: const Value('purchase_items'),
-            quantityChange: Value(qty),
-          ),
-        );
-      }
-
-      // 4. Handle supplier debt if applicable
-      if (header.supplierId.present && header.supplierId.value != null) {
-        final supplierId = header.supplierId.value!;
-        final debtAmt =
-            header.debtAmount.present ? header.debtAmount.value : 0.0;
-
-        if (debtAmt > 0) {
-          await db.supplierAccountsDao.addTransaction(
-            supplierId: supplierId,
-            type: 'PURCHASE',
-            amount: debtAmt,
-            referenceId: invoiceId,
-            note:
-                'فاتورة مشتريات #${header.invoiceNumber.present ? header.invoiceNumber.value : invoiceId}',
-          );
-        }
-      }
-
-      return invoiceId;
+      return savePurchaseInvoiceInTransaction(header: header, items: items);
     });
   }
 

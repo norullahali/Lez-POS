@@ -1,11 +1,14 @@
 // lib/features/purchases/repositories/purchases_repository.dart
-import 'package:drift/drift.dart';
 import '../../../core/database/app_database.dart';
+import '../../../core/services/purchase_save_result.dart';
+import '../../../core/services/purchase_save_service.dart';
 import '../models/purchase_invoice_model.dart';
 
 class PurchasesRepository {
   final AppDatabase _db;
-  PurchasesRepository(this._db);
+  final PurchaseSaveService _purchaseSaveService;
+
+  PurchasesRepository(this._db, this._purchaseSaveService);
 
   Future<List<PurchaseInvoiceModel>> getAll() async {
     final invoices = await _db.purchasesDao.getAllInvoices();
@@ -62,29 +65,33 @@ class PurchasesRepository {
     });
   }
 
-  Future<int> save(PurchaseInvoiceModel invoice, int? userId) async {
-    return _db.purchasesDao.savePurchaseInvoice(
-      header: PurchaseInvoicesCompanion(
-        supplierId: Value(invoice.supplierId),
-        invoiceNumber: Value(invoice.invoiceNumber),
-        purchaseDate: Value(invoice.purchaseDate),
-        subtotal: Value(invoice.subtotal),
-        discountAmount: Value(invoice.discountAmount),
-        total: Value(invoice.total),
-        paidAmount: Value(invoice.paidAmount),
-        debtAmount: Value(invoice.debtAmount),
-        dueDate: Value(invoice.dueDate),
-        status: Value(invoice.status),
-        notes: Value(invoice.notes),
-        createdByUserId: Value(userId),
-      ),
-      items: invoice.items.map((item) => {
-        'productId': item.productId,
-        'qty': item.quantity,
-        'cost': item.unitCost,
-        'discount': item.discountAmount,
-        'expiryDate': item.expiryDate,
-      }).toList(),
+  Future<PurchaseSaveResult> save(
+    PurchaseInvoiceModel invoice,
+    int? userId, {
+    required String idempotencyKey,
+    required String fingerprintHash,
+  }) {
+    return _purchaseSaveService.processSave(
+      idempotencyKey: idempotencyKey,
+      fingerprintHash: fingerprintHash,
+      supplierId: invoice.supplierId,
+      operatorInvoiceNumber: invoice.invoiceNumber,
+      purchaseDate: invoice.purchaseDate,
+      invoiceDiscount: invoice.discountAmount,
+      total: invoice.total,
+      paidAmount: invoice.paidAmount,
+      dueDate: invoice.dueDate,
+      notes: invoice.notes,
+      items: invoice.items
+          .map((item) => {
+                'productId': item.productId,
+                'qty': item.quantity,
+                'cost': item.unitCost,
+                'discount': item.discountAmount,
+                'expiryDate': item.expiryDate,
+              })
+          .toList(),
+      createdByUserId: userId,
     );
   }
 

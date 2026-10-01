@@ -410,7 +410,7 @@ void main() {
       final migrated = AppDatabase.test(NativeDatabase.opened(rawDb));
       addTearDown(() async => migrated.close());
 
-      expect(migrated.schemaVersion, 38);
+      expect(migrated.schemaVersion, 39);
       expect(await sequencesTableExists(migrated), isTrue);
       expect(await uniqueIndexExists(migrated), isTrue);
 
@@ -556,8 +556,8 @@ void main() {
       expect(number, '${expectedDayPrefix()}-0001');
     });
 
-    test('schema v38 includes B4 sequences and idempotency tables', () async {
-      expect(db.schemaVersion, 38);
+    test('schema v39 includes B4 sequences and idempotency tables', () async {
+      expect(db.schemaVersion, 39);
       expect(await uniqueIndexExists(), isTrue);
 
       final tables = await db.customSelect(

@@ -2,15 +2,25 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/database/app_database.dart';
+import '../../../core/services/purchase_save_result.dart';
+import '../../../core/services/purchase_save_service.dart';
 import '../models/purchase_invoice_model.dart';
 import '../repositories/purchases_repository.dart';
 import '../../auth/providers/auth_provider.dart';
 
-final purchasesRepositoryProvider = Provider<PurchasesRepository>((ref) {
-  return PurchasesRepository(AppDatabase.instance);
+final purchaseSaveServiceProvider = Provider<PurchaseSaveService>((ref) {
+  return PurchaseSaveService(AppDatabase.instance);
 });
 
-final purchasesStreamProvider = StreamProvider<List<PurchaseInvoiceModel>>((ref) {
+final purchasesRepositoryProvider = Provider<PurchasesRepository>((ref) {
+  return PurchasesRepository(
+    AppDatabase.instance,
+    ref.watch(purchaseSaveServiceProvider),
+  );
+});
+
+final purchasesStreamProvider =
+    StreamProvider<List<PurchaseInvoiceModel>>((ref) {
   return ref.watch(purchasesRepositoryProvider).watchAll();
 });
 
@@ -20,7 +30,8 @@ class PurchasesNotifier extends AsyncNotifier<List<PurchaseInvoiceModel>> {
     try {
       debugPrint('[PurchasesNotifier] build: loading purchase invoices...');
       final result = await ref.watch(purchasesRepositoryProvider).getAll();
-      debugPrint('[PurchasesNotifier] build: loaded ${result.length} invoices.');
+      debugPrint(
+          '[PurchasesNotifier] build: loaded ${result.length} invoices.');
       return result;
     } catch (e, st) {
       debugPrint('[PurchasesNotifier] build error: $e\n$st');
@@ -28,12 +39,21 @@ class PurchasesNotifier extends AsyncNotifier<List<PurchaseInvoiceModel>> {
     }
   }
 
-  Future<int> save(PurchaseInvoiceModel invoice) async {
+  Future<PurchaseSaveResult> save(
+    PurchaseInvoiceModel invoice, {
+    required String idempotencyKey,
+    required String fingerprintHash,
+  }) async {
     try {
       final userId = ref.read(authProvider).valueOrNull?.user?.id;
-      final id = await ref.read(purchasesRepositoryProvider).save(invoice, userId);
+      final result = await ref.read(purchasesRepositoryProvider).save(
+            invoice,
+            userId,
+            idempotencyKey: idempotencyKey,
+            fingerprintHash: fingerprintHash,
+          );
       ref.invalidateSelf();
-      return id;
+      return result;
     } catch (e, st) {
       debugPrint('[PurchasesNotifier] save error: $e\n$st');
       rethrow;
@@ -52,7 +72,8 @@ class PurchasesNotifier extends AsyncNotifier<List<PurchaseInvoiceModel>> {
 }
 
 final purchasesNotifierProvider =
-    AsyncNotifierProvider<PurchasesNotifier, List<PurchaseInvoiceModel>>(PurchasesNotifier.new);
+    AsyncNotifierProvider<PurchasesNotifier, List<PurchaseInvoiceModel>>(
+        PurchasesNotifier.new);
 
 // Form state for new purchase invoice
 class PurchaseFormState {
@@ -78,7 +99,8 @@ class PurchaseFormState {
     this.dueDate,
   });
 
-  double get subtotal => items.fold(0.0, (s, i) => s + (i.quantity * i.unitCost));
+  double get subtotal =>
+      items.fold(0.0, (s, i) => s + (i.quantity * i.unitCost));
   double get total => subtotal - invoiceDiscount;
 
   PurchaseFormState copyWith({
@@ -111,7 +133,8 @@ class PurchaseFormNotifier extends Notifier<PurchaseFormState> {
   PurchaseFormState build() => PurchaseFormState(date: DateTime.now());
 
   void reset() => state = PurchaseFormState(date: DateTime.now());
-  void setSupplier(int? id, String name) => state = state.copyWith(supplierId: id, supplierName: name);
+  void setSupplier(int? id, String name) =>
+      state = state.copyWith(supplierId: id, supplierName: name);
   void setInvoiceNumber(String v) => state = state.copyWith(invoiceNumber: v);
   void setDate(DateTime d) => state = state.copyWith(date: d);
   void setDiscount(double d) => state = state.copyWith(invoiceDiscount: d);
@@ -120,10 +143,12 @@ class PurchaseFormNotifier extends Notifier<PurchaseFormState> {
   void setDueDate(DateTime? d) => state = state.copyWith(dueDate: d);
 
   void addItem(PurchaseItemModel item) {
-    final existing = state.items.indexWhere((i) => i.productId == item.productId);
+    final existing =
+        state.items.indexWhere((i) => i.productId == item.productId);
     if (existing >= 0) {
       final items = [...state.items];
-      items[existing] = items[existing].copyWith(quantity: items[existing].quantity + item.quantity);
+      items[existing] = items[existing]
+          .copyWith(quantity: items[existing].quantity + item.quantity);
       state = state.copyWith(items: items);
     } else {
       state = state.copyWith(items: [...state.items, item]);
@@ -142,4 +167,6 @@ class PurchaseFormNotifier extends Notifier<PurchaseFormState> {
   }
 }
 
-final purchaseFormProvider = NotifierProvider<PurchaseFormNotifier, PurchaseFormState>(PurchaseFormNotifier.new);
+final purchaseFormProvider =
+    NotifierProvider<PurchaseFormNotifier, PurchaseFormState>(
+        PurchaseFormNotifier.new);

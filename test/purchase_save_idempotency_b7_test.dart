@@ -778,13 +778,13 @@ void main() {
       final migrated = AppDatabase.test(NativeDatabase.opened(opened.rawDb));
       addTearDown(() async => migrated.close());
 
-      expect(migrated.schemaVersion, 39);
+      expect(migrated.schemaVersion, 40);
       expect(await idempotencyTableExists(migrated), isTrue);
       expect(await idempotencyIndexExists(migrated), isTrue);
     });
 
-    test('17) fresh v39 database works', () async {
-      expect(db.schemaVersion, 39);
+    test('17) fresh v40 database works', () async {
+      expect(db.schemaVersion, 40);
       expect(await idempotencyTableExists(db), isTrue);
       expect(await idempotencyIndexExists(db), isTrue);
     });
@@ -831,20 +831,20 @@ void main() {
       expect(await invoiceCount(), 1);
     });
 
-    test('22) B2-B6 regression sentinel after schema v39', () async {
+    test('22) B2-B6 regression sentinel after schema v40', () async {
       final regressionDb = AppDatabase.test();
       addTearDown(() async => regressionDb.close());
 
-      expect(regressionDb.schemaVersion, 39);
+      expect(regressionDb.schemaVersion, 40);
 
-      // B4 — unique sales invoice index preserved after v39 migration.
+      // B4 — unique sales invoice index preserved after v40 migration.
       final b4Index = await regressionDb.customSelect(
         "SELECT name FROM sqlite_master WHERE type='index' "
         "AND name='uq_sales_invoices_invoice_number'",
       ).get();
       expect(b4Index, isNotEmpty);
 
-      // B5 — POS sale idempotency replay still works on v39.
+      // B5 — POS sale idempotency replay still works on v40.
       final b5ProductId = await regressionDb.into(regressionDb.products).insert(
             const ProductsCompanion(
               name: Value('B7 Regression Product'),
@@ -934,7 +934,7 @@ void main() {
       expect((await regressionDb.select(regressionDb.salesInvoices).get()).length,
           1);
 
-      // B6 — customer payment idempotency replay still works on v39.
+      // B6 — customer payment idempotency replay still works on v40.
       final b6CustomerId = await regressionDb.into(regressionDb.customers).insert(
             const CustomersCompanion(name: Value('B7 Regression Payer')),
           );
@@ -991,7 +991,7 @@ void main() {
         1,
       );
 
-      // B3 — supplier overpayment guard still rejects excess payments on v39.
+      // B3 — supplier overpayment guard still rejects excess payments on v40.
       final b3SupplierId = await regressionDb.into(regressionDb.suppliers).insert(
             const SuppliersCompanion(name: Value('B7 Regression Supplier')),
           );
@@ -1013,6 +1013,7 @@ void main() {
       final b3PaymentService = SupplierAccountService(regressionDb);
       await expectLater(
         b3PaymentService.processPayment(
+          idempotencyKey: b6PaymentIdempotencyKey(),
           supplierId: b3SupplierId,
           amount: 110,
         ),
@@ -1024,7 +1025,7 @@ void main() {
         closeTo(100, 0.001),
       );
 
-      // B2 — credit limit enforcement still rejects over-limit debt sales on v39.
+      // B2 — credit limit enforcement still rejects over-limit debt sales on v40.
       final b2CustomerId = await regressionDb.into(regressionDb.customers).insert(
             const CustomersCompanion(
               name: Value('B7 Regression Credit Customer'),

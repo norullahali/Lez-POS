@@ -1,5 +1,7 @@
 ﻿import 'package:drift/drift.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'support/supplier_payment_test_keys.dart';
+
 import 'package:lez_pos/core/constants/movement_types.dart';
 import 'package:lez_pos/core/database/app_database.dart';
 import 'package:lez_pos/core/database/daos/returns_dao.dart';
@@ -147,6 +149,7 @@ void main() {
     test('return after full payment yields negative balance, zero cash ledger',
         () async {
       await SupplierAccountService(db).processPayment(
+        idempotencyKey: b8SupplierPaymentIdempotencyKey(),
         supplierId: supplierId,
         amount: 50,
       );

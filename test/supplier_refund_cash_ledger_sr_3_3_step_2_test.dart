@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'support/supplier_payment_test_keys.dart';
 import 'support/supplier_refund_test_keys.dart';
 import 'package:lez_pos/core/database/app_database.dart';
 import 'package:lez_pos/core/services/supplier_account_service.dart';
@@ -88,6 +89,7 @@ void main() {
 
   Future<void> seedCredit20() async {
     await SupplierAccountService(db).processPayment(
+      idempotencyKey: b8SupplierPaymentIdempotencyKey(),
       supplierId: supplierId,
       amount: 50,
     );
@@ -181,6 +183,7 @@ void main() {
 
     test('D) no supplier credit rejected with zero ledger events', () async {
       await SupplierAccountService(db).processPayment(
+        idempotencyKey: b8SupplierPaymentIdempotencyKey(),
         supplierId: supplierId,
         amount: 50,
       );
@@ -299,6 +302,7 @@ void main() {
 
     test('I) goods RETURN alone creates no Cash Ledger event', () async {
       await SupplierAccountService(db).processPayment(
+        idempotencyKey: b8SupplierPaymentIdempotencyKey(),
         supplierId: supplierId,
         amount: 50,
       );

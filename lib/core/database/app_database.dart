@@ -15,6 +15,7 @@ import 'tables/customer_transactions_table.dart';
 import 'tables/customer_refund_idempotency_table.dart';
 import 'tables/customer_payment_idempotency_table.dart';
 import 'tables/purchase_idempotency_table.dart';
+import 'tables/supplier_payment_idempotency_table.dart';
 import 'tables/supplier_refund_idempotency_table.dart';
 import 'tables/pos_sale_idempotency_table.dart';
 import 'tables/products_table.dart';
@@ -61,6 +62,7 @@ import 'daos/customer_accounts_dao.dart';
 import 'daos/customer_refund_idempotency_dao.dart';
 import 'daos/customer_payment_idempotency_dao.dart';
 import 'daos/purchase_idempotency_dao.dart';
+import 'daos/supplier_payment_idempotency_dao.dart';
 import 'daos/supplier_refund_idempotency_dao.dart';
 import 'daos/pos_sale_idempotency_dao.dart';
 import 'daos/supplier_accounts_dao.dart';
@@ -84,6 +86,7 @@ part 'app_database.g.dart';
     CustomerRefundIdempotency,
     CustomerPaymentIdempotency,
     PurchaseIdempotency,
+    SupplierPaymentIdempotency,
     SupplierRefundIdempotency,
     PosSaleIdempotency,
     SupplierAccounts,
@@ -130,6 +133,7 @@ part 'app_database.g.dart';
     CustomerRefundIdempotencyDao,
     CustomerPaymentIdempotencyDao,
     PurchaseIdempotencyDao,
+    SupplierPaymentIdempotencyDao,
     SupplierRefundIdempotencyDao,
     PosSaleIdempotencyDao,
     SupplierAccountsDao,
@@ -166,7 +170,7 @@ class AppDatabase extends _$AppDatabase {
   late final pricingDao = PricingDao(this);
 
   @override
-  int get schemaVersion => 39;
+  int get schemaVersion => 40;
 
   @override
   MigrationStrategy get migration {
@@ -985,6 +989,11 @@ class AppDatabase extends _$AppDatabase {
             rethrow;
           }
           debugPrint('[Migration v39] purchase_idempotency ready');
+        }
+        if (from < 40) {
+          debugPrint('[Migration v40] supplier_payment_idempotency table...');
+          await m.createTable(supplierPaymentIdempotency);
+          debugPrint('[Migration v40] supplier_payment_idempotency ready');
         }
       },
       beforeOpen: (details) async {

@@ -15,6 +15,7 @@ import 'package:lez_pos/features/reports/core/models/report_date_preset.dart';
 import 'package:lez_pos/features/reports/core/models/report_filter_model.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite3;
 
+import 'support/supplier_payment_test_keys.dart';
 import 'support/supplier_refund_test_keys.dart';
 
 void main() {
@@ -98,7 +99,8 @@ void main() {
 
   Future<void> seedCredit20() async {
     await paymentService.processPayment(
-      supplierId: supplierId,
+        idempotencyKey: b8SupplierPaymentIdempotencyKey(),
+        supplierId: supplierId,
       amount: 100,
     );
     await returnService.postPurchaseLinkedReturn(
@@ -121,6 +123,7 @@ void main() {
       expect(await balance(), closeTo(100, 0.001));
 
       await paymentService.processPayment(
+        idempotencyKey: b8SupplierPaymentIdempotencyKey(),
         supplierId: supplierId,
         amount: 30,
       );
@@ -131,6 +134,7 @@ void main() {
 
     test('2) valid full payment succeeds', () async {
       await paymentService.processPayment(
+        idempotencyKey: b8SupplierPaymentIdempotencyKey(),
         supplierId: supplierId,
         amount: 100,
       );
@@ -141,12 +145,14 @@ void main() {
 
     test('3) exact outstanding balance payment succeeds', () async {
       await paymentService.processPayment(
+        idempotencyKey: b8SupplierPaymentIdempotencyKey(),
         supplierId: supplierId,
         amount: 40,
       );
       expect(await balance(), closeTo(60, 0.001));
 
       await paymentService.processPayment(
+        idempotencyKey: b8SupplierPaymentIdempotencyKey(),
         supplierId: supplierId,
         amount: 60,
       );
@@ -160,7 +166,8 @@ void main() {
 
       await expectLater(
         paymentService.processPayment(
-          supplierId: supplierId,
+        idempotencyKey: b8SupplierPaymentIdempotencyKey(),
+        supplierId: supplierId,
           amount: 110,
         ),
         throwsA(isA<SupplierPaymentExceedsPayableException>()),
@@ -173,7 +180,8 @@ void main() {
     test('5) zero payment rejected with ArgumentError', () async {
       await expectLater(
         paymentService.processPayment(
-          supplierId: supplierId,
+        idempotencyKey: b8SupplierPaymentIdempotencyKey(),
+        supplierId: supplierId,
           amount: 0,
         ),
         throwsA(isA<ArgumentError>()),
@@ -184,7 +192,8 @@ void main() {
     test('6) negative payment rejected with ArgumentError', () async {
       await expectLater(
         paymentService.processPayment(
-          supplierId: supplierId,
+        idempotencyKey: b8SupplierPaymentIdempotencyKey(),
+        supplierId: supplierId,
           amount: -5,
         ),
         throwsA(isA<ArgumentError>()),
@@ -194,6 +203,7 @@ void main() {
 
     test('7) supplier balance after valid payment is correct', () async {
       await paymentService.processPayment(
+        idempotencyKey: b8SupplierPaymentIdempotencyKey(),
         supplierId: supplierId,
         amount: 25,
       );
@@ -212,7 +222,8 @@ void main() {
 
       await expectLater(
         paymentService.processPayment(
-          supplierId: supplierId,
+        idempotencyKey: b8SupplierPaymentIdempotencyKey(),
+        supplierId: supplierId,
           amount: 10,
         ),
         throwsA(isA<SupplierPaymentExceedsPayableException>()),
@@ -225,7 +236,8 @@ void main() {
         () async {
       await expectLater(
         paymentService.processPayment(
-          supplierId: supplierId,
+        idempotencyKey: b8SupplierPaymentIdempotencyKey(),
+        supplierId: supplierId,
           amount: 150,
         ),
         throwsA(isA<SupplierPaymentExceedsPayableException>()),
@@ -241,7 +253,8 @@ void main() {
 
       await expectLater(
         paymentService.processPayment(
-          supplierId: supplierId,
+        idempotencyKey: b8SupplierPaymentIdempotencyKey(),
+        supplierId: supplierId,
           amount: 150,
         ),
         throwsA(isA<SupplierPaymentExceedsPayableException>()),
@@ -256,6 +269,7 @@ void main() {
       final ledgerBefore = await supplierPaymentLedgerEvents();
 
       await paymentService.processPayment(
+        idempotencyKey: b8SupplierPaymentIdempotencyKey(),
         supplierId: supplierId,
         amount: 40,
       );
@@ -270,7 +284,8 @@ void main() {
 
       await expectLater(
         paymentService.processPayment(
-          supplierId: supplierId,
+        idempotencyKey: b8SupplierPaymentIdempotencyKey(),
+        supplierId: supplierId,
           amount: 200,
         ),
         throwsA(isA<SupplierPaymentExceedsPayableException>()),
@@ -327,6 +342,7 @@ void main() {
         () async {
           try {
             await serviceA.processPayment(
+              idempotencyKey: b8SupplierPaymentIdempotencyKey(),
               supplierId: sid,
               amount: 60,
             );
@@ -338,6 +354,7 @@ void main() {
         () async {
           try {
             await serviceB.processPayment(
+              idempotencyKey: b8SupplierPaymentIdempotencyKey(),
               supplierId: sid,
               amount: 60,
             );

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:uuid/uuid.dart';
 
+import '../../../core/services/supplier_payment_idempotency_conflict_exception.dart';
 import '../../../core/services/supplier_payment_exceeds_payable_exception.dart';
 import '../../../core/theme/app_colors.dart';
 import '../providers/suppliers_provider.dart';
@@ -20,21 +22,47 @@ class SupplierPaymentsScreen extends ConsumerStatefulWidget {
       _SupplierPaymentsScreenState();
 }
 
+const _supplierPaymentUuid = Uuid();
+
 class _SupplierPaymentsScreenState
     extends ConsumerState<SupplierPaymentsScreen> {
   final _amountCtrl = TextEditingController();
   final _noteCtrl = TextEditingController();
 
-  bool _isLoading = false;
+  String? _idempotencyKey;
+  bool _submitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _amountCtrl.addListener(_resetPaymentAttempt);
+    _noteCtrl.addListener(_resetPaymentAttempt);
+  }
+
+  @override
+  void didUpdateWidget(covariant SupplierPaymentsScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.supplierId != widget.supplierId) {
+      _resetPaymentAttempt();
+    }
+  }
 
   @override
   void dispose() {
+    _amountCtrl.removeListener(_resetPaymentAttempt);
+    _noteCtrl.removeListener(_resetPaymentAttempt);
     _amountCtrl.dispose();
     _noteCtrl.dispose();
     super.dispose();
   }
 
+  void _resetPaymentAttempt() {
+    _idempotencyKey = null;
+  }
+
   Future<void> _submitPayment() async {
+    if (_submitting) return;
+
     final amt = double.tryParse(_amountCtrl.text);
 
     if (amt == null || amt <= 0) {
@@ -47,10 +75,12 @@ class _SupplierPaymentsScreenState
       return;
     }
 
-    setState(() => _isLoading = true);
+    _idempotencyKey ??= _supplierPaymentUuid.v4();
+    setState(() => _submitting = true);
 
     try {
       await ref.read(supplierAccountServiceProvider).processPayment(
+            idempotencyKey: _idempotencyKey!,
             supplierId: widget.supplierId,
             amount: amt,
             note: _noteCtrl.text,
@@ -65,12 +95,23 @@ class _SupplierPaymentsScreenState
         );
 
         ref.invalidate(supplierBalanceProvider(widget.supplierId));
+        _resetPaymentAttempt();
 
         if (context.canPop()) {
           context.pop();
         } else {
           context.go('/suppliers');
         }
+      }
+    } on SupplierPaymentIdempotencyConflictException catch (e) {
+      _resetPaymentAttempt();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('تعذر تنفيذ الدفعة: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
       }
     } catch (e) {
       final message = e is SupplierPaymentExceedsPayableException
@@ -83,7 +124,7 @@ class _SupplierPaymentsScreenState
         ),
       );
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _submitting = false);
     }
   }
 
@@ -130,7 +171,7 @@ class _SupplierPaymentsScreenState
                 ),
                 const SizedBox(height: 24),
                 ElevatedButton(
-                  onPressed: _isLoading ? null : _submitPayment,
+                  onPressed: _submitting ? null : _submitPayment,
                   child: const Text('حفظ'),
                 ),
               ],

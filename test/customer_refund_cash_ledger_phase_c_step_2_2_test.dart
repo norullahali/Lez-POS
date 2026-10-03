@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'support/customer_refund_test_keys.dart';
+import 'support/supplier_payment_test_keys.dart';
 import 'package:lez_pos/core/database/app_database.dart';
 import 'package:lez_pos/core/services/customer_account_service.dart';
 import 'package:lez_pos/core/services/customer_refund_settlement_service.dart';
@@ -327,7 +328,11 @@ void main() {
       final purchaseItems =
           await db.purchasesDao.getItemsForInvoice(purchaseInvoiceId);
       await SupplierAccountService(db)
-          .processPayment(supplierId: supplierId, amount: 50);
+          .processPayment(
+            idempotencyKey: b8SupplierPaymentIdempotencyKey(),
+            supplierId: supplierId,
+            amount: 50,
+          );
       await supplierReturnService
           .postPurchaseLinkedReturn(SupplierReturnPostingInput(
         supplierId: supplierId,

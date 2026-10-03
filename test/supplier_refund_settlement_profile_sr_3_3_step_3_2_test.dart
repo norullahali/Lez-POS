@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lez_pos/core/database/app_database.dart';
+
+import 'support/supplier_payment_test_keys.dart';
 import 'package:lez_pos/core/services/supplier_account_service.dart';
 import 'package:lez_pos/core/services/supplier_refund_settlement_service.dart';
 import 'package:lez_pos/core/services/supplier_return_service.dart';
@@ -28,6 +30,7 @@ void main() {
 
     Future<void> seedCredit({double credit = 20}) async {
       await SupplierAccountService(db).processPayment(
+        idempotencyKey: b8SupplierPaymentIdempotencyKey(),
         supplierId: supplierId,
         amount: 50,
       );

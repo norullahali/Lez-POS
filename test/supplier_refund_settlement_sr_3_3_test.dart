@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'support/supplier_payment_test_keys.dart';
 import 'support/supplier_refund_test_keys.dart';
 import 'package:lez_pos/core/database/app_database.dart';
 import 'package:lez_pos/core/services/supplier_account_service.dart';
@@ -70,6 +71,7 @@ void main() {
 
   Future<void> seedCredit20() async {
     await SupplierAccountService(db).processPayment(
+      idempotencyKey: b8SupplierPaymentIdempotencyKey(),
       supplierId: supplierId,
       amount: 50,
     );
@@ -193,6 +195,7 @@ void main() {
 
     test('F) no credit at zero balance rejected', () async {
       await SupplierAccountService(db).processPayment(
+        idempotencyKey: b8SupplierPaymentIdempotencyKey(),
         supplierId: supplierId,
         amount: 50,
       );
@@ -324,6 +327,7 @@ void main() {
 
       await expectLater(
         SupplierAccountService(db).processPayment(
+          idempotencyKey: b8SupplierPaymentIdempotencyKey(),
           supplierId: supplierId,
           amount: 10,
         ),
@@ -338,6 +342,7 @@ void main() {
 
       await expectLater(
         SupplierAccountService(db).processPayment(
+          idempotencyKey: b8SupplierPaymentIdempotencyKey(),
           supplierId: supplierId,
           amount: 60,
         ),
@@ -350,6 +355,7 @@ void main() {
 
     test('M) goods return regression unchanged', () async {
       await SupplierAccountService(db).processPayment(
+        idempotencyKey: b8SupplierPaymentIdempotencyKey(),
         supplierId: supplierId,
         amount: 50,
       );

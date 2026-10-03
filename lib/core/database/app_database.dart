@@ -18,6 +18,7 @@ import 'tables/purchase_idempotency_table.dart';
 import 'tables/supplier_payment_idempotency_table.dart';
 import 'tables/supplier_refund_idempotency_table.dart';
 import 'tables/pos_sale_idempotency_table.dart';
+import 'tables/customer_quick_return_idempotency_table.dart';
 import 'tables/products_table.dart';
 import 'tables/product_batches_table.dart';
 import 'tables/stock_ledger_table.dart';
@@ -65,6 +66,7 @@ import 'daos/purchase_idempotency_dao.dart';
 import 'daos/supplier_payment_idempotency_dao.dart';
 import 'daos/supplier_refund_idempotency_dao.dart';
 import 'daos/pos_sale_idempotency_dao.dart';
+import 'daos/customer_quick_return_idempotency_dao.dart';
 import 'daos/supplier_accounts_dao.dart';
 import 'daos/products_dao.dart';
 import 'daos/stock_dao.dart';
@@ -89,6 +91,7 @@ part 'app_database.g.dart';
     SupplierPaymentIdempotency,
     SupplierRefundIdempotency,
     PosSaleIdempotency,
+    CustomerQuickReturnIdempotency,
     SupplierAccounts,
     SupplierTransactions,
     Products,
@@ -136,6 +139,7 @@ part 'app_database.g.dart';
     SupplierPaymentIdempotencyDao,
     SupplierRefundIdempotencyDao,
     PosSaleIdempotencyDao,
+    CustomerQuickReturnIdempotencyDao,
     SupplierAccountsDao,
     ProductsDao,
     StockDao,
@@ -170,7 +174,7 @@ class AppDatabase extends _$AppDatabase {
   late final pricingDao = PricingDao(this);
 
   @override
-  int get schemaVersion => 40;
+  int get schemaVersion => 41;
 
   @override
   MigrationStrategy get migration {
@@ -201,6 +205,10 @@ class AppDatabase extends _$AppDatabase {
         await customStatement(
           'CREATE UNIQUE INDEX IF NOT EXISTS uq_sales_invoices_invoice_number '
           'ON sales_invoices (invoice_number)',
+        );
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS cqri_product_created_idx '
+          'ON customer_quick_return_idempotency (product_id, created_at)',
         );
         // Enable foreign keys
         await customStatement('PRAGMA foreign_keys = ON');
@@ -994,6 +1002,21 @@ class AppDatabase extends _$AppDatabase {
           debugPrint('[Migration v40] supplier_payment_idempotency table...');
           await m.createTable(supplierPaymentIdempotency);
           debugPrint('[Migration v40] supplier_payment_idempotency ready');
+        }
+        if (from < 41) {
+          debugPrint(
+              '[Migration v41] customer_quick_return_idempotency table...');
+          await m.createTable(customerQuickReturnIdempotency);
+          try {
+            await customStatement(
+              'CREATE INDEX IF NOT EXISTS cqri_product_created_idx '
+              'ON customer_quick_return_idempotency (product_id, created_at)',
+            );
+          } catch (e) {
+            debugPrint('[Migration v41] idempotency index skip/error: $e');
+            rethrow;
+          }
+          debugPrint('[Migration v41] customer_quick_return_idempotency ready');
         }
       },
       beforeOpen: (details) async {

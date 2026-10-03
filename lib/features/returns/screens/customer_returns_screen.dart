@@ -1,16 +1,44 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:drift/drift.dart' as drift;
+import 'package:uuid/uuid.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/loading_overlay.dart';
 import '../../../core/database/app_database.dart';
-import '../../../core/services/pos_sale_service.dart';
+import '../../../core/services/quick_return_idempotency_conflict_exception.dart';
 import '../../../core/widgets/manager_approval_dialog.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../../pos/providers/pos_provider.dart';
 import '../../products/providers/products_provider.dart';
 import '../providers/return_analytics_provider.dart';
 import 'widgets/smart_return_lookup_dialog.dart';
 import 'widgets/customer_return_detail_dialog.dart';
+
+const _quickReturnUuid = Uuid();
+
+class QuickReturnPayload {
+  const QuickReturnPayload({
+    required this.productId,
+    required this.quantity,
+    required this.refundAmount,
+    required this.reason,
+    required this.userId,
+  });
+
+  final int productId;
+  final double quantity;
+  final double refundAmount;
+  final String reason;
+  final int userId;
+
+  bool matches(QuickReturnPayload other) {
+    return productId == other.productId &&
+        quantity == other.quantity &&
+        refundAmount == other.refundAmount &&
+        reason == other.reason &&
+        userId == other.userId;
+  }
+}
 
 final customerReturnsProvider =
     FutureProvider<List<Map<String, dynamic>>>((ref) async {
@@ -35,6 +63,79 @@ class CustomerReturnsScreen extends ConsumerStatefulWidget {
 
 class _CustomerReturnsScreenState extends ConsumerState<CustomerReturnsScreen> {
   bool _isLoading = false;
+  String? _quickReturnIdempotencyKey;
+  QuickReturnPayload? _pendingQuickReturnPayload;
+  bool _quickReturnSubmitting = false;
+
+  void _clearQuickReturnAttempt() {
+    _quickReturnIdempotencyKey = null;
+    _pendingQuickReturnPayload = null;
+  }
+
+  Future<void> _submitQuickReturn(
+    QuickReturnPayload payload, {
+    int? approvedByUserId,
+  }) async {
+    if (_quickReturnSubmitting) return;
+
+    if (_pendingQuickReturnPayload != null &&
+        !_pendingQuickReturnPayload!.matches(payload)) {
+      _clearQuickReturnAttempt();
+    }
+    _pendingQuickReturnPayload = payload;
+    _quickReturnIdempotencyKey ??= _quickReturnUuid.v4();
+
+    _quickReturnSubmitting = true;
+    setState(() => _isLoading = true);
+    try {
+      await ref.read(posSaleServiceProvider).processQuickReturn(
+            idempotencyKey: _quickReturnIdempotencyKey!,
+            productId: payload.productId,
+            quantity: payload.quantity,
+            refundAmount: payload.refundAmount,
+            userId: payload.userId,
+            reason: payload.reason,
+            approvedByUserId: approvedByUserId,
+          );
+
+      _clearQuickReturnAttempt();
+      ref.invalidate(customerReturnsProvider);
+      ref.invalidate(productsNotifierProvider);
+      invalidateReturnAnalytics(ref);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('تم الاسترجاع بدون فاتورة بنجاح'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    } on QuickReturnIdempotencyConflictException {
+      _clearQuickReturnAttempt();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'تعارض في عملية الاسترجاع. أعد فتح نافذة الاسترجاع وحاول مرة أخرى.',
+            ),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('خطأ: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } finally {
+      _quickReturnSubmitting = false;
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -260,6 +361,8 @@ class _CustomerReturnsScreenState extends ConsumerState<CustomerReturnsScreen> {
   }
 
   Future<void> _showQuickReturnDialog() async {
+    _clearQuickReturnAttempt();
+
     final products = await ref.read(productsRepositoryProvider).getAll();
     int? selectedProductId;
     double productPrice = 0;
@@ -271,7 +374,7 @@ class _CustomerReturnsScreenState extends ConsumerState<CustomerReturnsScreen> {
     if (currentUser == null) return;
 
     if (!mounted) return;
-    showDialog(
+    final payload = await showDialog<QuickReturnPayload>(
       context: context,
       builder: (_) => StatefulBuilder(
           builder: (ctx, setStateDialog) => AlertDialog(
@@ -352,79 +455,56 @@ class _CustomerReturnsScreenState extends ConsumerState<CustomerReturnsScreen> {
                         backgroundColor: AppColors.warning,
                         foregroundColor: Colors.white),
                     onPressed: (selectedProductId == null ||
-                            selectedReason == null)
+                            selectedReason == null ||
+                            _quickReturnSubmitting)
                         ? null
-                        : () async {
+                        : () {
                             final qty = double.tryParse(qtyCtrl.text) ?? 0;
                             if (qty <= 0) {
                               ScaffoldMessenger.of(ctx).showSnackBar(
-                                  const SnackBar(
-                                      content: Text(
-                                          'الكمية يجب أن تكون أكبر من 0')));
-                              return;
-                            }
-                            Navigator.pop(ctx);
-
-                            final refundAmount = productPrice * qty;
-                            int? approvedByUserId;
-
-                            if (refundAmount > currentUser.refundLimit &&
-                                currentUser.roleId != 1) {
-                              // 1 = Admin
-                              final approver = await showDialog<dynamic>(
-                                context: context,
-                                barrierDismissible: false,
-                                builder: (context) =>
-                                    const ManagerApprovalDialog(
-                                  requiredPermission: 'pos.refund',
-                                  actionDescription:
-                                      'تجاوز حد المرتجع المسموح.',
+                                const SnackBar(
+                                  content: Text('الكمية يجب أن تكون أكبر من 0'),
                                 ),
                               );
-                              if (approver == null) {
-                                return; // Cancelled
-                              }
-                              approvedByUserId = approver.id;
+                              return;
                             }
-
-                            setState(() => _isLoading = true);
-                            try {
-                              final db = AppDatabase.instance;
-                              final saleService = PosSaleService(db);
-                              await saleService.processQuickReturn(
+                            final refundAmount = productPrice * qty;
+                            Navigator.pop(
+                              ctx,
+                              QuickReturnPayload(
                                 productId: selectedProductId!,
                                 quantity: qty,
                                 refundAmount: refundAmount,
-                                userId: currentUser.id,
                                 reason: selectedReason!,
-                                approvedByUserId: approvedByUserId,
-                              );
-
-                              ref.invalidate(customerReturnsProvider);
-                              ref.invalidate(productsNotifierProvider);
-                              invalidateReturnAnalytics(ref);
-                              if (mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                        content: Text(
-                                            'تم الاسترجاع بدون فاتورة بنجاح'),
-                                        backgroundColor: AppColors.success));
-                              }
-                            } catch (e) {
-                              if (mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                        content: Text('خطأ: $e'),
-                                        backgroundColor: AppColors.error));
-                              }
-                            } finally {
-                              if (mounted) setState(() => _isLoading = false);
-                            }
+                                userId: currentUser.id,
+                              ),
+                            );
                           },
                     child: const Text('تأكيد الاسترجاع'),
                   ),
                 ],
               )),
     );
+
+    if (payload == null || !mounted) return;
+
+    int? approvedByUserId;
+    if (payload.refundAmount > currentUser.refundLimit &&
+        currentUser.roleId != 1) {
+      final approver = await showDialog<dynamic>(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const ManagerApprovalDialog(
+          requiredPermission: 'pos.refund',
+          actionDescription: 'تجاوز حد المرتجع المسموح.',
+        ),
+      );
+      if (approver == null) {
+        return;
+      }
+      approvedByUserId = approver.id;
+    }
+
+    await _submitQuickReturn(payload, approvedByUserId: approvedByUserId);
   }
 }

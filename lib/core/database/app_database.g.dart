@@ -4287,6 +4287,512 @@ class PosSaleIdempotencyCompanion
   }
 }
 
+class $CustomerQuickReturnIdempotencyTable
+    extends CustomerQuickReturnIdempotency
+    with
+        TableInfo<$CustomerQuickReturnIdempotencyTable,
+            CustomerQuickReturnIdempotencyData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CustomerQuickReturnIdempotencyTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idempotencyKeyMeta =
+      const VerificationMeta('idempotencyKey');
+  @override
+  late final GeneratedColumn<String> idempotencyKey = GeneratedColumn<String>(
+      'idempotency_key', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _fingerprintHashMeta =
+      const VerificationMeta('fingerprintHash');
+  @override
+  late final GeneratedColumn<String> fingerprintHash = GeneratedColumn<String>(
+      'fingerprint_hash', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _productIdMeta =
+      const VerificationMeta('productId');
+  @override
+  late final GeneratedColumn<int> productId = GeneratedColumn<int>(
+      'product_id', aliasedName, false,
+      type: DriftSqlType.int, requiredDuringInsert: true);
+  static const VerificationMeta _quantityMeta =
+      const VerificationMeta('quantity');
+  @override
+  late final GeneratedColumn<double> quantity = GeneratedColumn<double>(
+      'quantity', aliasedName, false,
+      type: DriftSqlType.double, requiredDuringInsert: true);
+  static const VerificationMeta _refundAmountMeta =
+      const VerificationMeta('refundAmount');
+  @override
+  late final GeneratedColumn<double> refundAmount = GeneratedColumn<double>(
+      'refund_amount', aliasedName, false,
+      type: DriftSqlType.double, requiredDuringInsert: true);
+  static const VerificationMeta _userIdMeta = const VerificationMeta('userId');
+  @override
+  late final GeneratedColumn<int> userId = GeneratedColumn<int>(
+      'user_id', aliasedName, false,
+      type: DriftSqlType.int, requiredDuringInsert: true);
+  static const VerificationMeta _approvedByUserIdMeta =
+      const VerificationMeta('approvedByUserId');
+  @override
+  late final GeneratedColumn<int> approvedByUserId = GeneratedColumn<int>(
+      'approved_by_user_id', aliasedName, true,
+      type: DriftSqlType.int, requiredDuringInsert: false);
+  static const VerificationMeta _customerReturnIdMeta =
+      const VerificationMeta('customerReturnId');
+  @override
+  late final GeneratedColumn<int> customerReturnId = GeneratedColumn<int>(
+      'customer_return_id', aliasedName, false,
+      type: DriftSqlType.int, requiredDuringInsert: true);
+  static const VerificationMeta _createdAtMeta =
+      const VerificationMeta('createdAt');
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+      'created_at', aliasedName, false,
+      type: DriftSqlType.dateTime,
+      requiredDuringInsert: false,
+      defaultValue: currentDateAndTime);
+  @override
+  List<GeneratedColumn> get $columns => [
+        idempotencyKey,
+        fingerprintHash,
+        productId,
+        quantity,
+        refundAmount,
+        userId,
+        approvedByUserId,
+        customerReturnId,
+        createdAt
+      ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'customer_quick_return_idempotency';
+  @override
+  VerificationContext validateIntegrity(
+      Insertable<CustomerQuickReturnIdempotencyData> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('idempotency_key')) {
+      context.handle(
+          _idempotencyKeyMeta,
+          idempotencyKey.isAcceptableOrUnknown(
+              data['idempotency_key']!, _idempotencyKeyMeta));
+    } else if (isInserting) {
+      context.missing(_idempotencyKeyMeta);
+    }
+    if (data.containsKey('fingerprint_hash')) {
+      context.handle(
+          _fingerprintHashMeta,
+          fingerprintHash.isAcceptableOrUnknown(
+              data['fingerprint_hash']!, _fingerprintHashMeta));
+    } else if (isInserting) {
+      context.missing(_fingerprintHashMeta);
+    }
+    if (data.containsKey('product_id')) {
+      context.handle(_productIdMeta,
+          productId.isAcceptableOrUnknown(data['product_id']!, _productIdMeta));
+    } else if (isInserting) {
+      context.missing(_productIdMeta);
+    }
+    if (data.containsKey('quantity')) {
+      context.handle(_quantityMeta,
+          quantity.isAcceptableOrUnknown(data['quantity']!, _quantityMeta));
+    } else if (isInserting) {
+      context.missing(_quantityMeta);
+    }
+    if (data.containsKey('refund_amount')) {
+      context.handle(
+          _refundAmountMeta,
+          refundAmount.isAcceptableOrUnknown(
+              data['refund_amount']!, _refundAmountMeta));
+    } else if (isInserting) {
+      context.missing(_refundAmountMeta);
+    }
+    if (data.containsKey('user_id')) {
+      context.handle(_userIdMeta,
+          userId.isAcceptableOrUnknown(data['user_id']!, _userIdMeta));
+    } else if (isInserting) {
+      context.missing(_userIdMeta);
+    }
+    if (data.containsKey('approved_by_user_id')) {
+      context.handle(
+          _approvedByUserIdMeta,
+          approvedByUserId.isAcceptableOrUnknown(
+              data['approved_by_user_id']!, _approvedByUserIdMeta));
+    }
+    if (data.containsKey('customer_return_id')) {
+      context.handle(
+          _customerReturnIdMeta,
+          customerReturnId.isAcceptableOrUnknown(
+              data['customer_return_id']!, _customerReturnIdMeta));
+    } else if (isInserting) {
+      context.missing(_customerReturnIdMeta);
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(_createdAtMeta,
+          createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {idempotencyKey};
+  @override
+  CustomerQuickReturnIdempotencyData map(Map<String, dynamic> data,
+      {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return CustomerQuickReturnIdempotencyData(
+      idempotencyKey: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}idempotency_key'])!,
+      fingerprintHash: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}fingerprint_hash'])!,
+      productId: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}product_id'])!,
+      quantity: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}quantity'])!,
+      refundAmount: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}refund_amount'])!,
+      userId: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}user_id'])!,
+      approvedByUserId: attachedDatabase.typeMapping.read(
+          DriftSqlType.int, data['${effectivePrefix}approved_by_user_id']),
+      customerReturnId: attachedDatabase.typeMapping.read(
+          DriftSqlType.int, data['${effectivePrefix}customer_return_id'])!,
+      createdAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
+    );
+  }
+
+  @override
+  $CustomerQuickReturnIdempotencyTable createAlias(String alias) {
+    return $CustomerQuickReturnIdempotencyTable(attachedDatabase, alias);
+  }
+}
+
+class CustomerQuickReturnIdempotencyData extends DataClass
+    implements Insertable<CustomerQuickReturnIdempotencyData> {
+  final String idempotencyKey;
+  final String fingerprintHash;
+  final int productId;
+  final double quantity;
+  final double refundAmount;
+  final int userId;
+  final int? approvedByUserId;
+  final int customerReturnId;
+  final DateTime createdAt;
+  const CustomerQuickReturnIdempotencyData(
+      {required this.idempotencyKey,
+      required this.fingerprintHash,
+      required this.productId,
+      required this.quantity,
+      required this.refundAmount,
+      required this.userId,
+      this.approvedByUserId,
+      required this.customerReturnId,
+      required this.createdAt});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['idempotency_key'] = Variable<String>(idempotencyKey);
+    map['fingerprint_hash'] = Variable<String>(fingerprintHash);
+    map['product_id'] = Variable<int>(productId);
+    map['quantity'] = Variable<double>(quantity);
+    map['refund_amount'] = Variable<double>(refundAmount);
+    map['user_id'] = Variable<int>(userId);
+    if (!nullToAbsent || approvedByUserId != null) {
+      map['approved_by_user_id'] = Variable<int>(approvedByUserId);
+    }
+    map['customer_return_id'] = Variable<int>(customerReturnId);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    return map;
+  }
+
+  CustomerQuickReturnIdempotencyCompanion toCompanion(bool nullToAbsent) {
+    return CustomerQuickReturnIdempotencyCompanion(
+      idempotencyKey: Value(idempotencyKey),
+      fingerprintHash: Value(fingerprintHash),
+      productId: Value(productId),
+      quantity: Value(quantity),
+      refundAmount: Value(refundAmount),
+      userId: Value(userId),
+      approvedByUserId: approvedByUserId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(approvedByUserId),
+      customerReturnId: Value(customerReturnId),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory CustomerQuickReturnIdempotencyData.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return CustomerQuickReturnIdempotencyData(
+      idempotencyKey: serializer.fromJson<String>(json['idempotencyKey']),
+      fingerprintHash: serializer.fromJson<String>(json['fingerprintHash']),
+      productId: serializer.fromJson<int>(json['productId']),
+      quantity: serializer.fromJson<double>(json['quantity']),
+      refundAmount: serializer.fromJson<double>(json['refundAmount']),
+      userId: serializer.fromJson<int>(json['userId']),
+      approvedByUserId: serializer.fromJson<int?>(json['approvedByUserId']),
+      customerReturnId: serializer.fromJson<int>(json['customerReturnId']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'idempotencyKey': serializer.toJson<String>(idempotencyKey),
+      'fingerprintHash': serializer.toJson<String>(fingerprintHash),
+      'productId': serializer.toJson<int>(productId),
+      'quantity': serializer.toJson<double>(quantity),
+      'refundAmount': serializer.toJson<double>(refundAmount),
+      'userId': serializer.toJson<int>(userId),
+      'approvedByUserId': serializer.toJson<int?>(approvedByUserId),
+      'customerReturnId': serializer.toJson<int>(customerReturnId),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+    };
+  }
+
+  CustomerQuickReturnIdempotencyData copyWith(
+          {String? idempotencyKey,
+          String? fingerprintHash,
+          int? productId,
+          double? quantity,
+          double? refundAmount,
+          int? userId,
+          Value<int?> approvedByUserId = const Value.absent(),
+          int? customerReturnId,
+          DateTime? createdAt}) =>
+      CustomerQuickReturnIdempotencyData(
+        idempotencyKey: idempotencyKey ?? this.idempotencyKey,
+        fingerprintHash: fingerprintHash ?? this.fingerprintHash,
+        productId: productId ?? this.productId,
+        quantity: quantity ?? this.quantity,
+        refundAmount: refundAmount ?? this.refundAmount,
+        userId: userId ?? this.userId,
+        approvedByUserId: approvedByUserId.present
+            ? approvedByUserId.value
+            : this.approvedByUserId,
+        customerReturnId: customerReturnId ?? this.customerReturnId,
+        createdAt: createdAt ?? this.createdAt,
+      );
+  CustomerQuickReturnIdempotencyData copyWithCompanion(
+      CustomerQuickReturnIdempotencyCompanion data) {
+    return CustomerQuickReturnIdempotencyData(
+      idempotencyKey: data.idempotencyKey.present
+          ? data.idempotencyKey.value
+          : this.idempotencyKey,
+      fingerprintHash: data.fingerprintHash.present
+          ? data.fingerprintHash.value
+          : this.fingerprintHash,
+      productId: data.productId.present ? data.productId.value : this.productId,
+      quantity: data.quantity.present ? data.quantity.value : this.quantity,
+      refundAmount: data.refundAmount.present
+          ? data.refundAmount.value
+          : this.refundAmount,
+      userId: data.userId.present ? data.userId.value : this.userId,
+      approvedByUserId: data.approvedByUserId.present
+          ? data.approvedByUserId.value
+          : this.approvedByUserId,
+      customerReturnId: data.customerReturnId.present
+          ? data.customerReturnId.value
+          : this.customerReturnId,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CustomerQuickReturnIdempotencyData(')
+          ..write('idempotencyKey: $idempotencyKey, ')
+          ..write('fingerprintHash: $fingerprintHash, ')
+          ..write('productId: $productId, ')
+          ..write('quantity: $quantity, ')
+          ..write('refundAmount: $refundAmount, ')
+          ..write('userId: $userId, ')
+          ..write('approvedByUserId: $approvedByUserId, ')
+          ..write('customerReturnId: $customerReturnId, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+      idempotencyKey,
+      fingerprintHash,
+      productId,
+      quantity,
+      refundAmount,
+      userId,
+      approvedByUserId,
+      customerReturnId,
+      createdAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is CustomerQuickReturnIdempotencyData &&
+          other.idempotencyKey == this.idempotencyKey &&
+          other.fingerprintHash == this.fingerprintHash &&
+          other.productId == this.productId &&
+          other.quantity == this.quantity &&
+          other.refundAmount == this.refundAmount &&
+          other.userId == this.userId &&
+          other.approvedByUserId == this.approvedByUserId &&
+          other.customerReturnId == this.customerReturnId &&
+          other.createdAt == this.createdAt);
+}
+
+class CustomerQuickReturnIdempotencyCompanion
+    extends UpdateCompanion<CustomerQuickReturnIdempotencyData> {
+  final Value<String> idempotencyKey;
+  final Value<String> fingerprintHash;
+  final Value<int> productId;
+  final Value<double> quantity;
+  final Value<double> refundAmount;
+  final Value<int> userId;
+  final Value<int?> approvedByUserId;
+  final Value<int> customerReturnId;
+  final Value<DateTime> createdAt;
+  final Value<int> rowid;
+  const CustomerQuickReturnIdempotencyCompanion({
+    this.idempotencyKey = const Value.absent(),
+    this.fingerprintHash = const Value.absent(),
+    this.productId = const Value.absent(),
+    this.quantity = const Value.absent(),
+    this.refundAmount = const Value.absent(),
+    this.userId = const Value.absent(),
+    this.approvedByUserId = const Value.absent(),
+    this.customerReturnId = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  CustomerQuickReturnIdempotencyCompanion.insert({
+    required String idempotencyKey,
+    required String fingerprintHash,
+    required int productId,
+    required double quantity,
+    required double refundAmount,
+    required int userId,
+    this.approvedByUserId = const Value.absent(),
+    required int customerReturnId,
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  })  : idempotencyKey = Value(idempotencyKey),
+        fingerprintHash = Value(fingerprintHash),
+        productId = Value(productId),
+        quantity = Value(quantity),
+        refundAmount = Value(refundAmount),
+        userId = Value(userId),
+        customerReturnId = Value(customerReturnId);
+  static Insertable<CustomerQuickReturnIdempotencyData> custom({
+    Expression<String>? idempotencyKey,
+    Expression<String>? fingerprintHash,
+    Expression<int>? productId,
+    Expression<double>? quantity,
+    Expression<double>? refundAmount,
+    Expression<int>? userId,
+    Expression<int>? approvedByUserId,
+    Expression<int>? customerReturnId,
+    Expression<DateTime>? createdAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (idempotencyKey != null) 'idempotency_key': idempotencyKey,
+      if (fingerprintHash != null) 'fingerprint_hash': fingerprintHash,
+      if (productId != null) 'product_id': productId,
+      if (quantity != null) 'quantity': quantity,
+      if (refundAmount != null) 'refund_amount': refundAmount,
+      if (userId != null) 'user_id': userId,
+      if (approvedByUserId != null) 'approved_by_user_id': approvedByUserId,
+      if (customerReturnId != null) 'customer_return_id': customerReturnId,
+      if (createdAt != null) 'created_at': createdAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  CustomerQuickReturnIdempotencyCompanion copyWith(
+      {Value<String>? idempotencyKey,
+      Value<String>? fingerprintHash,
+      Value<int>? productId,
+      Value<double>? quantity,
+      Value<double>? refundAmount,
+      Value<int>? userId,
+      Value<int?>? approvedByUserId,
+      Value<int>? customerReturnId,
+      Value<DateTime>? createdAt,
+      Value<int>? rowid}) {
+    return CustomerQuickReturnIdempotencyCompanion(
+      idempotencyKey: idempotencyKey ?? this.idempotencyKey,
+      fingerprintHash: fingerprintHash ?? this.fingerprintHash,
+      productId: productId ?? this.productId,
+      quantity: quantity ?? this.quantity,
+      refundAmount: refundAmount ?? this.refundAmount,
+      userId: userId ?? this.userId,
+      approvedByUserId: approvedByUserId ?? this.approvedByUserId,
+      customerReturnId: customerReturnId ?? this.customerReturnId,
+      createdAt: createdAt ?? this.createdAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (idempotencyKey.present) {
+      map['idempotency_key'] = Variable<String>(idempotencyKey.value);
+    }
+    if (fingerprintHash.present) {
+      map['fingerprint_hash'] = Variable<String>(fingerprintHash.value);
+    }
+    if (productId.present) {
+      map['product_id'] = Variable<int>(productId.value);
+    }
+    if (quantity.present) {
+      map['quantity'] = Variable<double>(quantity.value);
+    }
+    if (refundAmount.present) {
+      map['refund_amount'] = Variable<double>(refundAmount.value);
+    }
+    if (userId.present) {
+      map['user_id'] = Variable<int>(userId.value);
+    }
+    if (approvedByUserId.present) {
+      map['approved_by_user_id'] = Variable<int>(approvedByUserId.value);
+    }
+    if (customerReturnId.present) {
+      map['customer_return_id'] = Variable<int>(customerReturnId.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CustomerQuickReturnIdempotencyCompanion(')
+          ..write('idempotencyKey: $idempotencyKey, ')
+          ..write('fingerprintHash: $fingerprintHash, ')
+          ..write('productId: $productId, ')
+          ..write('quantity: $quantity, ')
+          ..write('refundAmount: $refundAmount, ')
+          ..write('userId: $userId, ')
+          ..write('approvedByUserId: $approvedByUserId, ')
+          ..write('customerReturnId: $customerReturnId, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $SupplierAccountsTable extends SupplierAccounts
     with TableInfo<$SupplierAccountsTable, SupplierAccount> {
   @override
@@ -20530,6 +21036,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       $SupplierRefundIdempotencyTable(this);
   late final $PosSaleIdempotencyTable posSaleIdempotency =
       $PosSaleIdempotencyTable(this);
+  late final $CustomerQuickReturnIdempotencyTable
+      customerQuickReturnIdempotency =
+      $CustomerQuickReturnIdempotencyTable(this);
   late final $SupplierAccountsTable supplierAccounts =
       $SupplierAccountsTable(this);
   late final $SupplierTransactionsTable supplierTransactions =
@@ -20600,6 +21109,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       SupplierRefundIdempotencyDao(this as AppDatabase);
   late final PosSaleIdempotencyDao posSaleIdempotencyDao =
       PosSaleIdempotencyDao(this as AppDatabase);
+  late final CustomerQuickReturnIdempotencyDao
+      customerQuickReturnIdempotencyDao =
+      CustomerQuickReturnIdempotencyDao(this as AppDatabase);
   late final SupplierAccountsDao supplierAccountsDao =
       SupplierAccountsDao(this as AppDatabase);
   late final ProductsDao productsDao = ProductsDao(this as AppDatabase);
@@ -20637,6 +21149,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         supplierPaymentIdempotency,
         supplierRefundIdempotency,
         posSaleIdempotency,
+        customerQuickReturnIdempotency,
         supplierAccounts,
         supplierTransactions,
         products,
@@ -23973,6 +24486,256 @@ typedef $$PosSaleIdempotencyTableProcessedTableManager = ProcessedTableManager<
     ),
     PosSaleIdempotencyData,
     PrefetchHooks Function()>;
+typedef $$CustomerQuickReturnIdempotencyTableCreateCompanionBuilder
+    = CustomerQuickReturnIdempotencyCompanion Function({
+  required String idempotencyKey,
+  required String fingerprintHash,
+  required int productId,
+  required double quantity,
+  required double refundAmount,
+  required int userId,
+  Value<int?> approvedByUserId,
+  required int customerReturnId,
+  Value<DateTime> createdAt,
+  Value<int> rowid,
+});
+typedef $$CustomerQuickReturnIdempotencyTableUpdateCompanionBuilder
+    = CustomerQuickReturnIdempotencyCompanion Function({
+  Value<String> idempotencyKey,
+  Value<String> fingerprintHash,
+  Value<int> productId,
+  Value<double> quantity,
+  Value<double> refundAmount,
+  Value<int> userId,
+  Value<int?> approvedByUserId,
+  Value<int> customerReturnId,
+  Value<DateTime> createdAt,
+  Value<int> rowid,
+});
+
+class $$CustomerQuickReturnIdempotencyTableFilterComposer
+    extends Composer<_$AppDatabase, $CustomerQuickReturnIdempotencyTable> {
+  $$CustomerQuickReturnIdempotencyTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get idempotencyKey => $composableBuilder(
+      column: $table.idempotencyKey,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get fingerprintHash => $composableBuilder(
+      column: $table.fingerprintHash,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get productId => $composableBuilder(
+      column: $table.productId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get quantity => $composableBuilder(
+      column: $table.quantity, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get refundAmount => $composableBuilder(
+      column: $table.refundAmount, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get userId => $composableBuilder(
+      column: $table.userId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get approvedByUserId => $composableBuilder(
+      column: $table.approvedByUserId,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get customerReturnId => $composableBuilder(
+      column: $table.customerReturnId,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnFilters(column));
+}
+
+class $$CustomerQuickReturnIdempotencyTableOrderingComposer
+    extends Composer<_$AppDatabase, $CustomerQuickReturnIdempotencyTable> {
+  $$CustomerQuickReturnIdempotencyTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get idempotencyKey => $composableBuilder(
+      column: $table.idempotencyKey,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get fingerprintHash => $composableBuilder(
+      column: $table.fingerprintHash,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get productId => $composableBuilder(
+      column: $table.productId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get quantity => $composableBuilder(
+      column: $table.quantity, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get refundAmount => $composableBuilder(
+      column: $table.refundAmount,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get userId => $composableBuilder(
+      column: $table.userId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get approvedByUserId => $composableBuilder(
+      column: $table.approvedByUserId,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get customerReturnId => $composableBuilder(
+      column: $table.customerReturnId,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnOrderings(column));
+}
+
+class $$CustomerQuickReturnIdempotencyTableAnnotationComposer
+    extends Composer<_$AppDatabase, $CustomerQuickReturnIdempotencyTable> {
+  $$CustomerQuickReturnIdempotencyTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get idempotencyKey => $composableBuilder(
+      column: $table.idempotencyKey, builder: (column) => column);
+
+  GeneratedColumn<String> get fingerprintHash => $composableBuilder(
+      column: $table.fingerprintHash, builder: (column) => column);
+
+  GeneratedColumn<int> get productId =>
+      $composableBuilder(column: $table.productId, builder: (column) => column);
+
+  GeneratedColumn<double> get quantity =>
+      $composableBuilder(column: $table.quantity, builder: (column) => column);
+
+  GeneratedColumn<double> get refundAmount => $composableBuilder(
+      column: $table.refundAmount, builder: (column) => column);
+
+  GeneratedColumn<int> get userId =>
+      $composableBuilder(column: $table.userId, builder: (column) => column);
+
+  GeneratedColumn<int> get approvedByUserId => $composableBuilder(
+      column: $table.approvedByUserId, builder: (column) => column);
+
+  GeneratedColumn<int> get customerReturnId => $composableBuilder(
+      column: $table.customerReturnId, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+}
+
+class $$CustomerQuickReturnIdempotencyTableTableManager
+    extends RootTableManager<
+        _$AppDatabase,
+        $CustomerQuickReturnIdempotencyTable,
+        CustomerQuickReturnIdempotencyData,
+        $$CustomerQuickReturnIdempotencyTableFilterComposer,
+        $$CustomerQuickReturnIdempotencyTableOrderingComposer,
+        $$CustomerQuickReturnIdempotencyTableAnnotationComposer,
+        $$CustomerQuickReturnIdempotencyTableCreateCompanionBuilder,
+        $$CustomerQuickReturnIdempotencyTableUpdateCompanionBuilder,
+        (
+          CustomerQuickReturnIdempotencyData,
+          BaseReferences<_$AppDatabase, $CustomerQuickReturnIdempotencyTable,
+              CustomerQuickReturnIdempotencyData>
+        ),
+        CustomerQuickReturnIdempotencyData,
+        PrefetchHooks Function()> {
+  $$CustomerQuickReturnIdempotencyTableTableManager(
+      _$AppDatabase db, $CustomerQuickReturnIdempotencyTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CustomerQuickReturnIdempotencyTableFilterComposer(
+                  $db: db, $table: table),
+          createOrderingComposer: () =>
+              $$CustomerQuickReturnIdempotencyTableOrderingComposer(
+                  $db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$CustomerQuickReturnIdempotencyTableAnnotationComposer(
+                  $db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<String> idempotencyKey = const Value.absent(),
+            Value<String> fingerprintHash = const Value.absent(),
+            Value<int> productId = const Value.absent(),
+            Value<double> quantity = const Value.absent(),
+            Value<double> refundAmount = const Value.absent(),
+            Value<int> userId = const Value.absent(),
+            Value<int?> approvedByUserId = const Value.absent(),
+            Value<int> customerReturnId = const Value.absent(),
+            Value<DateTime> createdAt = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              CustomerQuickReturnIdempotencyCompanion(
+            idempotencyKey: idempotencyKey,
+            fingerprintHash: fingerprintHash,
+            productId: productId,
+            quantity: quantity,
+            refundAmount: refundAmount,
+            userId: userId,
+            approvedByUserId: approvedByUserId,
+            customerReturnId: customerReturnId,
+            createdAt: createdAt,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            required String idempotencyKey,
+            required String fingerprintHash,
+            required int productId,
+            required double quantity,
+            required double refundAmount,
+            required int userId,
+            Value<int?> approvedByUserId = const Value.absent(),
+            required int customerReturnId,
+            Value<DateTime> createdAt = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              CustomerQuickReturnIdempotencyCompanion.insert(
+            idempotencyKey: idempotencyKey,
+            fingerprintHash: fingerprintHash,
+            productId: productId,
+            quantity: quantity,
+            refundAmount: refundAmount,
+            userId: userId,
+            approvedByUserId: approvedByUserId,
+            customerReturnId: customerReturnId,
+            createdAt: createdAt,
+            rowid: rowid,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$CustomerQuickReturnIdempotencyTableProcessedTableManager
+    = ProcessedTableManager<
+        _$AppDatabase,
+        $CustomerQuickReturnIdempotencyTable,
+        CustomerQuickReturnIdempotencyData,
+        $$CustomerQuickReturnIdempotencyTableFilterComposer,
+        $$CustomerQuickReturnIdempotencyTableOrderingComposer,
+        $$CustomerQuickReturnIdempotencyTableAnnotationComposer,
+        $$CustomerQuickReturnIdempotencyTableCreateCompanionBuilder,
+        $$CustomerQuickReturnIdempotencyTableUpdateCompanionBuilder,
+        (
+          CustomerQuickReturnIdempotencyData,
+          BaseReferences<_$AppDatabase, $CustomerQuickReturnIdempotencyTable,
+              CustomerQuickReturnIdempotencyData>
+        ),
+        CustomerQuickReturnIdempotencyData,
+        PrefetchHooks Function()>;
 typedef $$SupplierAccountsTableCreateCompanionBuilder
     = SupplierAccountsCompanion Function({
   Value<int> id,
@@ -37171,6 +37934,10 @@ class $AppDatabaseManager {
           _db, _db.supplierRefundIdempotency);
   $$PosSaleIdempotencyTableTableManager get posSaleIdempotency =>
       $$PosSaleIdempotencyTableTableManager(_db, _db.posSaleIdempotency);
+  $$CustomerQuickReturnIdempotencyTableTableManager
+      get customerQuickReturnIdempotency =>
+          $$CustomerQuickReturnIdempotencyTableTableManager(
+              _db, _db.customerQuickReturnIdempotency);
   $$SupplierAccountsTableTableManager get supplierAccounts =>
       $$SupplierAccountsTableTableManager(_db, _db.supplierAccounts);
   $$SupplierTransactionsTableTableManager get supplierTransactions =>

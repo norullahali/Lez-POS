@@ -778,13 +778,13 @@ void main() {
       final migrated = AppDatabase.test(NativeDatabase.opened(opened.rawDb));
       addTearDown(() async => migrated.close());
 
-      expect(migrated.schemaVersion, 40);
+      expect(migrated.schemaVersion, 41);
       expect(await idempotencyTableExists(migrated), isTrue);
       expect(await idempotencyIndexExists(migrated), isTrue);
     });
 
-    test('17) fresh v40 database works', () async {
-      expect(db.schemaVersion, 40);
+    test('17) fresh v41 database works', () async {
+      expect(db.schemaVersion, 41);
       expect(await idempotencyTableExists(db), isTrue);
       expect(await idempotencyIndexExists(db), isTrue);
     });
@@ -831,11 +831,11 @@ void main() {
       expect(await invoiceCount(), 1);
     });
 
-    test('22) B2-B6 regression sentinel after schema v40', () async {
+    test('22) B2-B6 regression sentinel after schema v41', () async {
       final regressionDb = AppDatabase.test();
       addTearDown(() async => regressionDb.close());
 
-      expect(regressionDb.schemaVersion, 40);
+      expect(regressionDb.schemaVersion, 41);
 
       // B4 — unique sales invoice index preserved after v40 migration.
       final b4Index = await regressionDb.customSelect(

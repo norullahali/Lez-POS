@@ -635,12 +635,12 @@ void main() {
       final migrated = AppDatabase.test(NativeDatabase.opened(opened.rawDb));
       addTearDown(() async => migrated.close());
 
-      expect(migrated.schemaVersion, 41);
+      expect(migrated.schemaVersion, 42);
       expect(await idempotencyTableExists(migrated), isTrue);
     });
 
     test('15) fresh v41 schema includes table', () async {
-      expect(db.schemaVersion, 41);
+      expect(db.schemaVersion, 42);
       expect(await idempotencyTableExists(db), isTrue);
     });
 
@@ -774,7 +774,7 @@ void main() {
     test('20) B2-B7 regression sentinel on v41', () async {
       final regressionDb = AppDatabase.test();
       addTearDown(() async => regressionDb.close());
-      expect(regressionDb.schemaVersion, 41);
+      expect(regressionDb.schemaVersion, 42);
 
       final b4Index = await regressionDb.customSelect(
         "SELECT name FROM sqlite_master WHERE type='index' "

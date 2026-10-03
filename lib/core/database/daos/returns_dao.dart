@@ -206,87 +206,103 @@ class ReturnsDao extends DatabaseAccessor<AppDatabase> with _$ReturnsDaoMixin {
     }
   }
 
+  /// Manual customer return business mutations (B10 canonical path).
+  ///
+  /// Must run inside an enclosing transaction owned by the caller.
+  Future<int> saveCustomerReturnInTransaction({
+    required CustomerReturnsCompanion header,
+    required List<Map<String, dynamic>> items,
+    int? returnedByUserId,
+  }) async {
+    final returnId = await into(customerReturns).insert(header);
+
+    String? cashierName;
+    if (returnedByUserId != null) {
+      final cashierRow = await customSelect(
+        'SELECT full_name FROM users WHERE id = ?',
+        variables: [Variable.withInt(returnedByUserId)],
+        readsFrom: {attachedDatabase.usersTable},
+      ).getSingleOrNull();
+      cashierName = cashierRow?.data['full_name'] as String?;
+    }
+
+    final returnRow = await (select(customerReturns)
+          ..where((r) => r.id.equals(returnId)))
+        .getSingle();
+
+    for (final item in items) {
+      final productId = item['productId'] as int;
+      final qty = (item['qty'] as num).toDouble();
+      final price = (item['price'] as num).toDouble();
+      final cost = (item['cost'] as num?)?.toDouble() ?? 0.0;
+      final lineTotal = qty * price;
+
+      final stockBefore = await attachedDatabase.stockDao.getStock(productId);
+
+      final itemId = await into(customerReturnItems).insert(
+        CustomerReturnItemsCompanion(
+          returnId: Value(returnId),
+          productId: Value(productId),
+          productName:
+              Value(item['productName'] as String? ?? 'منتج #$productId'),
+          quantity: Value(qty),
+          unitPrice: Value(price),
+          unitCost: Value(cost),
+          total: Value(lineTotal),
+        ),
+      );
+
+      // Stock comes BACK IN when customer returns
+      await into(stockLedger).insert(
+        StockLedgerCompanion(
+          productId: Value(productId),
+          movementType: Value(StockMovementType.returnIn.code),
+          referenceId: Value(itemId),
+          referenceType: const Value('customer_return_items'),
+          quantityChange: Value(qty), // positive = stock back in
+          unitCost: Value(cost),
+        ),
+      );
+
+      // Increment current stock
+      await customUpdate(
+        'UPDATE products SET current_stock = current_stock + ? WHERE id = ?',
+        variables: [Variable.withReal(qty), Variable.withInt(productId)],
+        updates: {db.products},
+      );
+
+      await attachedDatabase.returnAuditLogsDao.insertAuditLog(
+        returnType: returnRow.originalInvoiceId != null ? 'full' : 'manual',
+        invoiceId: returnRow.originalInvoiceId,
+        productId: productId,
+        returnedQuantity: qty,
+        returnedAmount: lineTotal,
+        cashierUserId: returnedByUserId,
+        cashierNameSnapshot: cashierName,
+        customerId: null,
+        returnReason: returnRow.reason,
+        returnNote: returnRow.notes,
+        stockBefore: stockBefore,
+        stockAfter: stockBefore + qty,
+        referenceType: 'customer_return_items',
+        referenceId: itemId,
+      );
+    }
+    return returnId;
+  }
+
+  /// Legacy wrapper for non-idempotent callers and compatibility tests.
   Future<int> saveCustomerReturn({
     required CustomerReturnsCompanion header,
     required List<Map<String, dynamic>> items,
     int? returnedByUserId,
   }) async {
     return transaction(() async {
-      final returnId = await into(customerReturns).insert(header);
-
-      String? cashierName;
-      if (returnedByUserId != null) {
-        final cashierRow = await customSelect(
-          'SELECT full_name FROM users WHERE id = ?',
-          variables: [Variable.withInt(returnedByUserId)],
-          readsFrom: {attachedDatabase.usersTable},
-        ).getSingleOrNull();
-        cashierName = cashierRow?.data['full_name'] as String?;
-      }
-
-      final returnRow = await (select(customerReturns)
-            ..where((r) => r.id.equals(returnId)))
-          .getSingle();
-
-      for (final item in items) {
-        final productId = item['productId'] as int;
-        final qty = (item['qty'] as num).toDouble();
-        final price = (item['price'] as num).toDouble();
-        final cost = (item['cost'] as num?)?.toDouble() ?? 0.0;
-        final lineTotal = qty * price;
-
-        final stockBefore = await attachedDatabase.stockDao.getStock(productId);
-
-        final itemId = await into(customerReturnItems).insert(
-          CustomerReturnItemsCompanion(
-            returnId: Value(returnId),
-            productId: Value(productId),
-            productName:
-                Value(item['productName'] as String? ?? 'منتج #$productId'),
-            quantity: Value(qty),
-            unitPrice: Value(price),
-            unitCost: Value(cost),
-            total: Value(lineTotal),
-          ),
-        );
-
-        // Stock comes BACK IN when customer returns
-        await into(stockLedger).insert(
-          StockLedgerCompanion(
-            productId: Value(productId),
-            movementType: Value(StockMovementType.returnIn.code),
-            referenceId: Value(itemId),
-            referenceType: const Value('customer_return_items'),
-            quantityChange: Value(qty), // positive = stock back in
-            unitCost: Value(cost),
-          ),
-        );
-
-        // Increment current stock
-        await customUpdate(
-          'UPDATE products SET current_stock = current_stock + ? WHERE id = ?',
-          variables: [Variable.withReal(qty), Variable.withInt(productId)],
-          updates: {db.products},
-        );
-
-        await attachedDatabase.returnAuditLogsDao.insertAuditLog(
-          returnType: returnRow.originalInvoiceId != null ? 'full' : 'manual',
-          invoiceId: returnRow.originalInvoiceId,
-          productId: productId,
-          returnedQuantity: qty,
-          returnedAmount: lineTotal,
-          cashierUserId: returnedByUserId,
-          cashierNameSnapshot: cashierName,
-          customerId: null,
-          returnReason: returnRow.reason,
-          returnNote: returnRow.notes,
-          stockBefore: stockBefore,
-          stockAfter: stockBefore + qty,
-          referenceType: 'customer_return_items',
-          referenceId: itemId,
-        );
-      }
-      return returnId;
+      return saveCustomerReturnInTransaction(
+        header: header,
+        items: items,
+        returnedByUserId: returnedByUserId,
+      );
     });
   }
 
@@ -664,7 +680,8 @@ class ReturnsDao extends DatabaseAccessor<AppDatabase> with _$ReturnsDaoMixin {
 
       final int itemId;
       if (purchaseItemId != null) {
-        final insertedId = await insertSupplierReturnItemIfWithinPurchaseLineCap(
+        final insertedId =
+            await insertSupplierReturnItemIfWithinPurchaseLineCap(
           returnId: returnId,
           purchaseItemId: purchaseItemId,
           productId: productId,

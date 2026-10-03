@@ -9,10 +9,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:lez_pos/core/database/app_database.dart';
 import 'package:lez_pos/core/services/credit_limit_exception.dart';
 import 'package:lez_pos/core/services/customer_account_service.dart';
+import 'package:lez_pos/core/services/manual_return_idempotency_conflict_exception.dart';
+import 'package:lez_pos/core/services/manual_return_result.dart';
+import 'package:lez_pos/core/services/manual_return_service.dart';
 import 'package:lez_pos/core/services/pos_sale_fingerprint.dart';
 import 'package:lez_pos/core/services/pos_sale_service.dart';
-import 'package:lez_pos/core/services/quick_return_idempotency_conflict_exception.dart';
-import 'package:lez_pos/core/services/quick_return_result.dart';
 import 'package:lez_pos/core/services/supplier_account_service.dart';
 import 'package:lez_pos/core/services/supplier_payment_exceeds_payable_exception.dart';
 import 'package:lez_pos/features/auth/providers/auth_provider.dart';
@@ -20,83 +21,83 @@ import 'package:lez_pos/features/financial/models/cash_ledger_event_type.dart';
 import 'package:lez_pos/features/financial/models/cash_ledger_filter.dart';
 import 'package:lez_pos/features/financial/repositories/financial_ledger_repository.dart';
 import 'package:lez_pos/features/pos/models/cart_item.dart';
-import 'package:lez_pos/features/pos/providers/pos_provider.dart';
 import 'package:lez_pos/features/products/models/product_model.dart';
 import 'package:lez_pos/features/products/providers/products_provider.dart';
 import 'package:lez_pos/features/products/repositories/products_repository.dart';
 import 'package:lez_pos/features/reports/core/models/report_date_preset.dart';
 import 'package:lez_pos/features/reports/core/models/report_filter_model.dart';
+import 'package:lez_pos/features/returns/providers/manual_return_service_provider.dart';
 import 'package:lez_pos/features/returns/providers/return_analytics_provider.dart';
 import 'package:lez_pos/features/returns/repositories/return_analytics_repository.dart';
 import 'package:lez_pos/features/returns/screens/customer_returns_screen.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite3;
 
+import 'support/customer_manual_return_test_keys.dart';
 import 'support/customer_payment_test_keys.dart';
-import 'support/customer_quick_return_test_keys.dart';
 import 'support/supplier_payment_test_keys.dart';
 
 Future<({sqlite3.Database rawDb, String path})>
-    openSimulatedV40RawDatabase() async {
+    openSimulatedV41RawDatabase() async {
   final dbPath =
-      '${Directory.systemTemp.path}${Platform.pathSeparator}b9_v40_${DateTime.now().microsecondsSinceEpoch}.db';
+      '${Directory.systemTemp.path}${Platform.pathSeparator}b10_v41_${DateTime.now().microsecondsSinceEpoch}.db';
   final bootstrapHandle = sqlite3.sqlite3.open(dbPath);
   final bootstrap = AppDatabase.test(NativeDatabase.opened(bootstrapHandle));
   await bootstrap.select(bootstrap.products).get();
   await bootstrap.customStatement(
-      'DROP TABLE IF EXISTS customer_quick_return_idempotency');
-  await bootstrap.customStatement('PRAGMA user_version = 40');
+      'DROP TABLE IF EXISTS customer_manual_return_idempotency');
+  await bootstrap.customStatement('PRAGMA user_version = 41');
   await bootstrap.close();
 
   final rawDb = sqlite3.sqlite3.open(dbPath);
-  expect(rawDb.userVersion, 40);
+  expect(rawDb.userVersion, 41);
   return (rawDb: rawDb, path: dbPath);
 }
 
-class _CountingPosSaleService extends PosSaleService {
-  _CountingPosSaleService(
+class _CountingManualReturnService extends ManualReturnService {
+  _CountingManualReturnService(
     super.db, {
-    Completer<void>? quickReturnGate,
+    Completer<void>? manualReturnGate,
     this.deferToSuper = true,
-  }) : _quickReturnGate = quickReturnGate;
+  }) : _manualReturnGate = manualReturnGate;
 
-  final Completer<void>? _quickReturnGate;
+  final Completer<void>? _manualReturnGate;
   bool throwConflict = false;
   bool deferToSuper;
-  int processQuickReturnCalls = 0;
+  int processManualReturnCalls = 0;
   final List<String> keysUsed = [];
 
   @override
-  Future<QuickReturnResult> processQuickReturn({
+  Future<ManualReturnResult> processManualReturn({
     required String idempotencyKey,
     required int productId,
     required double quantity,
-    required double refundAmount,
-    required int userId,
+    required double unitPrice,
     required String reason,
+    int? userId,
     int? approvedByUserId,
     Future<void> Function()? preSealHook,
   }) async {
-    processQuickReturnCalls++;
+    processManualReturnCalls++;
     keysUsed.add(idempotencyKey);
     if (throwConflict) {
-      throw const QuickReturnIdempotencyConflictException();
+      throw const ManualReturnIdempotencyConflictException();
     }
-    if (_quickReturnGate != null) {
-      await _quickReturnGate!.future;
+    if (_manualReturnGate != null) {
+      await _manualReturnGate!.future;
     }
     if (!deferToSuper) {
-      return const QuickReturnResult(
+      return const ManualReturnResult(
         customerReturnId: 1,
         idempotentReplay: false,
       );
     }
-    return super.processQuickReturn(
+    return super.processManualReturn(
       idempotencyKey: idempotencyKey,
       productId: productId,
       quantity: quantity,
-      refundAmount: refundAmount,
-      userId: userId,
+      unitPrice: unitPrice,
       reason: reason,
+      userId: userId,
       approvedByUserId: approvedByUserId,
       preSealHook: preSealHook,
     );
@@ -153,7 +154,8 @@ void main() {
   const userId = 1;
   const sellPrice = 10.0;
   const initialStock = 100.0;
-  const defaultReason = 'بدون فاتورة';
+  const defaultReason = 'سبب الإرجاع';
+  const unitPrice = 0.0;
 
   const ledgerFilter = CashLedgerFilter(
     page: 0,
@@ -161,9 +163,9 @@ void main() {
     dateFilter: ReportFilterModel(preset: ReportDatePreset.thisYear),
   );
 
-  group('B9 customer quick return idempotency', () {
+  group('B10 customer manual return idempotency', () {
     late AppDatabase db;
-    late PosSaleService quickReturnService;
+    late ManualReturnService manualReturnService;
     late int productId;
 
     Future<int> customerReturnCount() async =>
@@ -175,16 +177,19 @@ void main() {
     Future<int> auditLogCount() async =>
         (await db.select(db.returnAuditLogs).get()).length;
 
-    Future<int> quickReturnLogCount() async {
+    Future<int> manualReturnLogCount() async {
       final rows = await (db.select(db.logsTable)
             ..where((l) => l.actionType.equals('RETURN_WITHOUT_INVOICE')))
           .get();
       return rows.length;
     }
 
+    Future<int> allLogsCount() async =>
+        (await db.select(db.logsTable).get()).length;
+
     Future<int> idempotencyRowCount([AppDatabase? database]) async {
       final target = database ?? db;
-      return (await target.select(target.customerQuickReturnIdempotency).get())
+      return (await target.select(target.customerManualReturnIdempotency).get())
           .length;
     }
 
@@ -203,31 +208,29 @@ void main() {
       final rows = await database
           .customSelect(
             "SELECT name FROM sqlite_master WHERE type='table' "
-            "AND name='customer_quick_return_idempotency'",
+            "AND name='customer_manual_return_idempotency'",
           )
           .get();
       return rows.isNotEmpty;
     }
 
-    Future<QuickReturnResult> quickReturn({
+    Future<ManualReturnResult> manualReturn({
       required String idempotencyKey,
       double quantity = 1,
-      double? refundAmount,
+      double unitPriceArg = unitPrice,
       String reason = defaultReason,
       int? overrideProductId,
       int? overrideUserId,
       int? approvedByUserId,
       Future<void> Function()? preSealHook,
     }) {
-      final qty = quantity;
-      final amount = refundAmount ?? sellPrice * qty;
-      return quickReturnService.processQuickReturn(
+      return manualReturnService.processManualReturn(
         idempotencyKey: idempotencyKey,
         productId: overrideProductId ?? productId,
-        quantity: qty,
-        refundAmount: amount,
-        userId: overrideUserId ?? userId,
+        quantity: quantity,
+        unitPrice: unitPriceArg,
         reason: reason,
+        userId: overrideUserId ?? userId,
         approvedByUserId: approvedByUserId,
         preSealHook: preSealHook,
       );
@@ -235,12 +238,12 @@ void main() {
 
     setUp(() async {
       db = AppDatabase.test();
-      quickReturnService = PosSaleService(db);
+      manualReturnService = ManualReturnService(db);
 
       productId = await db.into(db.products).insert(
             const ProductsCompanion(
-              name: Value('B9 Quick Return Product'),
-              barcode: Value('B9-QR-1'),
+              name: Value('B10 Manual Return Product'),
+              barcode: Value('B10-MR-1'),
               currentStock: Value(initialStock),
               costPrice: Value(5),
               sellPrice: Value(sellPrice),
@@ -252,9 +255,9 @@ void main() {
       await db.close();
     });
 
-    test('1) first quick return succeeds', () async {
-      final key = b9QuickReturnIdempotencyKey();
-      final result = await quickReturn(idempotencyKey: key);
+    test('1) first manual return succeeds', () async {
+      final key = b10ManualReturnIdempotencyKey();
+      final result = await manualReturn(idempotencyKey: key);
 
       expect(result.idempotentReplay, isFalse);
       expect(result.customerReturnId, greaterThan(0));
@@ -263,151 +266,124 @@ void main() {
     });
 
     test('2) same key + same fingerprint replays', () async {
-      final key = b9QuickReturnIdempotencyKey();
-      await quickReturn(idempotencyKey: key);
-      final replay = await quickReturn(idempotencyKey: key);
+      final key = b10ManualReturnIdempotencyKey();
+      await manualReturn(idempotencyKey: key);
+      final replay = await manualReturn(idempotencyKey: key);
       expect(replay.idempotentReplay, isTrue);
     });
 
     test('3) replay returns same customerReturnId', () async {
-      final key = b9QuickReturnIdempotencyKey();
-      final first = await quickReturn(idempotencyKey: key);
-      final replay = await quickReturn(idempotencyKey: key);
+      final key = b10ManualReturnIdempotencyKey();
+      final first = await manualReturn(idempotencyKey: key);
+      final replay = await manualReturn(idempotencyKey: key);
       expect(replay.customerReturnId, first.customerReturnId);
     });
 
     test('4) replay does not increase stock again', () async {
-      final key = b9QuickReturnIdempotencyKey();
-      await quickReturn(idempotencyKey: key, quantity: 2);
+      final key = b10ManualReturnIdempotencyKey();
+      await manualReturn(idempotencyKey: key, quantity: 2);
       final stockAfterFirst = await stockLevel();
-      await quickReturn(idempotencyKey: key, quantity: 2);
+      await manualReturn(idempotencyKey: key, quantity: 2);
       expect(await stockLevel(), stockAfterFirst);
     });
 
     test('5) replay creates no second customer_returns row', () async {
-      final key = b9QuickReturnIdempotencyKey();
-      await quickReturn(idempotencyKey: key);
-      await quickReturn(idempotencyKey: key);
+      final key = b10ManualReturnIdempotencyKey();
+      await manualReturn(idempotencyKey: key);
+      await manualReturn(idempotencyKey: key);
       expect(await customerReturnCount(), 1);
     });
 
     test('6) replay creates no second customer_return_items row', () async {
-      final key = b9QuickReturnIdempotencyKey();
-      await quickReturn(idempotencyKey: key);
-      await quickReturn(idempotencyKey: key);
+      final key = b10ManualReturnIdempotencyKey();
+      await manualReturn(idempotencyKey: key);
+      await manualReturn(idempotencyKey: key);
       expect(await returnItemCount(), 1);
     });
 
     test('7) replay creates no second return_audit_logs row', () async {
-      final key = b9QuickReturnIdempotencyKey();
-      await quickReturn(idempotencyKey: key);
-      await quickReturn(idempotencyKey: key);
+      final key = b10ManualReturnIdempotencyKey();
+      await manualReturn(idempotencyKey: key);
+      await manualReturn(idempotencyKey: key);
       expect(await auditLogCount(), 1);
     });
 
-    test('8) replay creates no second logsTable row', () async {
-      final key = b9QuickReturnIdempotencyKey();
-      await quickReturn(idempotencyKey: key);
-      await quickReturn(idempotencyKey: key);
-      expect(await quickReturnLogCount(), 1);
+    test('8) replay creates no logsTable row', () async {
+      final key = b10ManualReturnIdempotencyKey();
+      await manualReturn(idempotencyKey: key);
+      await manualReturn(idempotencyKey: key);
+      expect(await manualReturnLogCount(), 0);
+      expect(await allLogsCount(), 0);
     });
 
-    test('9) changed product + same key conflicts', () async {
-      final key = b9QuickReturnIdempotencyKey();
-      await quickReturn(idempotencyKey: key);
+    test('9) manual return creates NO logsTable row', () async {
+      final key = b10ManualReturnIdempotencyKey();
+      await manualReturn(idempotencyKey: key);
+      expect(await manualReturnLogCount(), 0);
+      expect(await allLogsCount(), 0);
+    });
+
+    test('10) changed product + same key conflicts', () async {
+      final key = b10ManualReturnIdempotencyKey();
+      await manualReturn(idempotencyKey: key);
       final otherProductId = await db.into(db.products).insert(
             const ProductsCompanion(
               name: Value('Other Product'),
-              barcode: Value('B9-QR-2'),
+              barcode: Value('B10-MR-2'),
               currentStock: Value(50),
               costPrice: Value(3),
               sellPrice: Value(8),
             ),
           );
       await expectLater(
-        quickReturn(
+        manualReturn(
           idempotencyKey: key,
           overrideProductId: otherProductId,
-          refundAmount: 8,
         ),
-        throwsA(isA<QuickReturnIdempotencyConflictException>()),
+        throwsA(isA<ManualReturnIdempotencyConflictException>()),
       );
       expect(await customerReturnCount(), 1);
     });
 
-    test('10) changed quantity + same key conflicts', () async {
-      final key = b9QuickReturnIdempotencyKey();
-      await quickReturn(idempotencyKey: key, quantity: 1);
+    test('11) changed quantity + same key conflicts', () async {
+      final key = b10ManualReturnIdempotencyKey();
+      await manualReturn(idempotencyKey: key, quantity: 1);
       await expectLater(
-        quickReturn(idempotencyKey: key, quantity: 2),
-        throwsA(isA<QuickReturnIdempotencyConflictException>()),
+        manualReturn(idempotencyKey: key, quantity: 2),
+        throwsA(isA<ManualReturnIdempotencyConflictException>()),
       );
     });
 
-    test('11) changed refund amount + same key conflicts', () async {
-      final key = b9QuickReturnIdempotencyKey();
-      await quickReturn(idempotencyKey: key, refundAmount: 10);
+    test('12) changed unitPrice + same key conflicts', () async {
+      final key = b10ManualReturnIdempotencyKey();
+      await manualReturn(idempotencyKey: key, unitPriceArg: 0);
       await expectLater(
-        quickReturn(idempotencyKey: key, refundAmount: 20),
-        throwsA(isA<QuickReturnIdempotencyConflictException>()),
+        manualReturn(idempotencyKey: key, unitPriceArg: sellPrice),
+        throwsA(isA<ManualReturnIdempotencyConflictException>()),
       );
     });
 
-    test('12) changed reason + same key conflicts', () async {
-      final key = b9QuickReturnIdempotencyKey();
-      await quickReturn(idempotencyKey: key, reason: defaultReason);
+    test('13) changed reason + same key conflicts', () async {
+      final key = b10ManualReturnIdempotencyKey();
+      await manualReturn(idempotencyKey: key, reason: defaultReason);
       await expectLater(
-        quickReturn(idempotencyKey: key, reason: 'عيب في المنتج'),
-        throwsA(isA<QuickReturnIdempotencyConflictException>()),
+        manualReturn(idempotencyKey: key, reason: 'عيب في المنتج'),
+        throwsA(isA<ManualReturnIdempotencyConflictException>()),
       );
     });
 
-    test('13) changed user + same key conflicts', () async {
-      final key = b9QuickReturnIdempotencyKey();
-      await quickReturn(idempotencyKey: key, overrideUserId: 1);
-      await expectLater(
-        quickReturn(idempotencyKey: key, overrideUserId: 2),
-        throwsA(isA<QuickReturnIdempotencyConflictException>()),
-      );
-    });
-
-    test('14) changed approvedByUserId + same key conflicts', () async {
-      final approverA = await db.into(db.usersTable).insert(
-            UsersTableCompanion.insert(
-              fullName: 'Approver A',
-              username: 'approver_a_${DateTime.now().microsecondsSinceEpoch}',
-              passwordHash: 'hash',
-              roleId: 1,
-            ),
-          );
-      final approverB = await db.into(db.usersTable).insert(
-            UsersTableCompanion.insert(
-              fullName: 'Approver B',
-              username: 'approver_b_${DateTime.now().microsecondsSinceEpoch}',
-              passwordHash: 'hash',
-              roleId: 1,
-            ),
-          );
-      final key = b9QuickReturnIdempotencyKey();
-      await quickReturn(idempotencyKey: key, approvedByUserId: approverA);
-      await expectLater(
-        quickReturn(idempotencyKey: key, approvedByUserId: approverB),
-        throwsA(isA<QuickReturnIdempotencyConflictException>()),
-      );
-    });
-
-    test('15) different keys create two legitimate returns', () async {
-      await quickReturn(idempotencyKey: b9QuickReturnIdempotencyKey());
-      await quickReturn(idempotencyKey: b9QuickReturnIdempotencyKey());
+    test('14) different keys create two legitimate returns', () async {
+      await manualReturn(idempotencyKey: b10ManualReturnIdempotencyKey());
+      await manualReturn(idempotencyKey: b10ManualReturnIdempotencyKey());
       expect(await customerReturnCount(), 2);
       expect(await idempotencyRowCount(), 2);
       expect(await stockLevel(), initialStock + 2);
     });
 
-    test('16) validation qty<=0 creates no rows', () async {
-      final key = b9QuickReturnIdempotencyKey();
+    test('15) validation qty<=0 creates no rows', () async {
+      final key = b10ManualReturnIdempotencyKey();
       await expectLater(
-        quickReturn(idempotencyKey: key, quantity: 0),
+        manualReturn(idempotencyKey: key, quantity: 0),
         throwsA(isA<ArgumentError>()),
       );
       expect(await customerReturnCount(), 0);
@@ -415,20 +391,20 @@ void main() {
       expect(await stockLevel(), initialStock);
     });
 
-    test('17) missing product creates no rows', () async {
-      final key = b9QuickReturnIdempotencyKey();
+    test('16) missing product creates no rows', () async {
+      final key = b10ManualReturnIdempotencyKey();
       await expectLater(
-        quickReturn(idempotencyKey: key, overrideProductId: 99999),
+        manualReturn(idempotencyKey: key, overrideProductId: 99999),
         throwsA(isA<StateError>()),
       );
       expect(await customerReturnCount(), 0);
       expect(await idempotencyRowCount(), 0);
     });
 
-    test('18) preSealHook failure rolls back completely', () async {
-      final key = b9QuickReturnIdempotencyKey();
+    test('17) preSealHook failure rolls back completely', () async {
+      final key = b10ManualReturnIdempotencyKey();
       await expectLater(
-        quickReturn(
+        manualReturn(
           idempotencyKey: key,
           preSealHook: () async {
             throw Exception('forced seal failure');
@@ -439,14 +415,14 @@ void main() {
       expect(await customerReturnCount(), 0);
       expect(await idempotencyRowCount(), 0);
       expect(await auditLogCount(), 0);
-      expect(await quickReturnLogCount(), 0);
+      expect(await manualReturnLogCount(), 0);
       expect(await stockLevel(), initialStock);
     });
 
-    test('19) retry same key after failure succeeds once', () async {
-      final key = b9QuickReturnIdempotencyKey();
+    test('18) retry same key after failure succeeds once', () async {
+      final key = b10ManualReturnIdempotencyKey();
       await expectLater(
-        quickReturn(
+        manualReturn(
           idempotencyKey: key,
           preSealHook: () async {
             throw Exception('forced seal failure');
@@ -455,15 +431,15 @@ void main() {
         throwsA(isA<Exception>()),
       );
 
-      final retry = await quickReturn(idempotencyKey: key);
+      final retry = await manualReturn(idempotencyKey: key);
       expect(retry.idempotentReplay, isFalse);
       expect(await customerReturnCount(), 1);
       expect(await idempotencyRowCount(), 1);
     });
 
-    test('20) dual-connection seal race commits exactly once', () async {
+    test('19) dual-connection seal race commits exactly once', () async {
       final dbPath =
-          '${Directory.systemTemp.path}${Platform.pathSeparator}b9_race_${DateTime.now().microsecondsSinceEpoch}.db';
+          '${Directory.systemTemp.path}${Platform.pathSeparator}b10_race_${DateTime.now().microsecondsSinceEpoch}.db';
       final rawA = sqlite3.sqlite3.open(dbPath);
       final rawB = sqlite3.sqlite3.open(dbPath);
       rawA.execute('PRAGMA busy_timeout = 10000');
@@ -484,33 +460,33 @@ void main() {
       final pid = await dbA.into(dbA.products).insert(
             const ProductsCompanion(
               name: Value('Race Product'),
-              barcode: Value('B9-RACE'),
+              barcode: Value('B10-RACE'),
               currentStock: Value(100),
               costPrice: Value(5),
               sellPrice: Value(10),
             ),
           );
 
-      final serviceA = PosSaleService(dbA);
-      final serviceB = PosSaleService(dbB);
-      final sameKey = b9QuickReturnIdempotencyKey();
+      final serviceA = ManualReturnService(dbA);
+      final serviceB = ManualReturnService(dbB);
+      final sameKey = b10ManualReturnIdempotencyKey();
 
       final outcomes = await Future.wait([
-        serviceA.processQuickReturn(
+        serviceA.processManualReturn(
           idempotencyKey: sameKey,
           productId: pid,
           quantity: 1,
-          refundAmount: 10,
-          userId: userId,
+          unitPrice: unitPrice,
           reason: defaultReason,
+          userId: userId,
         ),
-        serviceB.processQuickReturn(
+        serviceB.processManualReturn(
           idempotencyKey: sameKey,
           productId: pid,
           quantity: 1,
-          refundAmount: 10,
-          userId: userId,
+          unitPrice: unitPrice,
           reason: defaultReason,
+          userId: userId,
         ),
       ]);
 
@@ -521,7 +497,7 @@ void main() {
         await (dbA.select(dbA.logsTable)
               ..where((l) => l.actionType.equals('RETURN_WITHOUT_INVOICE')))
             .get(),
-        hasLength(1),
+        isEmpty,
       );
       final stockRow = await (dbA.select(dbA.products)
             ..where((p) => p.id.equals(pid)))
@@ -532,10 +508,10 @@ void main() {
       expect(outcomes.where((r) => !r.idempotentReplay).length, 1);
     });
 
-    test('21) SQLITE_BUSY retry succeeds under dual connection contention',
+    test('20) SQLITE_BUSY retry succeeds under dual connection contention',
         () async {
       final dbPath =
-          '${Directory.systemTemp.path}${Platform.pathSeparator}b9_busy_${DateTime.now().microsecondsSinceEpoch}.db';
+          '${Directory.systemTemp.path}${Platform.pathSeparator}b10_busy_${DateTime.now().microsecondsSinceEpoch}.db';
       final rawA = sqlite3.sqlite3.open(dbPath);
       final rawB = sqlite3.sqlite3.open(dbPath);
       rawA.execute('PRAGMA busy_timeout = 10000');
@@ -556,30 +532,30 @@ void main() {
       final pid = await dbA.into(dbA.products).insert(
             const ProductsCompanion(
               name: Value('Busy Product'),
-              barcode: Value('B9-BUSY'),
+              barcode: Value('B10-BUSY'),
               currentStock: Value(100),
               costPrice: Value(5),
               sellPrice: Value(10),
             ),
           );
 
-      final sameKey = b9QuickReturnIdempotencyKey();
+      final sameKey = b10ManualReturnIdempotencyKey();
       final results = await Future.wait([
-        PosSaleService(dbA).processQuickReturn(
+        ManualReturnService(dbA).processManualReturn(
           idempotencyKey: sameKey,
           productId: pid,
           quantity: 1,
-          refundAmount: 10,
-          userId: userId,
+          unitPrice: unitPrice,
           reason: defaultReason,
+          userId: userId,
         ),
-        PosSaleService(dbB).processQuickReturn(
+        ManualReturnService(dbB).processManualReturn(
           idempotencyKey: sameKey,
           productId: pid,
           quantity: 1,
-          refundAmount: 10,
-          userId: userId,
+          unitPrice: unitPrice,
           reason: defaultReason,
+          userId: userId,
         ),
       ]);
 
@@ -587,13 +563,13 @@ void main() {
       expect(await dbA.select(dbA.customerReturns).get(), hasLength(1));
     });
 
-    test('22) migration v40 -> v41 creates table', () async {
-      final opened = await openSimulatedV40RawDatabase();
+    test('21) migration v41 -> v42 creates table', () async {
+      final opened = await openSimulatedV41RawDatabase();
       addTearDown(opened.rawDb.dispose);
 
       final before = opened.rawDb.select(
         "SELECT name FROM sqlite_master WHERE type='table' "
-        "AND name='customer_quick_return_idempotency'",
+        "AND name='customer_manual_return_idempotency'",
       );
       expect(before, isEmpty);
 
@@ -604,15 +580,23 @@ void main() {
       expect(await idempotencyTableExists(migrated), isTrue);
     });
 
-    test('23) fresh v41 schema includes table', () async {
+    test('22) fresh v42 schema includes table', () async {
       expect(db.schemaVersion, 42);
       expect(await idempotencyTableExists(db), isTrue);
     });
 
-    test('29) B2-B8 regression sentinel on v41', () async {
+    test('29) B2-B9 regression sentinel on v42', () async {
       final regressionDb = AppDatabase.test();
       addTearDown(() async => regressionDb.close());
       expect(regressionDb.schemaVersion, 42);
+
+      final b10Table = await regressionDb
+          .customSelect(
+            "SELECT name FROM sqlite_master WHERE type='table' "
+            "AND name='customer_manual_return_idempotency'",
+          )
+          .get();
+      expect(b10Table, isNotEmpty);
 
       final b9Table = await regressionDb
           .customSelect(
@@ -632,8 +616,8 @@ void main() {
 
       final b5ProductId = await regressionDb.into(regressionDb.products).insert(
             const ProductsCompanion(
-              name: Value('B9 Regression Product'),
-              barcode: Value('B9-REG-PROD'),
+              name: Value('B10 Regression Product'),
+              barcode: Value('B10-REG-PROD'),
               currentStock: Value(100),
               costPrice: Value(5),
               sellPrice: Value(10),
@@ -642,7 +626,7 @@ void main() {
       final b5CustomerId =
           await regressionDb.into(regressionDb.customers).insert(
                 const CustomersCompanion(
-                  name: Value('B9 Regression Customer'),
+                  name: Value('B10 Regression Customer'),
                   creditLimit: Value(100),
                 ),
               );
@@ -654,8 +638,8 @@ void main() {
       );
       final b5Product = ProductModel(
         id: b5ProductId,
-        name: 'B9 Regression Product',
-        barcode: 'B9-REG-PROD',
+        name: 'B10 Regression Product',
+        barcode: 'B10-REG-PROD',
         costPrice: 5,
         sellPrice: 10,
       );
@@ -720,12 +704,12 @@ void main() {
 
       final b6CustomerId =
           await regressionDb.into(regressionDb.customers).insert(
-                const CustomersCompanion(name: Value('B9 Regression Payer')),
+                const CustomersCompanion(name: Value('B10 Regression Payer')),
               );
       final b6ProductId = await regressionDb.into(regressionDb.products).insert(
             const ProductsCompanion(
-              name: Value('B9 Regression Pay Product'),
-              barcode: Value('B9-REG-PAY'),
+              name: Value('B10 Regression Pay Product'),
+              barcode: Value('B10-REG-PAY'),
               currentStock: Value(100),
               costPrice: Value(5),
             ),
@@ -733,7 +717,7 @@ void main() {
       final b6InvoiceId = await regressionDb.salesDao.saveSaleInvoice(
         header: SalesInvoicesCompanion(
           invoiceNumber:
-              Value('B9-REG-${DateTime.now().microsecondsSinceEpoch}'),
+              Value('B10-REG-${DateTime.now().microsecondsSinceEpoch}'),
           subtotal: const Value(100),
           total: const Value(100),
           debtAmount: const Value(100),
@@ -748,7 +732,7 @@ void main() {
         customerId: b6CustomerId,
         amount: 100,
         invoiceId: b6InvoiceId,
-        note: 'B9 regression seed debt',
+        note: 'B10 regression seed debt',
       );
       final b6PaymentService = CustomerAccountService(regressionDb);
       final b6Key = b6PaymentIdempotencyKey();
@@ -767,13 +751,14 @@ void main() {
       expect(b6Second.idempotentReplay, isTrue);
       expect(b6Second.customerTransactionId, b6First.customerTransactionId);
 
-      final b3SupplierId =
-          await regressionDb.into(regressionDb.suppliers).insert(
-                const SuppliersCompanion(name: Value('B9 Regression Supplier')),
-              );
+      final b3SupplierId = await regressionDb
+          .into(regressionDb.suppliers)
+          .insert(
+            const SuppliersCompanion(name: Value('B10 Regression Supplier')),
+          );
       final b3ProductId = await regressionDb.into(regressionDb.products).insert(
             const ProductsCompanion(
-              name: Value('B9 Regression Supplier Part'),
+              name: Value('B10 Regression Supplier Part'),
             ),
           );
       await regressionDb.purchasesDao.savePurchaseInvoice(
@@ -800,14 +785,14 @@ void main() {
       final b2CustomerId =
           await regressionDb.into(regressionDb.customers).insert(
                 const CustomersCompanion(
-                  name: Value('B9 Regression Credit Customer'),
+                  name: Value('B10 Regression Credit Customer'),
                   creditLimit: Value(100),
                 ),
               );
       final b2ProductId = await regressionDb.into(regressionDb.products).insert(
             const ProductsCompanion(
-              name: Value('B9 Regression Credit Product'),
-              barcode: Value('B9-REG-CREDIT'),
+              name: Value('B10 Regression Credit Product'),
+              barcode: Value('B10-REG-CREDIT'),
               currentStock: Value(100),
               costPrice: Value(5),
             ),
@@ -815,7 +800,7 @@ void main() {
       await expectLater(
         PosSaleService(regressionDb).processSale(
           idempotencyKey: b6PaymentIdempotencyKey(),
-          fingerprintHash: 'b9-b2-regression-credit-fingerprint',
+          fingerprintHash: 'b10-b2-regression-credit-fingerprint',
           invoice: SalesInvoicesCompanion(
             subtotal: const Value(101),
             total: const Value(101),
@@ -846,16 +831,22 @@ void main() {
     });
 
     test('30) replay creates no second RETURN_REFUND ledger event', () async {
-      final key = b9QuickReturnIdempotencyKey();
-      await quickReturn(idempotencyKey: key);
+      final key = b10ManualReturnIdempotencyKey();
+      await manualReturn(
+        idempotencyKey: key,
+        unitPriceArg: sellPrice,
+      );
       final ledgerAfterFirst = await returnRefundLedgerCount();
-      await quickReturn(idempotencyKey: key);
+      await manualReturn(
+        idempotencyKey: key,
+        unitPriceArg: sellPrice,
+      );
       expect(await returnRefundLedgerCount(), ledgerAfterFirst);
       expect(ledgerAfterFirst, 1);
     });
   });
 
-  group('B9 customer quick return UI lifecycle', () {
+  group('B10 customer manual return UI lifecycle', () {
     late AppDatabase uiDb;
     late int uiProductId;
 
@@ -863,8 +854,8 @@ void main() {
       uiDb = AppDatabase.test();
       uiProductId = await uiDb.into(uiDb.products).insert(
             const ProductsCompanion(
-              name: Value('B9 UI Product'),
-              barcode: Value('B9-UI-PROD'),
+              name: Value('B10 UI Product'),
+              barcode: Value('B10-UI-PROD'),
               currentStock: Value(100),
               costPrice: Value(5),
               sellPrice: Value(10),
@@ -876,15 +867,15 @@ void main() {
       await uiDb.close();
     });
 
-    Future<void> pumpQuickReturnScreen(
+    Future<void> pumpManualReturnScreen(
       WidgetTester tester, {
-      required _CountingPosSaleService spyService,
+      required _CountingManualReturnService spyService,
       required List<ProductModel> products,
       required User user,
     }) async {
       final container = ProviderContainer(
         overrides: [
-          posSaleServiceProvider.overrideWithValue(spyService),
+          manualReturnServiceProvider.overrideWithValue(spyService),
           authProvider.overrideWith(() => _TestAuthNotifier(user)),
           customerReturnsProvider.overrideWith((ref) async => []),
           productsNotifierProvider
@@ -920,48 +911,50 @@ void main() {
       expect(container.read(authProvider).valueOrNull?.user, isNotNull);
     }
 
-    Future<void> pumpUntilQuickReturnDialog(WidgetTester tester) async {
+    Future<void> pumpUntilManualReturnDialog(WidgetTester tester) async {
       for (var i = 0; i < 40; i++) {
         await tester.pump(const Duration(milliseconds: 50));
         tester.takeException();
         if (find
             .descendant(
               of: find.byType(AlertDialog),
-              matching: find.text('تأكيد الاسترجاع'),
+              matching: find.text('مرتجع عميل جديد'),
             )
             .evaluate()
             .isNotEmpty) {
           return;
         }
       }
-      fail('Quick return dialog did not load');
+      fail('Manual return dialog did not load');
     }
 
-    Future<void> openQuickReturnDialog(WidgetTester tester) async {
-      await tester.tap(find.text('استرجاع بدون فاتورة'));
+    Future<void> openManualReturnDialog(WidgetTester tester) async {
+      await tester.tap(find.text('مرتجع جديد'));
       await tester.runAsync(() async {
         await Future<void>.delayed(const Duration(milliseconds: 300));
       });
-      await pumpUntilQuickReturnDialog(tester);
+      await pumpUntilManualReturnDialog(tester);
     }
 
-    Future<void> fillQuickReturnDialog(WidgetTester tester) async {
+    Future<void> fillManualReturnDialog(WidgetTester tester) async {
       final dialog = find.byType(AlertDialog);
       await tester.tap(find.descendant(
         of: dialog,
         matching: find.text('اختر منتجاً'),
       ));
       await tester.pump(const Duration(milliseconds: 100));
-      await tester.tap(find.text('B9 UI Product').last);
+      await tester.tap(find.text('B10 UI Product').last);
       await tester.pump(const Duration(milliseconds: 100));
 
-      final dropdownIcons = find.descendant(
-        of: dialog,
-        matching: find.byIcon(Icons.arrow_drop_down),
+      await tester.enterText(
+        find
+            .descendant(
+              of: dialog,
+              matching: find.widgetWithText(TextField, ''),
+            )
+            .first,
+        defaultReason,
       );
-      await tester.tap(dropdownIcons.at(1));
-      await tester.pump(const Duration(milliseconds: 100));
-      await tester.tap(find.text(defaultReason).last);
       await tester.pump(const Duration(milliseconds: 100));
     }
 
@@ -972,56 +965,95 @@ void main() {
       }
     }
 
-    Future<void> submitQuickReturnDialog(WidgetTester tester) async {
-      await tester.tap(find.widgetWithText(ElevatedButton, 'تأكيد الاسترجاع'));
+    Future<void> submitManualReturnDialog(WidgetTester tester) async {
+      await tester.tap(find.widgetWithText(ElevatedButton, 'حفظ المرتجع'));
       await drainUi(tester);
     }
 
-    testWidgets('24) UI double-submit invokes processQuickReturn once',
+    testWidgets('23) opening new dialog clears previous pending key',
         (tester) async {
       await tester.binding.setSurfaceSize(const Size(1920, 1080));
       addTearDown(() => tester.binding.setSurfaceSize(null));
 
-      final spyService = _CountingPosSaleService(uiDb, deferToSuper: false);
+      final spyService = _CountingManualReturnService(
+        uiDb,
+        deferToSuper: false,
+      );
 
-      await pumpQuickReturnScreen(
+      await pumpManualReturnScreen(
         tester,
         spyService: spyService,
         products: [
           ProductModel(
             id: uiProductId,
-            name: 'B9 UI Product',
-            barcode: 'B9-UI-1',
+            name: 'B10 UI Product',
+            barcode: 'B10-UI-1',
             costPrice: 5,
             sellPrice: 10,
           ),
         ],
         user: _testUser(),
       );
-      await openQuickReturnDialog(tester);
-      await fillQuickReturnDialog(tester);
-      final confirmButton =
-          find.widgetWithText(ElevatedButton, 'تأكيد الاسترجاع');
-      await tester.tap(confirmButton);
+      await openManualReturnDialog(tester);
+      await tester.tap(find.text('إلغاء'));
+      for (var i = 0; i < 5; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+        tester.takeException();
+      }
+
+      await openManualReturnDialog(tester);
+      await fillManualReturnDialog(tester);
+      await submitManualReturnDialog(tester);
+
+      expect(spyService.processManualReturnCalls, 1);
+      expect(spyService.keysUsed, hasLength(1));
+    });
+
+    testWidgets('24) UI double-submit invokes processManualReturn once',
+        (tester) async {
+      await tester.binding.setSurfaceSize(const Size(1920, 1080));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      final spyService =
+          _CountingManualReturnService(uiDb, deferToSuper: false);
+
+      await pumpManualReturnScreen(
+        tester,
+        spyService: spyService,
+        products: [
+          ProductModel(
+            id: uiProductId,
+            name: 'B10 UI Product',
+            barcode: 'B10-UI-2',
+            costPrice: 5,
+            sellPrice: 10,
+          ),
+        ],
+        user: _testUser(),
+      );
+      await openManualReturnDialog(tester);
+      await fillManualReturnDialog(tester);
+      final submitButton = find.widgetWithText(ElevatedButton, 'حفظ المرتجع');
+      await tester.tap(submitButton);
       await tester.pump();
-      await tester.tap(confirmButton, warnIfMissed: false);
+      await tester.tap(submitButton, warnIfMissed: false);
       await drainUi(tester);
-      expect(spyService.processQuickReturnCalls, 1);
+      expect(spyService.processManualReturnCalls, 1);
     });
 
     test('25) retry same key after preSealHook failure succeeds once',
         () async {
-      final key = b9QuickReturnIdempotencyKey();
-      final service = PosSaleService(uiDb);
+      final key = b10ManualReturnIdempotencyKey();
+      final service = ManualReturnService(uiDb);
 
       await expectLater(
-        service.processQuickReturn(
+        service.processManualReturn(
           idempotencyKey: key,
           productId: uiProductId,
           quantity: 1,
-          refundAmount: 10,
-          userId: userId,
+          unitPrice: unitPrice,
           reason: defaultReason,
+          userId: userId,
           preSealHook: () async {
             throw Exception('ordinary failure');
           },
@@ -1029,13 +1061,13 @@ void main() {
         throwsA(isA<Exception>()),
       );
 
-      final retry = await service.processQuickReturn(
+      final retry = await service.processManualReturn(
         idempotencyKey: key,
         productId: uiProductId,
         quantity: 1,
-        refundAmount: 10,
-        userId: userId,
+        unitPrice: unitPrice,
         reason: defaultReason,
+        userId: userId,
       );
       expect(retry.idempotentReplay, isFalse);
       expect(await uiDb.select(uiDb.customerReturns).get(), hasLength(1));
@@ -1046,29 +1078,30 @@ void main() {
       await tester.binding.setSurfaceSize(const Size(1920, 1080));
       addTearDown(() => tester.binding.setSurfaceSize(null));
 
-      final spyService = _CountingPosSaleService(uiDb, deferToSuper: false);
+      final spyService =
+          _CountingManualReturnService(uiDb, deferToSuper: false);
 
-      await pumpQuickReturnScreen(
+      await pumpManualReturnScreen(
         tester,
         spyService: spyService,
         products: [
           ProductModel(
             id: uiProductId,
-            name: 'B9 UI Product',
-            barcode: 'B9-UI-3',
+            name: 'B10 UI Product',
+            barcode: 'B10-UI-3',
             costPrice: 5,
             sellPrice: 10,
           ),
         ],
         user: _testUser(),
       );
-      await openQuickReturnDialog(tester);
-      await fillQuickReturnDialog(tester);
-      await submitQuickReturnDialog(tester);
+      await openManualReturnDialog(tester);
+      await fillManualReturnDialog(tester);
+      await submitManualReturnDialog(tester);
 
-      await openQuickReturnDialog(tester);
-      await fillQuickReturnDialog(tester);
-      await submitQuickReturnDialog(tester);
+      await openManualReturnDialog(tester);
+      await fillManualReturnDialog(tester);
+      await submitManualReturnDialog(tester);
 
       expect(spyService.keysUsed.length, 2);
       expect(spyService.keysUsed[0], isNot(spyService.keysUsed[1]));
@@ -1078,75 +1111,60 @@ void main() {
       await tester.binding.setSurfaceSize(const Size(1920, 1080));
       addTearDown(() => tester.binding.setSurfaceSize(null));
 
-      final spyService = _CountingPosSaleService(
+      final spyService = _CountingManualReturnService(
         uiDb,
         deferToSuper: false,
       )..throwConflict = true;
 
-      await pumpQuickReturnScreen(
+      await pumpManualReturnScreen(
         tester,
         spyService: spyService,
         products: [
           ProductModel(
             id: uiProductId,
-            name: 'B9 UI Product',
-            barcode: 'B9-UI-4',
+            name: 'B10 UI Product',
+            barcode: 'B10-UI-4',
             costPrice: 5,
             sellPrice: 10,
           ),
         ],
         user: _testUser(),
       );
-      await openQuickReturnDialog(tester);
-      await fillQuickReturnDialog(tester);
-      await submitQuickReturnDialog(tester);
+      await openManualReturnDialog(tester);
+      await fillManualReturnDialog(tester);
+      await submitManualReturnDialog(tester);
 
       spyService.throwConflict = false;
-      await openQuickReturnDialog(tester);
-      await fillQuickReturnDialog(tester);
-      await submitQuickReturnDialog(tester);
+      await openManualReturnDialog(tester);
+      await fillManualReturnDialog(tester);
+      await submitManualReturnDialog(tester);
 
       expect(spyService.keysUsed.length, 2);
       expect(spyService.keysUsed[0], isNot(spyService.keysUsed[1]));
     });
 
-    testWidgets('28) opening new dialog clears previous pending key',
-        (tester) async {
-      await tester.binding.setSurfaceSize(const Size(1920, 1080));
-      addTearDown(() => tester.binding.setSurfaceSize(null));
-
-      final spyService = _CountingPosSaleService(
-        uiDb,
-        deferToSuper: false,
+    test('28) changed user + same key conflicts', () async {
+      final key = b10ManualReturnIdempotencyKey();
+      final service = ManualReturnService(uiDb);
+      await service.processManualReturn(
+        idempotencyKey: key,
+        productId: uiProductId,
+        quantity: 1,
+        unitPrice: unitPrice,
+        reason: defaultReason,
+        userId: 1,
       );
-
-      await pumpQuickReturnScreen(
-        tester,
-        spyService: spyService,
-        products: [
-          ProductModel(
-            id: uiProductId,
-            name: 'B9 UI Product',
-            barcode: 'B9-UI-5',
-            costPrice: 5,
-            sellPrice: 10,
-          ),
-        ],
-        user: _testUser(),
+      await expectLater(
+        service.processManualReturn(
+          idempotencyKey: key,
+          productId: uiProductId,
+          quantity: 1,
+          unitPrice: unitPrice,
+          reason: defaultReason,
+          userId: 2,
+        ),
+        throwsA(isA<ManualReturnIdempotencyConflictException>()),
       );
-      await openQuickReturnDialog(tester);
-      await tester.tap(find.text('إلغاء'));
-      for (var i = 0; i < 5; i++) {
-        await tester.pump(const Duration(milliseconds: 50));
-        tester.takeException();
-      }
-
-      await openQuickReturnDialog(tester);
-      await fillQuickReturnDialog(tester);
-      await submitQuickReturnDialog(tester);
-
-      expect(spyService.processQuickReturnCalls, 1);
-      expect(spyService.keysUsed, hasLength(1));
     });
   });
 }

@@ -460,13 +460,13 @@ void main() {
         "SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'psi_sales_invoice_idx'",
       ).get();
       expect(indexRows, isNotEmpty);
-      expect(migrated.schemaVersion, 41);
+      expect(migrated.schemaVersion, 42);
     });
 
     test('10) fresh install includes pos_sale_idempotency at v41', () async {
       final fresh = AppDatabase.test();
       addTearDown(() async => fresh.close());
-      expect(fresh.schemaVersion, 41);
+      expect(fresh.schemaVersion, 42);
       final rows = await fresh.customSelect(
         "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'pos_sale_idempotency'",
       ).get();

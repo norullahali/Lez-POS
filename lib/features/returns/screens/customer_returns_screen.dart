@@ -1,20 +1,46 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:drift/drift.dart' as drift;
 import 'package:uuid/uuid.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/loading_overlay.dart';
 import '../../../core/database/app_database.dart';
+import '../../../core/services/manual_return_idempotency_conflict_exception.dart';
 import '../../../core/services/quick_return_idempotency_conflict_exception.dart';
 import '../../../core/widgets/manager_approval_dialog.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../pos/providers/pos_provider.dart';
 import '../../products/providers/products_provider.dart';
+import '../providers/manual_return_service_provider.dart';
 import '../providers/return_analytics_provider.dart';
 import 'widgets/smart_return_lookup_dialog.dart';
 import 'widgets/customer_return_detail_dialog.dart';
 
 const _quickReturnUuid = Uuid();
+const _manualReturnUuid = Uuid();
+
+class ManualReturnPayload {
+  const ManualReturnPayload({
+    required this.productId,
+    required this.quantity,
+    required this.unitPrice,
+    required this.reason,
+    required this.userId,
+  });
+
+  final int productId;
+  final double quantity;
+  final double unitPrice;
+  final String reason;
+  final int? userId;
+
+  bool matches(ManualReturnPayload other) {
+    return productId == other.productId &&
+        quantity == other.quantity &&
+        unitPrice == other.unitPrice &&
+        reason == other.reason &&
+        userId == other.userId;
+  }
+}
 
 class QuickReturnPayload {
   const QuickReturnPayload({
@@ -66,6 +92,75 @@ class _CustomerReturnsScreenState extends ConsumerState<CustomerReturnsScreen> {
   String? _quickReturnIdempotencyKey;
   QuickReturnPayload? _pendingQuickReturnPayload;
   bool _quickReturnSubmitting = false;
+  String? _manualReturnIdempotencyKey;
+  ManualReturnPayload? _pendingManualReturnPayload;
+  bool _manualReturnSubmitting = false;
+
+  void _clearManualReturnAttempt() {
+    _manualReturnIdempotencyKey = null;
+    _pendingManualReturnPayload = null;
+  }
+
+  Future<void> _submitManualReturn(ManualReturnPayload payload) async {
+    if (_manualReturnSubmitting) return;
+
+    if (_pendingManualReturnPayload != null &&
+        !_pendingManualReturnPayload!.matches(payload)) {
+      _clearManualReturnAttempt();
+    }
+    _pendingManualReturnPayload = payload;
+    _manualReturnIdempotencyKey ??= _manualReturnUuid.v4();
+
+    _manualReturnSubmitting = true;
+    setState(() => _isLoading = true);
+    try {
+      await ref.read(manualReturnServiceProvider).processManualReturn(
+            idempotencyKey: _manualReturnIdempotencyKey!,
+            productId: payload.productId,
+            quantity: payload.quantity,
+            unitPrice: payload.unitPrice,
+            reason: payload.reason,
+            userId: payload.userId,
+          );
+
+      _clearManualReturnAttempt();
+      ref.invalidate(customerReturnsProvider);
+      ref.invalidate(productsNotifierProvider);
+      invalidateReturnAnalytics(ref);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('تم حفظ مرتجع العميل بنجاح'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    } on ManualReturnIdempotencyConflictException {
+      _clearManualReturnAttempt();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'تعارض في عملية المرتجع. أعد فتح نافذة المرتجع وحاول مرة أخرى.',
+            ),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('خطأ: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } finally {
+      _manualReturnSubmitting = false;
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
 
   void _clearQuickReturnAttempt() {
     _quickReturnIdempotencyKey = null;
@@ -233,6 +328,8 @@ class _CustomerReturnsScreenState extends ConsumerState<CustomerReturnsScreen> {
   }
 
   Future<void> _showCustomerReturnDialog() async {
+    _clearManualReturnAttempt();
+
     final invoiceCtrl = TextEditingController();
     final noteCtrl = TextEditingController();
     int? selectedProductId;
@@ -240,8 +337,10 @@ class _CustomerReturnsScreenState extends ConsumerState<CustomerReturnsScreen> {
     final qtyCtrl = TextEditingController(text: '1');
     final products = await ref.read(productsRepositoryProvider).getAll();
 
+    final currentUser = ref.read(authProvider).valueOrNull?.user;
+
     if (!mounted) return;
-    showDialog(
+    final payload = await showDialog<ManualReturnPayload>(
       context: context,
       builder: (_) => StatefulBuilder(
           builder: (ctx, setStateDialog) => AlertDialog(
@@ -299,65 +398,39 @@ class _CustomerReturnsScreenState extends ConsumerState<CustomerReturnsScreen> {
                       onPressed: () => Navigator.pop(ctx),
                       child: const Text('إلغاء')),
                   ElevatedButton(
-                    onPressed: selectedProductId == null
+                    onPressed: (selectedProductId == null ||
+                            _manualReturnSubmitting)
                         ? null
-                        : () async {
-                            Navigator.pop(ctx);
-                            setState(() => _isLoading = true);
-                            try {
-                              final qty = double.tryParse(qtyCtrl.text) ?? 1;
-                              final db = AppDatabase.instance;
-                              final userId =
-                                  ref.read(authProvider).valueOrNull?.user?.id;
-                              final productName = selectedProductId != null
-                                  ? products
-                                      .firstWhere(
-                                          (p) => p.id == selectedProductId)
-                                      .name
-                                  : 'منتج';
-                              await db.returnsDao.saveCustomerReturn(
-                                header: CustomerReturnsCompanion(
-                                  returnNumber: drift.Value(
-                                      'RET-${DateTime.now().millisecondsSinceEpoch}'),
-                                  reason: drift.Value(noteCtrl.text.trim()),
+                        : () {
+                            final qty = double.tryParse(qtyCtrl.text) ?? 1;
+                            if (qty <= 0) {
+                              ScaffoldMessenger.of(ctx).showSnackBar(
+                                const SnackBar(
+                                  content: Text('الكمية يجب أن تكون أكبر من 0'),
                                 ),
-                                items: [
-                                  {
-                                    'productId': selectedProductId,
-                                    'productName': productName,
-                                    'qty': qty,
-                                    'price': 0.0,
-                                    'discount': 0.0,
-                                  }
-                                ],
-                                returnedByUserId: userId,
                               );
-                              ref.invalidate(customerReturnsProvider);
-                              ref.invalidate(productsNotifierProvider);
-                              invalidateReturnAnalytics(ref);
-                              if (mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                        content:
-                                            Text('تم حفظ مرتجع العميل بنجاح'),
-                                        backgroundColor: AppColors.success));
-                              }
-                            } catch (e) {
-                              if (mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                        content: Text('خطأ: $e'),
-                                        backgroundColor: AppColors.error));
-                              }
-                            } finally {
-                              if (mounted) setState(() => _isLoading = false);
+                              return;
                             }
+                            Navigator.pop(
+                              ctx,
+                              ManualReturnPayload(
+                                productId: selectedProductId!,
+                                quantity: qty,
+                                unitPrice: 0.0,
+                                reason: noteCtrl.text.trim(),
+                                userId: currentUser?.id,
+                              ),
+                            );
                           },
                     child: const Text('حفظ المرتجع'),
                   ),
                 ],
               )),
     );
+
+    if (payload == null || !mounted) return;
+
+    await _submitManualReturn(payload);
   }
 
   Future<void> _showQuickReturnDialog() async {

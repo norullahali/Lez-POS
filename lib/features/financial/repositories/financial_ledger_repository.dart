@@ -159,10 +159,22 @@ WHERE ral.returned_amount > 0
   AND NOT EXISTS (
     SELECT 1
     FROM customer_transactions ct2
-    INNER JOIN customer_returns cr ON cr.id = ct2.reference_id
     WHERE ct2.type = 'RETURN'
       AND ral.invoice_id IS NOT NULL
-      AND cr.original_invoice_id = ral.invoice_id
+      AND (
+        EXISTS (
+          SELECT 1
+          FROM customer_returns cr
+          WHERE cr.id = ct2.reference_id
+            AND cr.original_invoice_id = ral.invoice_id
+        )
+        OR EXISTS (
+          SELECT 1
+          FROM sale_item_returns sir
+          WHERE sir.id = ct2.reference_id
+            AND sir.sale_invoice_id = ral.invoice_id
+        )
+      )
   )
 
 UNION ALL
@@ -752,6 +764,7 @@ ORDER BY total_amount DESC
         _db.supplierReturns, // SR.3.3 — purchase invoice trace via return linkage
         _db.returnAuditLogs,
         _db.customerReturns,
+        _db.saleItemReturns, // B11 — partial credit RETURN guard
         _db.expenseRecords, // Phase 3.3
         _db.expenseCategories, // Phase 3.3 — category name in description
         _db.otherIncomeRecords, // Phase 4.3

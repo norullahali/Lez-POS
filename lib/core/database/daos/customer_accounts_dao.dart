@@ -226,6 +226,106 @@ class CustomerAccountsDao extends DatabaseAccessor<AppDatabase>
         note: note,
       );
 
+  /// Authoritative invoice-scoped RETURN credit sum (ABS amounts).
+  ///
+  /// Shared by [getCreditReversalTotalForSaleInvoice] and
+  /// [recordReturnInTransactionIfWithinInvoiceCreditCap].
+  static const _invoiceReturnCreditReversalSumSelect = '''
+      SELECT COALESCE(SUM(ABS(ct.amount)), 0)
+      FROM customer_transactions ct
+      WHERE ct.customer_id = ?
+        AND ct.type = 'RETURN'
+        AND (
+          ct.reference_id IN (
+            SELECT id FROM customer_returns WHERE original_invoice_id = ?
+          )
+          OR ct.reference_id IN (
+            SELECT id FROM sale_item_returns WHERE sale_invoice_id = ?
+          )
+        )
+  ''';
+
+  /// Atomically inserts a RETURN row clipped to remaining invoice credit.
+  ///
+  /// `effective = MIN(proposedAmount, debt_amount - already_reversed)`.
+  /// Uses the same invoice linkage as [getCreditReversalTotalForSaleInvoice].
+  ///
+  /// Returns the inserted row id, or null when effective credit is within
+  /// [tolerance] (no RETURN row needed — partial return still succeeds).
+  /// Must run inside an enclosing transaction.
+  Future<int?> recordReturnInTransactionIfWithinInvoiceCreditCap({
+    required int customerId,
+    required int invoiceId,
+    required double proposedAmount,
+    required int referenceId,
+    String note = '',
+    double tolerance = 0.0001,
+  }) async {
+    if (proposedAmount <= 0) return null;
+
+    await customStatement(
+      '''
+      INSERT INTO customer_transactions (customer_id, type, amount, reference_id, note)
+      SELECT ?, 'RETURN', -calc.effective, ?, ?
+      FROM (
+        SELECT MIN(
+          ?,
+          MAX(
+            0,
+            (SELECT debt_amount FROM sales_invoices WHERE id = ?)
+              - COALESCE(($_invoiceReturnCreditReversalSumSelect), 0)
+          )
+        ) AS effective
+      ) calc
+      WHERE calc.effective > ?
+      ''',
+      [
+        customerId,
+        referenceId,
+        note,
+        proposedAmount,
+        invoiceId,
+        customerId,
+        invoiceId,
+        invoiceId,
+        tolerance,
+      ],
+    );
+
+    final changesRow =
+        await customSelect('SELECT changes() AS inserted').getSingle();
+    if (changesRow.read<int>('inserted') != 1) return null;
+
+    final insertedIdRow =
+        await customSelect('SELECT last_insert_rowid() AS id').getSingle();
+    final insertedId = insertedIdRow.read<int>('id');
+
+    final newBalance = await calculateBalanceFromTransactions(customerId);
+    final existing = await (select(customerAccounts)
+          ..where((a) => a.customerId.equals(customerId)))
+        .getSingleOrNull();
+
+    if (existing != null) {
+      await (update(customerAccounts)..where((a) => a.id.equals(existing.id)))
+          .write(
+        CustomerAccountsCompanion(
+          currentBalance: Value(newBalance),
+          updatedAt: Value(DateTime.now()),
+        ),
+      );
+    } else {
+      await into(customerAccounts).insert(
+        CustomerAccountsCompanion(
+          customerId: Value(customerId),
+          currentBalance: Value(newBalance),
+          updatedAt: Value(DateTime.now()),
+        ),
+      );
+    }
+
+    return insertedId;
+  }
+
   /// Records cash paid to customer against accumulated credit (Phase C.2).
   ///
   /// [amount] is the positive settlement value stored as a positive ledger amount,
@@ -406,18 +506,7 @@ class CustomerAccountsDao extends DatabaseAccessor<AppDatabase>
   }) async {
     final row = await customSelect(
       '''
-      SELECT COALESCE(SUM(ABS(ct.amount)), 0) AS total
-      FROM customer_transactions ct
-      WHERE ct.customer_id = ?
-        AND ct.type = 'RETURN'
-        AND (
-          ct.reference_id IN (
-            SELECT id FROM customer_returns WHERE original_invoice_id = ?
-          )
-          OR ct.reference_id IN (
-            SELECT id FROM sale_item_returns WHERE sale_invoice_id = ?
-          )
-        )
+      SELECT COALESCE(($_invoiceReturnCreditReversalSumSelect), 0) AS total
       ''',
       variables: [
         Variable.withInt(customerId),
@@ -428,6 +517,7 @@ class CustomerAccountsDao extends DatabaseAccessor<AppDatabase>
         customerTransactions,
         attachedDatabase.customerReturns,
         attachedDatabase.saleItemReturns,
+        attachedDatabase.salesInvoices,
       },
     ).getSingle();
     return (row.data['total'] as num?)?.toDouble() ?? 0.0;

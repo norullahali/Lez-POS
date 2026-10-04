@@ -330,29 +330,21 @@ class PartialReturnService {
           saleLines: saleLines,
           returnedQtyBySaleItemId: returnedQtyBySaleItemId,
         );
-        final alreadyReversed =
-            await _db.customerAccountsDao.getCreditReversalTotalForSaleInvoice(
-          customerId: customerId,
-          invoiceId: saleInvoiceId,
-        );
-        final creditAmount = CustomerReturnCredit.cappedCreditReversal(
-          proposed: proposed,
-          invoiceDebtAmount: inv.debtAmount,
-          alreadyReversed: alreadyReversed,
-        );
-        if (creditAmount > 0.0001) {
+        if (proposed > 0.0001) {
           if (_creditPoster != null) {
             await _creditPoster!(
               customerId: customerId,
-              amount: creditAmount,
+              amount: proposed,
               returnId: firstReturnLineId,
               note: 'إرجاع فاتورة ${inv.invoiceNumber}',
             );
           } else {
-            await _db.customerAccountsDao.recordReturnInTransaction(
+            await _db.customerAccountsDao
+                .recordReturnInTransactionIfWithinInvoiceCreditCap(
               customerId: customerId,
-              amount: creditAmount,
-              returnId: firstReturnLineId,
+              invoiceId: saleInvoiceId,
+              proposedAmount: proposed,
+              referenceId: firstReturnLineId,
               note: 'إرجاع فاتورة ${inv.invoiceNumber}',
             );
           }

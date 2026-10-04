@@ -228,10 +228,12 @@ class SupplierReturnService {
                 note: input.notes ?? '',
               );
             } else {
-              await _db.supplierAccountsDao.recordReturnInTransaction(
+              await _db.supplierAccountsDao
+                  .recordReturnInTransactionIfWithinPurchaseInvoiceCreditCap(
                 supplierId: input.supplierId,
-                amount: accountingTotal,
-                returnId: returnId,
+                purchaseInvoiceId: input.purchaseInvoiceId,
+                proposedAmount: accountingTotal,
+                referenceId: returnId,
                 note: input.notes ?? '',
               );
             }

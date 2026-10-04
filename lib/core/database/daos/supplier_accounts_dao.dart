@@ -140,6 +140,127 @@ class SupplierAccountsDao extends DatabaseAccessor<AppDatabase>
         note: note,
       );
 
+  /// Authoritative purchase-invoice-scoped RETURN credit sum (ABS amounts).
+  ///
+  /// Linked via [supplier_returns.purchase_invoice_id] and
+  /// [supplier_transactions.reference_id] = supplier_returns.id.
+  ///
+  /// Shared by [getCreditReversalTotalForPurchaseInvoice] and
+  /// [recordReturnInTransactionIfWithinPurchaseInvoiceCreditCap].
+  static const _purchaseInvoiceReturnCreditReversalSumSelect = '''
+      SELECT COALESCE(SUM(ABS(st.amount)), 0)
+      FROM supplier_transactions st
+      WHERE st.supplier_id = ?
+        AND st.type = 'RETURN'
+        AND st.reference_id IN (
+          SELECT id FROM supplier_returns WHERE purchase_invoice_id = ?
+        )
+  ''';
+
+  /// Atomically inserts a RETURN row clipped to remaining purchase-invoice credit.
+  ///
+  /// `effective = MIN(proposedAmount, debt_amount - already_reversed)`.
+  /// Cap is based on [purchase_invoices.debt_amount] only (Option A).
+  ///
+  /// Returns the inserted row id, or null when effective credit is within
+  /// [tolerance] (no RETURN row needed — return document still succeeds).
+  /// Must run inside an enclosing transaction.
+  Future<int?> recordReturnInTransactionIfWithinPurchaseInvoiceCreditCap({
+    required int supplierId,
+    required int purchaseInvoiceId,
+    required double proposedAmount,
+    required int referenceId,
+    String note = '',
+    double tolerance = 0.0001,
+  }) async {
+    if (proposedAmount <= 0) return null;
+
+    await customStatement(
+      '''
+      INSERT INTO supplier_transactions (supplier_id, type, amount, reference_id, note)
+      SELECT ?, 'RETURN', -calc.effective, ?, ?
+      FROM (
+        SELECT MIN(
+          ?,
+          MAX(
+            0,
+            (SELECT debt_amount FROM purchase_invoices WHERE id = ?)
+              - COALESCE(($_purchaseInvoiceReturnCreditReversalSumSelect), 0)
+          )
+        ) AS effective
+      ) calc
+      WHERE calc.effective > ?
+      ''',
+      [
+        supplierId,
+        referenceId,
+        note,
+        proposedAmount,
+        purchaseInvoiceId,
+        supplierId,
+        purchaseInvoiceId,
+        tolerance,
+      ],
+    );
+
+    final changesRow =
+        await customSelect('SELECT changes() AS inserted').getSingle();
+    if (changesRow.read<int>('inserted') != 1) return null;
+
+    final insertedIdRow =
+        await customSelect('SELECT last_insert_rowid() AS id').getSingle();
+    final insertedId = insertedIdRow.read<int>('id');
+
+    final newBalance = await calculateBalanceFromTransactions(supplierId);
+
+    final existing = await (select(supplierAccounts)
+          ..where((a) => a.supplierId.equals(supplierId)))
+        .getSingleOrNull();
+
+    if (existing != null) {
+      await (update(supplierAccounts)..where((a) => a.id.equals(existing.id)))
+          .write(
+        SupplierAccountsCompanion(
+          currentBalance: Value(newBalance),
+          updatedAt: Value(DateTime.now()),
+        ),
+      );
+    } else {
+      await into(supplierAccounts).insert(
+        SupplierAccountsCompanion(
+          supplierId: Value(supplierId),
+          currentBalance: Value(newBalance),
+          updatedAt: Value(DateTime.now()),
+        ),
+      );
+    }
+
+    return insertedId;
+  }
+
+  /// Total credit already reversed for [purchaseInvoiceId] via RETURN rows linked
+  /// to supplier_returns on that purchase invoice.
+  Future<double> getCreditReversalTotalForPurchaseInvoice({
+    required int supplierId,
+    required int purchaseInvoiceId,
+  }) async {
+    final row = await customSelect(
+      '''
+      SELECT COALESCE(($_purchaseInvoiceReturnCreditReversalSumSelect), 0) AS total
+      ''',
+      variables: [
+        Variable.withInt(supplierId),
+        Variable.withInt(purchaseInvoiceId),
+      ],
+      readsFrom: {
+        supplierTransactions,
+        attachedDatabase.supplierReturns,
+        attachedDatabase.purchaseInvoices,
+      },
+    ).getSingle();
+    return (row.data['total'] as num?)?.toDouble() ?? 0.0;
+  }
+
   /// Records cash received from supplier against supplier credit (SR.3.3).
   ///
   /// [amount] is the positive settlement value stored as a positive ledger amount,

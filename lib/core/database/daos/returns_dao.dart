@@ -1,5 +1,6 @@
 // lib/core/database/daos/returns_dao.dart
 import 'package:drift/drift.dart';
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import '../app_database.dart';
 import '../tables/customer_returns_table.dart';
 import '../tables/supplier_returns_table.dart';
@@ -61,8 +62,20 @@ class SupplierReturnQuantityCapExceededException implements Exception {
   SupplierReturnItems,
   StockLedger,
 ])
+typedef FullReturnCreditHook = Future<void> Function({
+  required int customerId,
+  required int invoiceId,
+  required double proposedAmount,
+  required int returnId,
+  String note,
+});
+
 class ReturnsDao extends DatabaseAccessor<AppDatabase> with _$ReturnsDaoMixin {
   ReturnsDao(super.db);
+
+  /// Test seam for full-return credit rollback verification (B13).
+  @visibleForTesting
+  FullReturnCreditHook? fullReturnCreditHook;
 
   // --- Customer Returns ---
   Future<List<CustomerReturn>> getAllCustomerReturns() =>
@@ -342,15 +355,22 @@ class ReturnsDao extends DatabaseAccessor<AppDatabase> with _$ReturnsDaoMixin {
       return 0;
     }
 
-    return transaction(() async {
-      if (inv.invoiceStatus == InvoiceLifecycleStatus.returned) {
+    final freshReturnId = await transaction(() async {
+      final invNow = await attachedDatabase.salesDao.getInvoiceById(invoiceId);
+      if (invNow == null) {
+        throw StateError('الفاتورة غير موجودة');
+      }
+      if (invNow.invoiceStatus == InvoiceLifecycleStatus.returned) {
         throw StateError('الفاتورة مرتجعة مسبقاً');
       }
 
-      final dup = await (select(customerReturns)
-            ..where((r) => r.originalInvoiceId.equals(invoiceId)))
-          .getSingleOrNull();
-      if (dup != null) {
+      if (await attachedDatabase.saleItemReturnsDao.hasAnyReturns(invoiceId)) {
+        return null;
+      }
+
+      final existingHeader =
+          await findCustomerReturnByOriginalInvoiceId(invoiceId);
+      if (existingHeader != null) {
         throw StateError('يوجد مرتجع مسجل لهذه الفاتورة');
       }
 
@@ -371,7 +391,7 @@ class ReturnsDao extends DatabaseAccessor<AppDatabase> with _$ReturnsDaoMixin {
       final cashierName = cashierRow?.data['full_name'] as String?;
 
       String? customerName;
-      final customerId = inv.customerId;
+      final customerId = invNow.customerId;
       if (customerId != null && customerId != 1) {
         final customerRow = await customSelect(
           'SELECT name FROM customers WHERE id = ?',
@@ -406,7 +426,7 @@ class ReturnsDao extends DatabaseAccessor<AppDatabase> with _$ReturnsDaoMixin {
           returnNumber: Value(returnNumber),
           total: Value(returnHeaderTotal),
           reason: const Value('إرجاع كامل للفاتورة'),
-          notes: Value('فاتورة أصلية: ${inv.invoiceNumber}'),
+          notes: Value('فاتورة أصلية: ${invNow.invoiceNumber}'),
         ),
       );
 
@@ -477,7 +497,7 @@ class ReturnsDao extends DatabaseAccessor<AppDatabase> with _$ReturnsDaoMixin {
           returnedAmount: lineTotal,
           cashierUserId: returnedByUserId,
           cashierNameSnapshot: cashierName,
-          sessionId: inv.sessionId,
+          sessionId: invNow.sessionId,
           customerId: customerId,
           customerNameSnapshot: customerName,
           returnReason: 'إرجاع كامل للفاتورة',
@@ -489,17 +509,42 @@ class ReturnsDao extends DatabaseAccessor<AppDatabase> with _$ReturnsDaoMixin {
         );
       }
 
-      if (inv.debtAmount > 0 && customerId != null && customerId != 1) {
-        await attachedDatabase.customerAccountsDao.recordReturnInTransaction(
-          customerId: customerId,
-          amount: inv.debtAmount,
-          returnId: returnId,
-          note: 'إرجاع فاتورة ${inv.invoiceNumber}',
-        );
+      if (invNow.debtAmount > 0 && customerId != null && customerId != 1) {
+        final creditNote = 'إرجاع فاتورة ${invNow.invoiceNumber}';
+        if (fullReturnCreditHook != null) {
+          await fullReturnCreditHook!(
+            customerId: customerId,
+            invoiceId: invoiceId,
+            proposedAmount: invNow.debtAmount,
+            returnId: returnId,
+            note: creditNote,
+          );
+        } else {
+          await attachedDatabase.customerAccountsDao
+              .recordReturnInTransactionIfWithinInvoiceCreditCap(
+            customerId: customerId,
+            invoiceId: invoiceId,
+            proposedAmount: invNow.debtAmount,
+            referenceId: returnId,
+            note: creditNote,
+          );
+        }
       }
 
       return returnId;
     });
+
+    if (freshReturnId == null) {
+      await PartialReturnService(attachedDatabase)
+          .returnAllRemainingSaleInvoice(
+        saleInvoiceId: invoiceId,
+        returnedByUserId: returnedByUserId,
+        note: note,
+      );
+      return 0;
+    }
+
+    return freshReturnId;
   }
 
   // --- Supplier Returns ---

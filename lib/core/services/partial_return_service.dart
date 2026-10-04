@@ -178,6 +178,13 @@ class PartialReturnService {
     }
 
     await _db.transaction(() async {
+      final invNow = await _db.salesDao.getInvoiceById(saleInvoiceId);
+      if (invNow == null) throw StateError('الفاتورة غير موجودة');
+      if (invNow.invoiceStatus == InvoiceLifecycleStatus.returned) {
+        throw StateError(
+            'الفاتورة مرتجعة بالكامل مسبقاً - لا يمكن الإرجاع الجزئي');
+      }
+
       final saleLines = await _db.salesDao.getItemsForInvoice(saleInvoiceId);
 
       // -- Audit snapshots (looked up once per transaction) -----------------

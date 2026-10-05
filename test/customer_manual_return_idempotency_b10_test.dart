@@ -576,19 +576,19 @@ void main() {
       final migrated = AppDatabase.test(NativeDatabase.opened(opened.rawDb));
       addTearDown(() async => migrated.close());
 
-      expect(migrated.schemaVersion, 42);
+      expect(migrated.schemaVersion, 43);
       expect(await idempotencyTableExists(migrated), isTrue);
     });
 
     test('22) fresh v42 schema includes table', () async {
-      expect(db.schemaVersion, 42);
+      expect(db.schemaVersion, 43);
       expect(await idempotencyTableExists(db), isTrue);
     });
 
     test('29) B2-B9 regression sentinel on v42', () async {
       final regressionDb = AppDatabase.test();
       addTearDown(() async => regressionDb.close());
-      expect(regressionDb.schemaVersion, 42);
+      expect(regressionDb.schemaVersion, 43);
 
       final b10Table = await regressionDb
           .customSelect(

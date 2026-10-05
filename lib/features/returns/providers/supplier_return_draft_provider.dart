@@ -1,8 +1,11 @@
 // lib/features/returns/providers/supplier_return_draft_provider.dart
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../../core/database/app_database.dart';
+import '../../../core/services/supplier_return_fingerprint.dart';
+import '../../../core/services/supplier_return_idempotency_conflict_exception.dart';
 import '../../../core/services/supplier_return_service.dart';
 import '../models/supplier_return_draft_models.dart';
 import '../repositories/supplier_return_read_repository.dart';
@@ -122,10 +125,14 @@ class SupplierReturnDraftState {
   }
 }
 
+const _supplierReturnUuid = Uuid();
+
 class SupplierReturnDraftNotifier extends Notifier<SupplierReturnDraftState> {
   int _loadPurchasesGeneration = 0;
   int _loadLinesGeneration = 0;
   int _postGeneration = 0;
+  String? _submitIdempotencyKey;
+  SupplierReturnPostingInput? _pendingPostingInput;
 
   @override
   SupplierReturnDraftState build() => const SupplierReturnDraftState();
@@ -141,6 +148,17 @@ class SupplierReturnDraftNotifier extends Notifier<SupplierReturnDraftState> {
   void _invalidatePurchaseLoads() => _loadPurchasesGeneration++;
 
   void _invalidatePosts() => _postGeneration++;
+
+  void _clearSubmitAttempt() {
+    _submitIdempotencyKey = null;
+    _pendingPostingInput = null;
+  }
+
+  bool _postingInputMatches(SupplierReturnPostingInput current) {
+    if (_pendingPostingInput == null) return true;
+    return SupplierReturnFingerprint.compute(_pendingPostingInput!) ==
+        SupplierReturnFingerprint.compute(current);
+  }
 
   Future<void> loadPurchases() async {
     final generation = ++_loadPurchasesGeneration;
@@ -166,6 +184,7 @@ class SupplierReturnDraftNotifier extends Notifier<SupplierReturnDraftState> {
   }
 
   Future<void> selectPurchase(SupplierReturnPurchaseOption purchase) async {
+    _clearSubmitAttempt();
     final generation = ++_loadLinesGeneration;
     state = state.copyWith(
       selectedPurchase: purchase,
@@ -194,6 +213,7 @@ class SupplierReturnDraftNotifier extends Notifier<SupplierReturnDraftState> {
   }
 
   void backToPurchaseSelection() {
+    _clearSubmitAttempt();
     _invalidateLineLoads();
     state = state.copyWith(
       step: SupplierReturnDraftStep.selectPurchase,
@@ -207,9 +227,19 @@ class SupplierReturnDraftNotifier extends Notifier<SupplierReturnDraftState> {
     );
   }
 
-  void setReason(String value) => state = state.copyWith(reason: value);
+  void setReason(String value) {
+    if (state.reason != value) {
+      _clearSubmitAttempt();
+    }
+    state = state.copyWith(reason: value);
+  }
 
-  void setNotes(String value) => state = state.copyWith(notes: value);
+  void setNotes(String value) {
+    if (state.notes != value) {
+      _clearSubmitAttempt();
+    }
+    state = state.copyWith(notes: value);
+  }
 
   void setLineQuantity(int purchaseItemId, double quantity) {
     final updated = state.lines.map((line) {
@@ -221,6 +251,7 @@ class SupplierReturnDraftNotifier extends Notifier<SupplierReturnDraftState> {
     final line = updated.firstWhere((l) => l.purchaseItemId == purchaseItemId);
     errors[purchaseItemId] = validateDraftLineQuantity(line, quantity);
 
+    _clearSubmitAttempt();
     state = state.copyWith(
       lines: updated,
       lineErrors: errors,
@@ -245,6 +276,12 @@ class SupplierReturnDraftNotifier extends Notifier<SupplierReturnDraftState> {
     );
     if (input == null) return false;
 
+    if (!_postingInputMatches(input)) {
+      _clearSubmitAttempt();
+    }
+    _pendingPostingInput = input;
+    _submitIdempotencyKey ??= _supplierReturnUuid.v4();
+
     final generation = ++_postGeneration;
     state = state.copyWith(
       postingStatus: SupplierReturnPostingStatus.posting,
@@ -252,15 +289,28 @@ class SupplierReturnDraftNotifier extends Notifier<SupplierReturnDraftState> {
     );
 
     try {
-      final returnId = await _postingService.postPurchaseLinkedReturn(input);
+      final result = await _postingService.postPurchaseLinkedReturn(
+        idempotencyKey: _submitIdempotencyKey!,
+        input: input,
+      );
       if (!_isCurrentPost(generation)) return false;
 
+      _clearSubmitAttempt();
       ref.read(supplierReturnsRefreshProvider.notifier).state++;
       state = state.copyWith(
         postingStatus: SupplierReturnPostingStatus.success,
-        lastPostedReturnId: returnId,
+        lastPostedReturnId: result.supplierReturnId,
       );
       return true;
+    } on SupplierReturnIdempotencyConflictException {
+      if (!_isCurrentPost(generation)) return false;
+      _clearSubmitAttempt();
+      state = state.copyWith(
+        postingStatus: SupplierReturnPostingStatus.failure,
+        postingErrorMessage:
+            'تعارض في عملية المرتجع. أعد فتح نافذة المرتجع وحاول مرة أخرى.',
+      );
+      return false;
     } on SupplierReturnPostingException catch (e) {
       if (!_isCurrentPost(generation)) return false;
       state = state.copyWith(
@@ -279,6 +329,7 @@ class SupplierReturnDraftNotifier extends Notifier<SupplierReturnDraftState> {
   }
 
   void reset() {
+    _clearSubmitAttempt();
     _invalidatePurchaseLoads();
     _invalidateLineLoads();
     _invalidatePosts();

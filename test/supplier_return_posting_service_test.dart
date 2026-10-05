@@ -5,6 +5,7 @@ import 'package:lez_pos/core/database/app_database.dart';
 import 'package:lez_pos/core/services/supplier_return_service.dart';
 import 'package:lez_pos/features/financial/models/cash_ledger_filter.dart';
 import 'package:lez_pos/features/financial/repositories/financial_ledger_repository.dart';
+import 'support/supplier_return_posting_helpers.dart';
 
 void main() {
   late AppDatabase db;
@@ -113,7 +114,7 @@ void main() {
       final stockBefore = await productStock(productId);
       expect(stockBefore, 10);
 
-      final returnId = await service.postPurchaseLinkedReturn(postingInput());
+      final returnId = await postSupplierReturnId(service, postingInput());
 
       expect(returnId, greaterThan(0));
       expect(await supplierReturnCount(), 1);
@@ -139,7 +140,7 @@ void main() {
     test('B) requestedQty > returnableQty rejects with no side effects',
         () async {
       await expectLater(
-        service.postPurchaseLinkedReturn(
+        postSupplierReturn(service, 
           postingInput(
             lines: [
               SupplierReturnPostingLine(
@@ -167,7 +168,7 @@ void main() {
 
     test('C) only remaining returnable quantity can post after prior return',
         () async {
-      await service.postPurchaseLinkedReturn(
+      await postSupplierReturnId(service, 
         postingInput(
           lines: [
             SupplierReturnPostingLine(
@@ -178,7 +179,7 @@ void main() {
         ),
       );
 
-      await service.postPurchaseLinkedReturn(
+      await postSupplierReturnId(service, 
         postingInput(
           lines: [
             SupplierReturnPostingLine(
@@ -190,7 +191,7 @@ void main() {
       );
 
       await expectLater(
-        service.postPurchaseLinkedReturn(
+        postSupplierReturn(service, 
           postingInput(
             lines: [
               SupplierReturnPostingLine(
@@ -209,7 +210,7 @@ void main() {
 
     test('D) wrong supplier for purchase is rejected atomically', () async {
       await expectLater(
-        service.postPurchaseLinkedReturn(
+        postSupplierReturn(service, 
           postingInput(supplier: otherSupplierId),
         ),
         throwsA(
@@ -245,7 +246,7 @@ void main() {
       final foreignItemId = otherItems.single.id;
 
       await expectLater(
-        service.postPurchaseLinkedReturn(
+        postSupplierReturn(service, 
           postingInput(
             lines: [
               SupplierReturnPostingLine(
@@ -272,7 +273,7 @@ void main() {
     test('F) duplicate purchaseItemId lines aggregate before validation',
         () async {
       await expectLater(
-        service.postPurchaseLinkedReturn(
+        postSupplierReturn(service, 
           postingInput(
             lines: [
               SupplierReturnPostingLine(
@@ -305,7 +306,7 @@ void main() {
           .write(const ProductsCompanion(currentStock: Value(0)));
 
       await expectLater(
-        service.postPurchaseLinkedReturn(postingInput()),
+        postSupplierReturn(service, postingInput()),
         throwsA(
           predicate(
             (e) =>
@@ -338,7 +339,7 @@ void main() {
       final stockBefore = await productStock(productId);
 
       await expectLater(
-        failingService.postPurchaseLinkedReturn(postingInput()),
+        postSupplierReturn(failingService, postingInput()),
         throwsA(
           predicate(
             (e) =>
@@ -359,7 +360,7 @@ void main() {
     test(
         'I) multi-item return posts each stock movement once with correct total',
         () async {
-      final returnId = await service.postPurchaseLinkedReturn(
+      final returnId = await postSupplierReturnId(service, 
         postingInput(
           lines: [
             SupplierReturnPostingLine(
@@ -396,7 +397,7 @@ void main() {
         const CashLedgerFilter(page: 0, pageSize: 1000),
       );
 
-      await service.postPurchaseLinkedReturn(postingInput());
+      await postSupplierReturnId(service, postingInput());
 
       final after = await ledger.getEntries(
         const CashLedgerFilter(page: 0, pageSize: 1000),

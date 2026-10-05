@@ -13,6 +13,7 @@ import 'package:lez_pos/features/returns/providers/supplier_refund_settlement_pr
 import 'package:lez_pos/features/suppliers/providers/supplier_accounts_provider.dart';
 import 'package:lez_pos/features/returns/providers/supplier_return_service_provider.dart';
 import 'package:lez_pos/features/returns/utils/supplier_refund_settlement_messages.dart';
+import 'support/supplier_return_posting_helpers.dart';
 
 void main() {
   group('SR.3.3 Step 3.1 supplier refund UI foundation', () {
@@ -28,7 +29,7 @@ void main() {
         supplierId: supplierId,
         amount: 50,
       );
-      await SupplierReturnService(db).postPurchaseLinkedReturn(
+      await postSupplierReturnId(SupplierReturnService(db), 
         SupplierReturnPostingInput(
           supplierId: supplierId,
           purchaseInvoiceId: invoiceId,
@@ -332,7 +333,7 @@ void main() {
     test('L) optional returnId is passed correctly when linked', () async {
       await seedCredit(credit: 20);
       int? capturedReturnId;
-      final returnId = await SupplierReturnService(db).postPurchaseLinkedReturn(
+      final returnId = await postSupplierReturnId(SupplierReturnService(db), 
         SupplierReturnPostingInput(
           supplierId: supplierId,
           purchaseInvoiceId: invoiceId,

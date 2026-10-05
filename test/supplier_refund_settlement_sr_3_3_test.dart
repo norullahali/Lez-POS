@@ -6,6 +6,7 @@ import 'package:lez_pos/core/database/app_database.dart';
 import 'package:lez_pos/core/services/supplier_account_service.dart';
 import 'package:lez_pos/core/services/supplier_refund_settlement_service.dart';
 import 'package:lez_pos/core/services/supplier_return_service.dart';
+import 'support/supplier_return_posting_helpers.dart';
 
 void main() {
   late AppDatabase db;
@@ -75,7 +76,7 @@ void main() {
       supplierId: supplierId,
       amount: 50,
     );
-    await returnService.postPurchaseLinkedReturn(
+    await postSupplierReturnId(returnService, 
       SupplierReturnPostingInput(
         supplierId: supplierId,
         purchaseInvoiceId: invoiceId,
@@ -360,7 +361,7 @@ void main() {
         amount: 50,
       );
 
-      await returnService.postPurchaseLinkedReturn(
+      await postSupplierReturnId(returnService, 
         SupplierReturnPostingInput(
           supplierId: supplierId,
           purchaseInvoiceId: invoiceId,

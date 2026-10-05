@@ -17,6 +17,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite3;
 
 import 'support/supplier_payment_test_keys.dart';
 import 'support/supplier_refund_test_keys.dart';
+import 'support/supplier_return_posting_helpers.dart';
 
 void main() {
   late AppDatabase db;
@@ -103,7 +104,7 @@ void main() {
         supplierId: supplierId,
       amount: 100,
     );
-    await returnService.postPurchaseLinkedReturn(
+    await postSupplierReturnId(returnService, 
       SupplierReturnPostingInput(
         supplierId: supplierId,
         purchaseInvoiceId: invoiceId,

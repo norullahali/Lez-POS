@@ -12,6 +12,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite3;
 
 import 'support/supplier_payment_test_keys.dart';
 import 'support/supplier_refund_test_keys.dart';
+import 'support/supplier_return_posting_helpers.dart';
 
 void main() {
   late AppDatabase db;
@@ -131,7 +132,7 @@ void main() {
   ) async {
     for (var attempt = 0; attempt < 8; attempt++) {
       try {
-        return await targetService.postPurchaseLinkedReturn(input);
+        return await postSupplierReturnId(targetService, input);
       } on SupplierReturnPostingException catch (e) {
         return e.code;
       } catch (e) {
@@ -164,7 +165,7 @@ void main() {
 
   group('B14 supplier purchase-linked return invoice credit cap', () {
     test('1) single return within cap posts full RETURN amount', () async {
-      await returnService.postPurchaseLinkedReturn(postingInput(quantity: 6));
+      await postSupplierReturnId(returnService, postingInput(quantity: 6));
 
       expect(await creditReversalTotal(), closeTo(30, 0.0001));
       expect(await returnTxnCount(), 1);
@@ -172,10 +173,10 @@ void main() {
     });
 
     test('2) proposed return exceeding remaining cap is clipped', () async {
-      await returnService.postPurchaseLinkedReturn(postingInput(quantity: 16));
+      await postSupplierReturnId(returnService, postingInput(quantity: 16));
       expect(await creditReversalTotal(), closeTo(80, 0.0001));
 
-      await returnService.postPurchaseLinkedReturn(postingInput(quantity: 8));
+      await postSupplierReturnId(returnService, postingInput(quantity: 8));
 
       expect(await creditReversalTotal(), closeTo(100, 0.0001));
       expect(await returnTxnCount(), 2);
@@ -188,26 +189,26 @@ void main() {
     });
 
     test('3) sequential 40 + 60 totals 100 credit reversal', () async {
-      await returnService.postPurchaseLinkedReturn(postingInput(quantity: 8));
-      await returnService.postPurchaseLinkedReturn(postingInput(quantity: 12));
+      await postSupplierReturnId(returnService, postingInput(quantity: 8));
+      await postSupplierReturnId(returnService, postingInput(quantity: 12));
 
       expect(await creditReversalTotal(), closeTo(100, 0.0001));
       expect(await returnTxnAbsTotal(), closeTo(100, 0.0001));
     });
 
     test('4) sequential 70 + 40 totals 100 credit reversal', () async {
-      await returnService.postPurchaseLinkedReturn(postingInput(quantity: 14));
-      await returnService.postPurchaseLinkedReturn(postingInput(quantity: 8));
+      await postSupplierReturnId(returnService, postingInput(quantity: 14));
+      await postSupplierReturnId(returnService, postingInput(quantity: 8));
 
       expect(await creditReversalTotal(), closeTo(100, 0.0001));
       expect(await returnTxnAbsTotal(), closeTo(100, 0.0001));
     });
 
     test('5) exhausted cap succeeds without RETURN row', () async {
-      await returnService.postPurchaseLinkedReturn(postingInput(quantity: 20));
+      await postSupplierReturnId(returnService, postingInput(quantity: 20));
       expect(await creditReversalTotal(), closeTo(100, 0.0001));
 
-      final returnId = await returnService.postPurchaseLinkedReturn(
+      final returnId = await postSupplierReturnId(returnService, 
         postingInput(quantity: 4),
       );
 
@@ -346,7 +347,7 @@ void main() {
       );
       expect(await supplierBalance(), closeTo(0, 0.0001));
 
-      await returnService.postPurchaseLinkedReturn(postingInput(quantity: 4));
+      await postSupplierReturnId(returnService, postingInput(quantity: 4));
 
       expect(await creditReversalTotal(), closeTo(20, 0.0001));
       expect(await supplierBalance(), closeTo(-20, 0.0001));
@@ -366,7 +367,7 @@ void main() {
       );
 
       await expectLater(
-        failingService.postPurchaseLinkedReturn(postingInput(quantity: 2)),
+        postSupplierReturn(failingService, postingInput(quantity: 2)),
         throwsA(
           isA<SupplierReturnPostingException>().having(
             (e) => e.code,
@@ -384,10 +385,10 @@ void main() {
 
     test('10) SR 2.3 quantity-cap regression still rejects over-return',
         () async {
-      await returnService.postPurchaseLinkedReturn(postingInput(quantity: 30));
+      await postSupplierReturnId(returnService, postingInput(quantity: 30));
 
       await expectLater(
-        returnService.postPurchaseLinkedReturn(postingInput(quantity: 1)),
+        postSupplierReturn(returnService, postingInput(quantity: 1)),
         throwsA(
           isA<SupplierReturnPostingException>().having(
             (e) => e.code,
@@ -435,7 +436,7 @@ void main() {
         supplierId: supplierId,
         amount: 100,
       );
-      await returnService.postPurchaseLinkedReturn(postingInput(quantity: 4));
+      await postSupplierReturnId(returnService, postingInput(quantity: 4));
       expect(await supplierBalance(), closeTo(-20, 0.0001));
 
       final result = await settlementService.settleCredit(
@@ -448,8 +449,8 @@ void main() {
     });
 
     test('14) invariant credit reversal total <= invoice debt_amount', () async {
-      await returnService.postPurchaseLinkedReturn(postingInput(quantity: 14));
-      await returnService.postPurchaseLinkedReturn(postingInput(quantity: 8));
+      await postSupplierReturnId(returnService, postingInput(quantity: 14));
+      await postSupplierReturnId(returnService, postingInput(quantity: 8));
 
       final totalCredit = await creditReversalTotal();
       final debt = await invoiceDebtAmount();

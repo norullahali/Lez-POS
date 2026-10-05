@@ -7,6 +7,7 @@ import 'package:lez_pos/core/constants/movement_types.dart';
 import 'package:lez_pos/core/database/app_database.dart';
 import 'package:lez_pos/core/services/supplier_return_service.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite3;
+import 'support/supplier_return_posting_helpers.dart';
 
 void main() {
   late AppDatabase db;
@@ -111,7 +112,7 @@ void main() {
   ) async {
     for (var attempt = 0; attempt < 8; attempt++) {
       try {
-        return await targetService.postPurchaseLinkedReturn(input);
+        return await postSupplierReturnId(targetService, input);
       } on SupplierReturnPostingException catch (e) {
         return e.code;
       } catch (e) {
@@ -207,8 +208,8 @@ void main() {
     });
 
     test('B) sequential 6 + 4 succeeds with total returned 10', () async {
-      await service.postPurchaseLinkedReturn(postingInput(quantity: 6));
-      await service.postPurchaseLinkedReturn(postingInput(quantity: 4));
+      await postSupplierReturnId(service, postingInput(quantity: 6));
+      await postSupplierReturnId(service, postingInput(quantity: 4));
 
       expect(await returnedQuantity(), 10);
       expect(await returnHeaderCount(), 2);
@@ -216,10 +217,10 @@ void main() {
     });
 
     test('C) sequential 10 + 1 allows only 10 total returned', () async {
-      await service.postPurchaseLinkedReturn(postingInput(quantity: 10));
+      await postSupplierReturnId(service, postingInput(quantity: 10));
 
       await expectLater(
-        service.postPurchaseLinkedReturn(postingInput(quantity: 1)),
+        postSupplierReturn(service, postingInput(quantity: 1)),
         throwsA(
           isA<SupplierReturnPostingException>().having(
             (e) => e.code,
@@ -239,7 +240,7 @@ void main() {
           await db.supplierAccountsDao.getBalance(supplierId);
 
       await expectLater(
-        service.postPurchaseLinkedReturn(postingInput(quantity: 11)),
+        postSupplierReturn(service, postingInput(quantity: 11)),
         throwsA(
           isA<SupplierReturnPostingException>().having(
             (e) => e.code,
@@ -259,16 +260,16 @@ void main() {
     });
 
     test('E) exact remaining quantity succeeds after partial return', () async {
-      await service.postPurchaseLinkedReturn(postingInput(quantity: 7));
-      await service.postPurchaseLinkedReturn(postingInput(quantity: 3));
+      await postSupplierReturnId(service, postingInput(quantity: 7));
+      await postSupplierReturnId(service, postingInput(quantity: 3));
 
       expect(await returnedQuantity(), 10);
       expect(await returnHeaderCount(), 2);
     });
 
     test('F) multiple return documents 7 + 3 both succeed', () async {
-      await service.postPurchaseLinkedReturn(postingInput(quantity: 7));
-      await service.postPurchaseLinkedReturn(postingInput(quantity: 3));
+      await postSupplierReturnId(service, postingInput(quantity: 7));
+      await postSupplierReturnId(service, postingInput(quantity: 3));
 
       expect(await returnedQuantity(), 10);
       expect(await returnHeaderCount(), 2);

@@ -11,6 +11,8 @@ import 'package:lez_pos/features/returns/providers/supplier_return_draft_provide
 import 'package:lez_pos/features/returns/providers/supplier_return_service_provider.dart';
 import 'package:lez_pos/features/returns/providers/supplier_returns_list_provider.dart';
 import 'package:lez_pos/features/returns/repositories/supplier_return_read_repository.dart';
+import 'support/supplier_return_posting_helpers.dart';
+import 'package:lez_pos/core/services/supplier_return_posting_result.dart';
 
 void main() {
   group('SR.3.2 Step 2 supplier returns history/list', () {
@@ -24,7 +26,7 @@ void main() {
     late int purchaseItemId;
 
     Future<int> postReturn({double quantity = 2}) {
-      return service.postPurchaseLinkedReturn(
+      return postSupplierReturnId(service, 
         SupplierReturnPostingInput(
           supplierId: supplierId,
           purchaseInvoiceId: invoiceId,
@@ -223,7 +225,10 @@ void main() {
 class _FailingService extends SupplierReturnService {
   _FailingService(super.db);
   @override
-  Future<int> postPurchaseLinkedReturn(SupplierReturnPostingInput input) async {
+  Future<SupplierReturnPostingResult> postPurchaseLinkedReturn({
+    required String idempotencyKey,
+    required SupplierReturnPostingInput input,
+  }) async {
     throw const SupplierReturnPostingException(
       SupplierReturnPostingFailure.stockInsufficient,
       'fail',

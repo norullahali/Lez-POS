@@ -20,6 +20,7 @@ import 'tables/supplier_refund_idempotency_table.dart';
 import 'tables/pos_sale_idempotency_table.dart';
 import 'tables/customer_quick_return_idempotency_table.dart';
 import 'tables/customer_manual_return_idempotency_table.dart';
+import 'tables/supplier_return_idempotency_table.dart';
 import 'tables/products_table.dart';
 import 'tables/product_batches_table.dart';
 import 'tables/stock_ledger_table.dart';
@@ -69,6 +70,7 @@ import 'daos/supplier_refund_idempotency_dao.dart';
 import 'daos/pos_sale_idempotency_dao.dart';
 import 'daos/customer_quick_return_idempotency_dao.dart';
 import 'daos/customer_manual_return_idempotency_dao.dart';
+import 'daos/supplier_return_idempotency_dao.dart';
 import 'daos/supplier_accounts_dao.dart';
 import 'daos/products_dao.dart';
 import 'daos/stock_dao.dart';
@@ -95,6 +97,7 @@ part 'app_database.g.dart';
     PosSaleIdempotency,
     CustomerQuickReturnIdempotency,
     CustomerManualReturnIdempotency,
+    SupplierReturnIdempotency,
     SupplierAccounts,
     SupplierTransactions,
     Products,
@@ -144,6 +147,7 @@ part 'app_database.g.dart';
     PosSaleIdempotencyDao,
     CustomerQuickReturnIdempotencyDao,
     CustomerManualReturnIdempotencyDao,
+    SupplierReturnIdempotencyDao,
     SupplierAccountsDao,
     ProductsDao,
     StockDao,
@@ -178,7 +182,7 @@ class AppDatabase extends _$AppDatabase {
   late final pricingDao = PricingDao(this);
 
   @override
-  int get schemaVersion => 42;
+  int get schemaVersion => 43;
 
   @override
   MigrationStrategy get migration {
@@ -1041,6 +1045,21 @@ class AppDatabase extends _$AppDatabase {
           }
           debugPrint(
               '[Migration v42] customer_manual_return_idempotency ready');
+        }
+        if (from < 43) {
+          debugPrint(
+              '[Migration v43] supplier_return_idempotency table...');
+          await m.createTable(supplierReturnIdempotency);
+          try {
+            await customStatement(
+              'CREATE INDEX IF NOT EXISTS sri_supplier_created_idx '
+              'ON supplier_return_idempotency (supplier_id, created_at)',
+            );
+          } catch (e) {
+            debugPrint('[Migration v43] idempotency index skip/error: $e');
+            rethrow;
+          }
+          debugPrint('[Migration v43] supplier_return_idempotency ready');
         }
       },
       beforeOpen: (details) async {

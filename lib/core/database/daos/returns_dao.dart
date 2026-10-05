@@ -55,13 +55,6 @@ class SupplierReturnQuantityCapExceededException implements Exception {
   String toString() => 'supplier return quantity exceeds purchase line cap';
 }
 
-@DriftAccessor(tables: [
-  CustomerReturns,
-  CustomerReturnItems,
-  SupplierReturns,
-  SupplierReturnItems,
-  StockLedger,
-])
 typedef FullReturnCreditHook = Future<void> Function({
   required int customerId,
   required int invoiceId,
@@ -70,6 +63,13 @@ typedef FullReturnCreditHook = Future<void> Function({
   String note,
 });
 
+@DriftAccessor(tables: [
+  CustomerReturns,
+  CustomerReturnItems,
+  SupplierReturns,
+  SupplierReturnItems,
+  StockLedger,
+])
 class ReturnsDao extends DatabaseAccessor<AppDatabase> with _$ReturnsDaoMixin {
   ReturnsDao(super.db);
 

@@ -17,6 +17,7 @@ import 'package:lez_pos/features/financial/models/cash_ledger_filter.dart';
 import 'package:lez_pos/features/financial/repositories/financial_ledger_repository.dart';
 import 'package:lez_pos/features/reports/core/models/report_date_preset.dart';
 import 'package:lez_pos/features/reports/core/models/report_filter_model.dart';
+import 'support/supplier_return_posting_helpers.dart';
 
 void main() {
   late AppDatabase db;
@@ -361,8 +362,7 @@ void main() {
         supplierId: supplierId,
         amount: 50,
       );
-      await supplierReturnService
-          .postPurchaseLinkedReturn(SupplierReturnPostingInput(
+      await postSupplierReturnId(supplierReturnService, SupplierReturnPostingInput(
         supplierId: supplierId,
         purchaseInvoiceId: purchaseInvoiceId,
         lines: [

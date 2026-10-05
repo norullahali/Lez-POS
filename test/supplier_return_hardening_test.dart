@@ -9,6 +9,7 @@ import 'package:lez_pos/core/services/supplier_account_service.dart';
 import 'package:lez_pos/core/services/supplier_return_service.dart';
 import 'package:lez_pos/features/financial/models/cash_ledger_filter.dart';
 import 'package:lez_pos/features/financial/repositories/financial_ledger_repository.dart';
+import 'support/supplier_return_posting_helpers.dart';
 
 void main() {
   late AppDatabase db;
@@ -98,7 +99,7 @@ void main() {
 
     test('B) canonical service path succeeds for same purchase-linked data',
         () async {
-      final returnId = await service.postPurchaseLinkedReturn(
+      final returnId = await postSupplierReturnId(service, 
         SupplierReturnPostingInput(
           supplierId: supplierId,
           purchaseInvoiceId: invoiceId,
@@ -160,7 +161,7 @@ void main() {
         const CashLedgerFilter(page: 0, pageSize: 1000),
       );
 
-      await service.postPurchaseLinkedReturn(
+      await postSupplierReturnId(service, 
         SupplierReturnPostingInput(
           supplierId: supplierId,
           purchaseInvoiceId: invoiceId,

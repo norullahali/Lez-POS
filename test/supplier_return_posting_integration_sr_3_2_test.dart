@@ -10,6 +10,8 @@ import 'package:lez_pos/features/returns/providers/supplier_return_draft_provide
 import 'package:lez_pos/features/returns/providers/supplier_return_service_provider.dart';
 import 'package:lez_pos/features/returns/repositories/supplier_return_read_repository.dart';
 import 'package:lez_pos/features/returns/utils/supplier_return_posting_messages.dart';
+import 'support/supplier_return_posting_helpers.dart';
+import 'package:lez_pos/core/services/supplier_return_posting_result.dart';
 
 void main() {
   group('SR.3.2 posting integration', () {
@@ -267,11 +269,19 @@ class RecordingSupplierReturnService extends SupplierReturnService {
   int _nextReturnId = 9001;
 
   @override
-  Future<int> postPurchaseLinkedReturn(SupplierReturnPostingInput input) async {
+  Future<SupplierReturnPostingResult> postPurchaseLinkedReturn({
+    required String idempotencyKey,
+    required SupplierReturnPostingInput input,
+  }) async {
     callCount++;
     lastInput = input;
     if (failure != null) throw failure!;
     if (holdNextPost != null) await holdNextPost!.future;
-    return _nextReturnId++;
+    final id = _nextReturnId++;
+    return SupplierReturnPostingResult(
+      supplierReturnId: id,
+      supplierTransactionId: null,
+      idempotentReplay: false,
+    );
   }
 }

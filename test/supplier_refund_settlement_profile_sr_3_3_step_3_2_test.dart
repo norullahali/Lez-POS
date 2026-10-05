@@ -19,6 +19,7 @@ import 'package:lez_pos/features/reports/core/models/report_date_preset.dart';
 import 'package:lez_pos/features/reports/core/models/report_filter_model.dart';
 import 'package:lez_pos/features/returns/screens/widgets/supplier_credit_refund_entry.dart';
 import 'package:lez_pos/features/returns/utils/supplier_refund_settlement_messages.dart';
+import 'support/supplier_return_posting_helpers.dart';
 
 void main() {
   group('SR.3.3 Step 3.2 supplier profile refund entry', () {
@@ -34,7 +35,7 @@ void main() {
         supplierId: supplierId,
         amount: 50,
       );
-      await SupplierReturnService(db).postPurchaseLinkedReturn(
+      await postSupplierReturnId(SupplierReturnService(db), 
         SupplierReturnPostingInput(
           supplierId: supplierId,
           purchaseInvoiceId: invoiceId,

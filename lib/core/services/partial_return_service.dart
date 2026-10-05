@@ -4,13 +4,13 @@
 //
 // Design rules:
 //  - Original sale_items rows are NEVER modified.
-//  - Every partial return runs inside a single DB transaction.
+//  - Business mutations run inside caller-owned transactions via
+//    [executePartialReturnInTransaction].
 //  - Stock restoration is atomic with the return record insertion.
 //  - Stock movements table is updated for audit trail.
 //  - Invoice status is auto-updated after each return batch.
 //  - Credit receivable reversal for credit invoices (Phase C.1).
 //  - Invoice-linked customer_returns document (Phase C.2.6).
-//  - ALL Drift Companion / generated-type usage lives in DAOs.
 
 import 'package:drift/drift.dart' show Variable;
 
@@ -22,8 +22,21 @@ import '../activity/activity_categories.dart';
 import '../activity/activity_types.dart';
 import 'activity_logger_service.dart';
 import 'customer_return_credit.dart';
+import 'customer_invoice_return_fingerprint.dart';
+import 'customer_invoice_return_posting_result.dart';
 
-// Describes one product line being partially returned.
+/// Minimal caller-controlled line for partial invoice returns (B16).
+class CustomerInvoicePartialReturnLine {
+  final int saleItemId;
+  final double quantity;
+
+  const CustomerInvoicePartialReturnLine({
+    required this.saleItemId,
+    required this.quantity,
+  });
+}
+
+// Describes one product line being partially returned (legacy UI/tests).
 class PartialReturnLine {
   final int saleItemId;
   final int productId;
@@ -54,20 +67,15 @@ class PartialReturnService {
   PartialReturnService(this._db, {CustomerReturnCreditPoster? creditPoster})
       : _creditPoster = creditPoster;
 
-  /// Test seam for accounting rollback tests.
   factory PartialReturnService.withCreditPoster(
     AppDatabase db, {
     required CustomerReturnCreditPoster creditPoster,
   }) =>
       PartialReturnService(db, creditPoster: creditPoster);
 
-  // ---- Read helpers -------------------------------------------------------
-
-  // Total quantity already returned for a specific sale line.
   Future<double> getReturnedQuantityForSaleItem(int saleItemId) =>
       _db.saleItemReturnsDao.getReturnedQuantityForSaleItem(saleItemId);
 
-  // Quantity still eligible for return: sold_qty - already_returned_qty.
   Future<double> getAvailableReturnQuantity(int saleItemId) async {
     final soldQty =
         await _db.saleItemReturnsDao.getSaleItemQuantity(saleItemId);
@@ -77,11 +85,9 @@ class PartialReturnService {
     return available < 0 ? 0.0 : available;
   }
 
-  // Per-line return summary for building return history views.
   Future<Map<int, double>> getReturnedQuantitiesForInvoice(int saleInvoiceId) =>
       _db.saleItemReturnsDao.getReturnedQuantitiesForInvoice(saleInvoiceId);
 
-  /// Whether any sale line on [saleInvoiceId] still has returnable quantity.
   Future<bool> hasRemainingReturnableQuantity(int saleInvoiceId) async {
     final saleLines = await _db.salesDao.getItemsForInvoice(saleInvoiceId);
     for (final line in saleLines) {
@@ -91,9 +97,6 @@ class PartialReturnService {
     return false;
   }
 
-  // ---- Validation ---------------------------------------------------------
-
-  // Throws if the requested quantity is invalid.
   void validateReturnQuantity({
     required double quantity,
     required double available,
@@ -109,10 +112,9 @@ class PartialReturnService {
     }
   }
 
-  // ---- Main operation -----------------------------------------------------
-
-  /// Returns all remaining quantities on [saleInvoiceId] (Return All Remaining).
-  Future<void> returnAllRemainingSaleInvoice({
+  /// Returns all remaining quantities on [saleInvoiceId] inside caller txn.
+  Future<CustomerInvoicePartialReturnExecution>
+      executeReturnAllRemainingInTransaction({
     required int saleInvoiceId,
     required int returnedByUserId,
     required String note,
@@ -128,17 +130,19 @@ class PartialReturnService {
       throw StateError('لا توجد أصناف في الفاتورة');
     }
 
-    final lines = <PartialReturnLine>[];
+    final lines = <CustomerInvoicePartialReturnLine>[];
     for (final line in saleLines) {
-      final available = await getAvailableReturnQuantity(line.id);
+      final soldQty =
+          await _db.saleItemReturnsDao.getSaleItemQuantity(line.id);
+      if (soldQty == null) continue;
+      final alreadyReturned = await _db.saleItemReturnsDao
+          .getReturnedQuantityForSaleItem(line.id);
+      final available = soldQty - alreadyReturned;
       if (available > 0.0001) {
         lines.add(
-          PartialReturnLine(
+          CustomerInvoicePartialReturnLine(
             saleItemId: line.id,
-            productId: line.productId,
             quantity: available,
-            unitPrice: line.unitPrice,
-            unitCost: line.unitCost,
           ),
         );
       }
@@ -148,7 +152,7 @@ class PartialReturnService {
       throw StateError('لا توجد كميات متبقية للإرجاع');
     }
 
-    await processPartialReturn(
+    return executePartialReturnInTransaction(
       saleInvoiceId: saleInvoiceId,
       lines: lines,
       returnedByUserId: returnedByUserId,
@@ -158,8 +162,250 @@ class PartialReturnService {
     );
   }
 
-  // Processes a batch of partial return lines atomically.
-  // All lines MUST belong to the same saleInvoiceId.
+  Future<void> returnAllRemainingSaleInvoice({
+    required int saleInvoiceId,
+    required int returnedByUserId,
+    required String note,
+  }) async {
+    await _db.transaction(() async {
+      await executeReturnAllRemainingInTransaction(
+        saleInvoiceId: saleInvoiceId,
+        returnedByUserId: returnedByUserId,
+        note: note,
+      );
+    });
+  }
+
+  /// Core partial-return mutation. Must run inside caller's transaction.
+  Future<CustomerInvoicePartialReturnExecution>
+      executePartialReturnInTransaction({
+    required int saleInvoiceId,
+    required List<CustomerInvoicePartialReturnLine> lines,
+    required int returnedByUserId,
+    String? note,
+    String returnReason = 'إرجاع جزئي',
+    bool persistReturnMetadata = false,
+  }) async {
+    if (lines.isEmpty) {
+      throw ArgumentError('empty partial return lines');
+    }
+
+    final inv = await _db.salesDao.getInvoiceById(saleInvoiceId);
+    if (inv == null) throw StateError('الفاتورة غير موجودة');
+    if (inv.invoiceStatus == InvoiceLifecycleStatus.returned) {
+      throw StateError(
+          'الفاتورة مرتجعة بالكامل مسبقاً - لا يمكن الإرجاع الجزئي');
+    }
+
+    final invNow = await _db.salesDao.getInvoiceById(saleInvoiceId);
+    if (invNow == null) throw StateError('الفاتورة غير موجودة');
+    if (invNow.invoiceStatus == InvoiceLifecycleStatus.returned) {
+      throw StateError(
+          'الفاتورة مرتجعة بالكامل مسبقاً - لا يمكن الإرجاع الجزئي');
+    }
+
+    final saleLines = await _db.salesDao.getItemsForInvoice(saleInvoiceId);
+    final saleLineById = {for (final line in saleLines) line.id: line};
+
+    final cashierRow = await _db.customSelect(
+      'SELECT full_name FROM users WHERE id = ?',
+      variables: [Variable.withInt(returnedByUserId)],
+      readsFrom: {_db.usersTable},
+    ).getSingleOrNull();
+    final cashierName = cashierRow?.data['full_name'] as String?;
+
+    final customerId = inv.customerId;
+    String? customerName;
+    if (customerId != null && customerId != 1) {
+      final customerRow = await _db.customSelect(
+        'SELECT name FROM customers WHERE id = ?',
+        variables: [Variable.withInt(customerId)],
+        readsFrom: {_db.customers},
+      ).getSingleOrNull();
+      customerName = customerRow?.data['name'] as String?;
+    }
+
+    int? firstReturnLineId;
+    final returnedQtyBySaleItemId = <int, double>{};
+    final documentLines = <CustomerReturnDocumentLine>[];
+    var batchGoodsTotal = 0.0;
+
+    final aggregated = aggregatePartialReturnLines(
+      lines
+          .map(
+            (line) => CustomerInvoicePartialReturnLineInput(
+              saleItemId: line.saleItemId,
+              quantity: line.quantity,
+            ),
+          )
+          .toList(),
+    );
+
+    for (final entry in aggregated.entries) {
+      final saleItemId = entry.key;
+      final requestedQty = entry.value;
+      final saleItem = saleLineById[saleItemId];
+      if (saleItem == null) {
+        throw StateError('الصنف #$saleItemId غير موجود في الفاتورة');
+      }
+
+      final soldQty =
+          await _db.saleItemReturnsDao.getSaleItemQuantity(saleItemId);
+      if (soldQty == null) {
+        throw StateError('الصنف #$saleItemId غير موجود في الفاتورة');
+      }
+      final alreadyReturned =
+          await _db.saleItemReturnsDao.getReturnedQuantityForSaleItem(
+        saleItemId,
+      );
+      final available = soldQty - alreadyReturned;
+      validateReturnQuantity(
+        quantity: requestedQty,
+        available: available < 0 ? 0 : available,
+        saleItemId: saleItemId,
+      );
+
+      final unitPrice = saleItem.unitPrice;
+      final unitCost = saleItem.unitCost;
+      final productId = saleItem.productId;
+
+      final returnLineId = await _db.saleItemReturnsDao
+          .insertSaleItemReturnIfWithinSaleLineCap(
+        saleInvoiceId: saleInvoiceId,
+        saleItemId: saleItemId,
+        productId: productId,
+        returnedQuantity: requestedQty,
+        unitPriceAtReturn: unitPrice,
+        returnTotal: requestedQty * unitPrice,
+        returnedByUserId: returnedByUserId,
+        returnReasonNote: note,
+      );
+      if (returnLineId == null) {
+        final alreadyReturnedNow = await _db.saleItemReturnsDao
+            .getReturnedQuantityForSaleItem(saleItemId);
+        final availableNow = soldQty - alreadyReturnedNow;
+        throw StateError(
+          'كمية الإرجاع ($requestedQty) تتجاوز الكمية المتاحة (${availableNow < 0 ? 0 : availableNow}) للصنف #$saleItemId',
+        );
+      }
+      firstReturnLineId ??= returnLineId;
+      returnedQtyBySaleItemId[saleItemId] = requestedQty;
+
+      final lineTotal = requestedQty * unitPrice;
+      batchGoodsTotal += lineTotal;
+      final product = await _db.productsDao.getProductById(productId);
+      final productName = product?.name ?? 'منتج #$productId';
+      documentLines.add(
+        CustomerReturnDocumentLine(
+          productId: productId,
+          productName: productName,
+          quantity: requestedQty,
+          unitPrice: unitPrice,
+          unitCost: unitCost,
+          lineTotal: lineTotal,
+        ),
+      );
+
+      final stockBefore = await _db.stockDao.getStock(productId);
+      await _db.saleItemReturnsDao.restoreProductStock(productId, requestedQty);
+
+      await _db.saleItemReturnsDao.insertStockLedgerReturn(
+        productId: productId,
+        referenceId: returnLineId,
+        quantity: requestedQty,
+        unitCost: unitCost,
+      );
+
+      await _db.stockMovementsDao.recordMovement(
+        productId: productId,
+        movementType: StockMovementKind.partialReturn,
+        quantityChange: requestedQty,
+        stockBefore: stockBefore,
+        stockAfter: stockBefore + requestedQty,
+        referenceId: saleInvoiceId,
+        referenceType: 'sale_invoice',
+        note: note,
+        createdByUserId: returnedByUserId,
+      );
+
+      await _db.returnAuditLogsDao.insertAuditLog(
+        returnType: 'partial',
+        invoiceId: saleInvoiceId,
+        saleItemId: saleItemId,
+        productId: productId,
+        returnedQuantity: requestedQty,
+        returnedAmount: lineTotal,
+        cashierUserId: returnedByUserId,
+        cashierNameSnapshot: cashierName,
+        sessionId: inv.sessionId,
+        customerId: customerId,
+        customerNameSnapshot: customerName,
+        returnReason: returnReason,
+        returnNote: note,
+        stockBefore: stockBefore,
+        stockAfter: stockBefore + requestedQty,
+        referenceType: 'sale_item_return',
+        referenceId: returnLineId,
+      );
+    }
+
+    final customerReturnId = await _db.returnsDao.upsertPartialReturnDocumentHeader(
+      saleInvoiceId: saleInvoiceId,
+      invoiceNumber: inv.invoiceNumber,
+      batchGoodsTotal: batchGoodsTotal,
+      returnReason: returnReason,
+    );
+    await _db.returnsDao.appendCustomerReturnDocumentLines(
+      returnId: customerReturnId,
+      lines: documentLines,
+    );
+
+    if (inv.debtAmount > 0 &&
+        customerId != null &&
+        customerId != 1 &&
+        firstReturnLineId != null) {
+      final proposed = CustomerReturnCredit.creditReversalForSaleLines(
+        invoice: inv,
+        saleLines: saleLines,
+        returnedQtyBySaleItemId: returnedQtyBySaleItemId,
+      );
+      if (proposed > 0.0001) {
+        if (_creditPoster != null) {
+          await _creditPoster!(
+            customerId: customerId,
+            amount: proposed,
+            returnId: firstReturnLineId,
+            note: 'إرجاع فاتورة ${inv.invoiceNumber}',
+          );
+        } else {
+          await _db.customerAccountsDao
+              .recordReturnInTransactionIfWithinInvoiceCreditCap(
+            customerId: customerId,
+            invoiceId: saleInvoiceId,
+            proposedAmount: proposed,
+            referenceId: firstReturnLineId,
+            note: 'إرجاع فاتورة ${inv.invoiceNumber}',
+          );
+        }
+      }
+    }
+
+    final allFullyReturned = await _refreshInvoiceStatus(saleInvoiceId);
+
+    if (persistReturnMetadata && allFullyReturned && note != null) {
+      await _db.saleItemReturnsDao.setInvoiceReturnMetadata(
+        saleInvoiceId: saleInvoiceId,
+        note: note,
+        returnedByUserId: returnedByUserId,
+      );
+    }
+
+    return CustomerInvoicePartialReturnExecution(
+      customerReturnId: customerReturnId,
+      primaryReferenceId: firstReturnLineId!,
+    );
+  }
+
   Future<void> processPartialReturn({
     required int saleInvoiceId,
     required List<PartialReturnLine> lines,
@@ -170,204 +416,22 @@ class PartialReturnService {
   }) async {
     if (lines.isEmpty) return;
 
-    final inv = await _db.salesDao.getInvoiceById(saleInvoiceId);
-    if (inv == null) throw StateError('الفاتورة غير موجودة');
-    if (inv.invoiceStatus == InvoiceLifecycleStatus.returned) {
-      throw StateError(
-          'الفاتورة مرتجعة بالكامل مسبقاً - لا يمكن الإرجاع الجزئي');
-    }
-
     await _db.transaction(() async {
-      final invNow = await _db.salesDao.getInvoiceById(saleInvoiceId);
-      if (invNow == null) throw StateError('الفاتورة غير موجودة');
-      if (invNow.invoiceStatus == InvoiceLifecycleStatus.returned) {
-        throw StateError(
-            'الفاتورة مرتجعة بالكامل مسبقاً - لا يمكن الإرجاع الجزئي');
-      }
-
-      final saleLines = await _db.salesDao.getItemsForInvoice(saleInvoiceId);
-
-      // -- Audit snapshots (looked up once per transaction) -----------------
-      final cashierRow = await _db.customSelect(
-        'SELECT full_name FROM users WHERE id = ?',
-        variables: [Variable.withInt(returnedByUserId)],
-        readsFrom: {_db.usersTable},
-      ).getSingleOrNull();
-      final cashierName = cashierRow?.data['full_name'] as String?;
-
-      final customerId = inv.customerId;
-      String? customerName;
-      if (customerId != null && customerId != 1) {
-        final customerRow = await _db.customSelect(
-          'SELECT name FROM customers WHERE id = ?',
-          variables: [Variable.withInt(customerId)],
-          readsFrom: {_db.customers},
-        ).getSingleOrNull();
-        customerName = customerRow?.data['name'] as String?;
-      }
-      // ---------------------------------------------------------------------
-
-      int? firstReturnLineId;
-      final returnedQtyBySaleItemId = <int, double>{};
-      final documentLines = <CustomerReturnDocumentLine>[];
-      var batchGoodsTotal = 0.0;
-
-      for (final line in lines) {
-        // 1. Validate against current DB state inside txn
-        final soldQty =
-            await _db.saleItemReturnsDao.getSaleItemQuantity(line.saleItemId);
-        if (soldQty == null) {
-          throw StateError('الصنف #${line.saleItemId} غير موجود في الفاتورة');
-        }
-        final alreadyReturned = await _db.saleItemReturnsDao
-            .getReturnedQuantityForSaleItem(line.saleItemId);
-        final available = soldQty - alreadyReturned;
-        validateReturnQuantity(
-          quantity: line.quantity,
-          available: available < 0 ? 0 : available,
-          saleItemId: line.saleItemId,
-        );
-
-        // 2. Insert return line record (atomic quantity cap guard)
-        final returnLineId = await _db.saleItemReturnsDao
-            .insertSaleItemReturnIfWithinSaleLineCap(
-          saleInvoiceId: saleInvoiceId,
-          saleItemId: line.saleItemId,
-          productId: line.productId,
-          returnedQuantity: line.quantity,
-          unitPriceAtReturn: line.unitPrice,
-          returnTotal: line.quantity * line.unitPrice,
-          returnedByUserId: returnedByUserId,
-          returnReasonNote: note,
-        );
-        if (returnLineId == null) {
-          final alreadyReturnedNow = await _db.saleItemReturnsDao
-              .getReturnedQuantityForSaleItem(line.saleItemId);
-          final availableNow = soldQty - alreadyReturnedNow;
-          throw StateError(
-            'كمية الإرجاع (${line.quantity}) تتجاوز الكمية المتاحة (${availableNow < 0 ? 0 : availableNow}) للصنف #${line.saleItemId}',
-          );
-        }
-        firstReturnLineId ??= returnLineId;
-        returnedQtyBySaleItemId[line.saleItemId] = line.quantity;
-
-        final lineTotal = line.quantity * line.unitPrice;
-        batchGoodsTotal += lineTotal;
-        final product = await _db.productsDao.getProductById(line.productId);
-        final productName = product?.name ?? 'منتج #${line.productId}';
-        documentLines.add(
-          CustomerReturnDocumentLine(
-            productId: line.productId,
-            productName: productName,
-            quantity: line.quantity,
-            unitPrice: line.unitPrice,
-            unitCost: line.unitCost,
-            lineTotal: lineTotal,
-          ),
-        );
-
-        // 3. Restore stock
-        final stockBefore = await _db.stockDao.getStock(line.productId);
-        await _db.saleItemReturnsDao
-            .restoreProductStock(line.productId, line.quantity);
-
-        // 4. Stock ledger (low-level accounting trail)
-        await _db.saleItemReturnsDao.insertStockLedgerReturn(
-          productId: line.productId,
-          referenceId: returnLineId,
-          quantity: line.quantity,
-          unitCost: line.unitCost,
-        );
-
-        // 5. Stock movement (business-level audit)
-        await _db.stockMovementsDao.recordMovement(
-          productId: line.productId,
-          movementType: StockMovementKind.partialReturn,
-          quantityChange: line.quantity,
-          stockBefore: stockBefore,
-          stockAfter: stockBefore + line.quantity,
-          referenceId: saleInvoiceId,
-          referenceType: 'sale_invoice',
-          note: note,
-          createdByUserId: returnedByUserId,
-        );
-
-        // 6. Immutable audit row (same transaction — atomic with return)
-        await _db.returnAuditLogsDao.insertAuditLog(
-          returnType: 'partial',
-          invoiceId: saleInvoiceId,
-          saleItemId: line.saleItemId,
-          productId: line.productId,
-          returnedQuantity: line.quantity,
-          returnedAmount: line.quantity * line.unitPrice,
-          cashierUserId: returnedByUserId,
-          cashierNameSnapshot: cashierName,
-          sessionId: inv.sessionId,
-          customerId: customerId,
-          customerNameSnapshot: customerName,
-          returnReason: returnReason,
-          returnNote: note,
-          stockBefore: stockBefore,
-          stockAfter: stockBefore + line.quantity,
-          referenceType: 'sale_item_return',
-          referenceId: returnLineId,
-        );
-      }
-
-      // 7. Invoice-linked customer return document (one header per invoice)
-      final customerReturnId =
-          await _db.returnsDao.upsertPartialReturnDocumentHeader(
+      await executePartialReturnInTransaction(
         saleInvoiceId: saleInvoiceId,
-        invoiceNumber: inv.invoiceNumber,
-        batchGoodsTotal: batchGoodsTotal,
+        lines: lines
+            .map(
+              (line) => CustomerInvoicePartialReturnLine(
+                saleItemId: line.saleItemId,
+                quantity: line.quantity,
+              ),
+            )
+            .toList(),
+        returnedByUserId: returnedByUserId,
+        note: note,
         returnReason: returnReason,
+        persistReturnMetadata: persistReturnMetadata,
       );
-      await _db.returnsDao.appendCustomerReturnDocumentLines(
-        returnId: customerReturnId,
-        lines: documentLines,
-      );
-
-      // 8. Customer credit reversal (credit invoices only)
-      if (inv.debtAmount > 0 &&
-          customerId != null &&
-          customerId != 1 &&
-          firstReturnLineId != null) {
-        final proposed = CustomerReturnCredit.creditReversalForSaleLines(
-          invoice: inv,
-          saleLines: saleLines,
-          returnedQtyBySaleItemId: returnedQtyBySaleItemId,
-        );
-        if (proposed > 0.0001) {
-          if (_creditPoster != null) {
-            await _creditPoster!(
-              customerId: customerId,
-              amount: proposed,
-              returnId: firstReturnLineId,
-              note: 'إرجاع فاتورة ${inv.invoiceNumber}',
-            );
-          } else {
-            await _db.customerAccountsDao
-                .recordReturnInTransactionIfWithinInvoiceCreditCap(
-              customerId: customerId,
-              invoiceId: saleInvoiceId,
-              proposedAmount: proposed,
-              referenceId: firstReturnLineId,
-              note: 'إرجاع فاتورة ${inv.invoiceNumber}',
-            );
-          }
-        }
-      }
-
-      // 9. Recalculate and persist invoice status
-      final allFullyReturned = await _refreshInvoiceStatus(saleInvoiceId);
-
-      if (persistReturnMetadata && allFullyReturned && note != null) {
-        await _db.saleItemReturnsDao.setInvoiceReturnMetadata(
-          saleInvoiceId: saleInvoiceId,
-          note: note,
-          returnedByUserId: returnedByUserId,
-        );
-      }
     });
 
     await ActivityLoggerService(_db).logWarning(
@@ -381,9 +445,6 @@ class PartialReturnService {
     );
   }
 
-  // ---- Invoice status auto-update -----------------------------------------
-
-  /// Returns true when every line is fully returned after refresh.
   Future<bool> _refreshInvoiceStatus(int saleInvoiceId) async {
     final saleLines = await _db.salesDao.getItemsForInvoice(saleInvoiceId);
     if (saleLines.isEmpty) return false;
@@ -408,7 +469,6 @@ class PartialReturnService {
     return allFullyReturned;
   }
 
-  // Public wrapper to recalculate status without performing a return.
   Future<void> refreshInvoiceStatus(int saleInvoiceId) =>
       _db.transaction(() => _refreshInvoiceStatus(saleInvoiceId));
 }

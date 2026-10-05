@@ -5763,6 +5763,529 @@ class SupplierReturnIdempotencyCompanion
   }
 }
 
+class $CustomerInvoiceReturnIdempotencyTable
+    extends CustomerInvoiceReturnIdempotency
+    with
+        TableInfo<$CustomerInvoiceReturnIdempotencyTable,
+            CustomerInvoiceReturnIdempotencyData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CustomerInvoiceReturnIdempotencyTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idempotencyKeyMeta =
+      const VerificationMeta('idempotencyKey');
+  @override
+  late final GeneratedColumn<String> idempotencyKey = GeneratedColumn<String>(
+      'idempotency_key', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _fingerprintHashMeta =
+      const VerificationMeta('fingerprintHash');
+  @override
+  late final GeneratedColumn<String> fingerprintHash = GeneratedColumn<String>(
+      'fingerprint_hash', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _customerIdMeta =
+      const VerificationMeta('customerId');
+  @override
+  late final GeneratedColumn<int> customerId = GeneratedColumn<int>(
+      'customer_id', aliasedName, true,
+      type: DriftSqlType.int, requiredDuringInsert: false);
+  static const VerificationMeta _saleInvoiceIdMeta =
+      const VerificationMeta('saleInvoiceId');
+  @override
+  late final GeneratedColumn<int> saleInvoiceId = GeneratedColumn<int>(
+      'sale_invoice_id', aliasedName, false,
+      type: DriftSqlType.int, requiredDuringInsert: true);
+  static const VerificationMeta _returnTypeMeta =
+      const VerificationMeta('returnType');
+  @override
+  late final GeneratedColumn<String> returnType = GeneratedColumn<String>(
+      'return_type', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _customerReturnIdMeta =
+      const VerificationMeta('customerReturnId');
+  @override
+  late final GeneratedColumn<int> customerReturnId = GeneratedColumn<int>(
+      'customer_return_id', aliasedName, true,
+      type: DriftSqlType.int, requiredDuringInsert: false);
+  static const VerificationMeta _primaryReferenceIdMeta =
+      const VerificationMeta('primaryReferenceId');
+  @override
+  late final GeneratedColumn<int> primaryReferenceId = GeneratedColumn<int>(
+      'primary_reference_id', aliasedName, true,
+      type: DriftSqlType.int, requiredDuringInsert: false);
+  static const VerificationMeta _executionPathMeta =
+      const VerificationMeta('executionPath');
+  @override
+  late final GeneratedColumn<String> executionPath = GeneratedColumn<String>(
+      'execution_path', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _createdAtMeta =
+      const VerificationMeta('createdAt');
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+      'created_at', aliasedName, false,
+      type: DriftSqlType.dateTime,
+      requiredDuringInsert: false,
+      defaultValue: currentDateAndTime);
+  @override
+  List<GeneratedColumn> get $columns => [
+        idempotencyKey,
+        fingerprintHash,
+        customerId,
+        saleInvoiceId,
+        returnType,
+        customerReturnId,
+        primaryReferenceId,
+        executionPath,
+        createdAt
+      ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'customer_invoice_return_idempotency';
+  @override
+  VerificationContext validateIntegrity(
+      Insertable<CustomerInvoiceReturnIdempotencyData> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('idempotency_key')) {
+      context.handle(
+          _idempotencyKeyMeta,
+          idempotencyKey.isAcceptableOrUnknown(
+              data['idempotency_key']!, _idempotencyKeyMeta));
+    } else if (isInserting) {
+      context.missing(_idempotencyKeyMeta);
+    }
+    if (data.containsKey('fingerprint_hash')) {
+      context.handle(
+          _fingerprintHashMeta,
+          fingerprintHash.isAcceptableOrUnknown(
+              data['fingerprint_hash']!, _fingerprintHashMeta));
+    } else if (isInserting) {
+      context.missing(_fingerprintHashMeta);
+    }
+    if (data.containsKey('customer_id')) {
+      context.handle(
+          _customerIdMeta,
+          customerId.isAcceptableOrUnknown(
+              data['customer_id']!, _customerIdMeta));
+    }
+    if (data.containsKey('sale_invoice_id')) {
+      context.handle(
+          _saleInvoiceIdMeta,
+          saleInvoiceId.isAcceptableOrUnknown(
+              data['sale_invoice_id']!, _saleInvoiceIdMeta));
+    } else if (isInserting) {
+      context.missing(_saleInvoiceIdMeta);
+    }
+    if (data.containsKey('return_type')) {
+      context.handle(
+          _returnTypeMeta,
+          returnType.isAcceptableOrUnknown(
+              data['return_type']!, _returnTypeMeta));
+    } else if (isInserting) {
+      context.missing(_returnTypeMeta);
+    }
+    if (data.containsKey('customer_return_id')) {
+      context.handle(
+          _customerReturnIdMeta,
+          customerReturnId.isAcceptableOrUnknown(
+              data['customer_return_id']!, _customerReturnIdMeta));
+    }
+    if (data.containsKey('primary_reference_id')) {
+      context.handle(
+          _primaryReferenceIdMeta,
+          primaryReferenceId.isAcceptableOrUnknown(
+              data['primary_reference_id']!, _primaryReferenceIdMeta));
+    }
+    if (data.containsKey('execution_path')) {
+      context.handle(
+          _executionPathMeta,
+          executionPath.isAcceptableOrUnknown(
+              data['execution_path']!, _executionPathMeta));
+    } else if (isInserting) {
+      context.missing(_executionPathMeta);
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(_createdAtMeta,
+          createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {idempotencyKey};
+  @override
+  CustomerInvoiceReturnIdempotencyData map(Map<String, dynamic> data,
+      {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return CustomerInvoiceReturnIdempotencyData(
+      idempotencyKey: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}idempotency_key'])!,
+      fingerprintHash: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}fingerprint_hash'])!,
+      customerId: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}customer_id']),
+      saleInvoiceId: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}sale_invoice_id'])!,
+      returnType: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}return_type'])!,
+      customerReturnId: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}customer_return_id']),
+      primaryReferenceId: attachedDatabase.typeMapping.read(
+          DriftSqlType.int, data['${effectivePrefix}primary_reference_id']),
+      executionPath: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}execution_path'])!,
+      createdAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
+    );
+  }
+
+  @override
+  $CustomerInvoiceReturnIdempotencyTable createAlias(String alias) {
+    return $CustomerInvoiceReturnIdempotencyTable(attachedDatabase, alias);
+  }
+}
+
+class CustomerInvoiceReturnIdempotencyData extends DataClass
+    implements Insertable<CustomerInvoiceReturnIdempotencyData> {
+  final String idempotencyKey;
+  final String fingerprintHash;
+  final int? customerId;
+  final int saleInvoiceId;
+  final String returnType;
+  final int? customerReturnId;
+  final int? primaryReferenceId;
+  final String executionPath;
+  final DateTime createdAt;
+  const CustomerInvoiceReturnIdempotencyData(
+      {required this.idempotencyKey,
+      required this.fingerprintHash,
+      this.customerId,
+      required this.saleInvoiceId,
+      required this.returnType,
+      this.customerReturnId,
+      this.primaryReferenceId,
+      required this.executionPath,
+      required this.createdAt});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['idempotency_key'] = Variable<String>(idempotencyKey);
+    map['fingerprint_hash'] = Variable<String>(fingerprintHash);
+    if (!nullToAbsent || customerId != null) {
+      map['customer_id'] = Variable<int>(customerId);
+    }
+    map['sale_invoice_id'] = Variable<int>(saleInvoiceId);
+    map['return_type'] = Variable<String>(returnType);
+    if (!nullToAbsent || customerReturnId != null) {
+      map['customer_return_id'] = Variable<int>(customerReturnId);
+    }
+    if (!nullToAbsent || primaryReferenceId != null) {
+      map['primary_reference_id'] = Variable<int>(primaryReferenceId);
+    }
+    map['execution_path'] = Variable<String>(executionPath);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    return map;
+  }
+
+  CustomerInvoiceReturnIdempotencyCompanion toCompanion(bool nullToAbsent) {
+    return CustomerInvoiceReturnIdempotencyCompanion(
+      idempotencyKey: Value(idempotencyKey),
+      fingerprintHash: Value(fingerprintHash),
+      customerId: customerId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(customerId),
+      saleInvoiceId: Value(saleInvoiceId),
+      returnType: Value(returnType),
+      customerReturnId: customerReturnId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(customerReturnId),
+      primaryReferenceId: primaryReferenceId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(primaryReferenceId),
+      executionPath: Value(executionPath),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory CustomerInvoiceReturnIdempotencyData.fromJson(
+      Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return CustomerInvoiceReturnIdempotencyData(
+      idempotencyKey: serializer.fromJson<String>(json['idempotencyKey']),
+      fingerprintHash: serializer.fromJson<String>(json['fingerprintHash']),
+      customerId: serializer.fromJson<int?>(json['customerId']),
+      saleInvoiceId: serializer.fromJson<int>(json['saleInvoiceId']),
+      returnType: serializer.fromJson<String>(json['returnType']),
+      customerReturnId: serializer.fromJson<int?>(json['customerReturnId']),
+      primaryReferenceId: serializer.fromJson<int?>(json['primaryReferenceId']),
+      executionPath: serializer.fromJson<String>(json['executionPath']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'idempotencyKey': serializer.toJson<String>(idempotencyKey),
+      'fingerprintHash': serializer.toJson<String>(fingerprintHash),
+      'customerId': serializer.toJson<int?>(customerId),
+      'saleInvoiceId': serializer.toJson<int>(saleInvoiceId),
+      'returnType': serializer.toJson<String>(returnType),
+      'customerReturnId': serializer.toJson<int?>(customerReturnId),
+      'primaryReferenceId': serializer.toJson<int?>(primaryReferenceId),
+      'executionPath': serializer.toJson<String>(executionPath),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+    };
+  }
+
+  CustomerInvoiceReturnIdempotencyData copyWith(
+          {String? idempotencyKey,
+          String? fingerprintHash,
+          Value<int?> customerId = const Value.absent(),
+          int? saleInvoiceId,
+          String? returnType,
+          Value<int?> customerReturnId = const Value.absent(),
+          Value<int?> primaryReferenceId = const Value.absent(),
+          String? executionPath,
+          DateTime? createdAt}) =>
+      CustomerInvoiceReturnIdempotencyData(
+        idempotencyKey: idempotencyKey ?? this.idempotencyKey,
+        fingerprintHash: fingerprintHash ?? this.fingerprintHash,
+        customerId: customerId.present ? customerId.value : this.customerId,
+        saleInvoiceId: saleInvoiceId ?? this.saleInvoiceId,
+        returnType: returnType ?? this.returnType,
+        customerReturnId: customerReturnId.present
+            ? customerReturnId.value
+            : this.customerReturnId,
+        primaryReferenceId: primaryReferenceId.present
+            ? primaryReferenceId.value
+            : this.primaryReferenceId,
+        executionPath: executionPath ?? this.executionPath,
+        createdAt: createdAt ?? this.createdAt,
+      );
+  CustomerInvoiceReturnIdempotencyData copyWithCompanion(
+      CustomerInvoiceReturnIdempotencyCompanion data) {
+    return CustomerInvoiceReturnIdempotencyData(
+      idempotencyKey: data.idempotencyKey.present
+          ? data.idempotencyKey.value
+          : this.idempotencyKey,
+      fingerprintHash: data.fingerprintHash.present
+          ? data.fingerprintHash.value
+          : this.fingerprintHash,
+      customerId:
+          data.customerId.present ? data.customerId.value : this.customerId,
+      saleInvoiceId: data.saleInvoiceId.present
+          ? data.saleInvoiceId.value
+          : this.saleInvoiceId,
+      returnType:
+          data.returnType.present ? data.returnType.value : this.returnType,
+      customerReturnId: data.customerReturnId.present
+          ? data.customerReturnId.value
+          : this.customerReturnId,
+      primaryReferenceId: data.primaryReferenceId.present
+          ? data.primaryReferenceId.value
+          : this.primaryReferenceId,
+      executionPath: data.executionPath.present
+          ? data.executionPath.value
+          : this.executionPath,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CustomerInvoiceReturnIdempotencyData(')
+          ..write('idempotencyKey: $idempotencyKey, ')
+          ..write('fingerprintHash: $fingerprintHash, ')
+          ..write('customerId: $customerId, ')
+          ..write('saleInvoiceId: $saleInvoiceId, ')
+          ..write('returnType: $returnType, ')
+          ..write('customerReturnId: $customerReturnId, ')
+          ..write('primaryReferenceId: $primaryReferenceId, ')
+          ..write('executionPath: $executionPath, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+      idempotencyKey,
+      fingerprintHash,
+      customerId,
+      saleInvoiceId,
+      returnType,
+      customerReturnId,
+      primaryReferenceId,
+      executionPath,
+      createdAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is CustomerInvoiceReturnIdempotencyData &&
+          other.idempotencyKey == this.idempotencyKey &&
+          other.fingerprintHash == this.fingerprintHash &&
+          other.customerId == this.customerId &&
+          other.saleInvoiceId == this.saleInvoiceId &&
+          other.returnType == this.returnType &&
+          other.customerReturnId == this.customerReturnId &&
+          other.primaryReferenceId == this.primaryReferenceId &&
+          other.executionPath == this.executionPath &&
+          other.createdAt == this.createdAt);
+}
+
+class CustomerInvoiceReturnIdempotencyCompanion
+    extends UpdateCompanion<CustomerInvoiceReturnIdempotencyData> {
+  final Value<String> idempotencyKey;
+  final Value<String> fingerprintHash;
+  final Value<int?> customerId;
+  final Value<int> saleInvoiceId;
+  final Value<String> returnType;
+  final Value<int?> customerReturnId;
+  final Value<int?> primaryReferenceId;
+  final Value<String> executionPath;
+  final Value<DateTime> createdAt;
+  final Value<int> rowid;
+  const CustomerInvoiceReturnIdempotencyCompanion({
+    this.idempotencyKey = const Value.absent(),
+    this.fingerprintHash = const Value.absent(),
+    this.customerId = const Value.absent(),
+    this.saleInvoiceId = const Value.absent(),
+    this.returnType = const Value.absent(),
+    this.customerReturnId = const Value.absent(),
+    this.primaryReferenceId = const Value.absent(),
+    this.executionPath = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  CustomerInvoiceReturnIdempotencyCompanion.insert({
+    required String idempotencyKey,
+    required String fingerprintHash,
+    this.customerId = const Value.absent(),
+    required int saleInvoiceId,
+    required String returnType,
+    this.customerReturnId = const Value.absent(),
+    this.primaryReferenceId = const Value.absent(),
+    required String executionPath,
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  })  : idempotencyKey = Value(idempotencyKey),
+        fingerprintHash = Value(fingerprintHash),
+        saleInvoiceId = Value(saleInvoiceId),
+        returnType = Value(returnType),
+        executionPath = Value(executionPath);
+  static Insertable<CustomerInvoiceReturnIdempotencyData> custom({
+    Expression<String>? idempotencyKey,
+    Expression<String>? fingerprintHash,
+    Expression<int>? customerId,
+    Expression<int>? saleInvoiceId,
+    Expression<String>? returnType,
+    Expression<int>? customerReturnId,
+    Expression<int>? primaryReferenceId,
+    Expression<String>? executionPath,
+    Expression<DateTime>? createdAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (idempotencyKey != null) 'idempotency_key': idempotencyKey,
+      if (fingerprintHash != null) 'fingerprint_hash': fingerprintHash,
+      if (customerId != null) 'customer_id': customerId,
+      if (saleInvoiceId != null) 'sale_invoice_id': saleInvoiceId,
+      if (returnType != null) 'return_type': returnType,
+      if (customerReturnId != null) 'customer_return_id': customerReturnId,
+      if (primaryReferenceId != null)
+        'primary_reference_id': primaryReferenceId,
+      if (executionPath != null) 'execution_path': executionPath,
+      if (createdAt != null) 'created_at': createdAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  CustomerInvoiceReturnIdempotencyCompanion copyWith(
+      {Value<String>? idempotencyKey,
+      Value<String>? fingerprintHash,
+      Value<int?>? customerId,
+      Value<int>? saleInvoiceId,
+      Value<String>? returnType,
+      Value<int?>? customerReturnId,
+      Value<int?>? primaryReferenceId,
+      Value<String>? executionPath,
+      Value<DateTime>? createdAt,
+      Value<int>? rowid}) {
+    return CustomerInvoiceReturnIdempotencyCompanion(
+      idempotencyKey: idempotencyKey ?? this.idempotencyKey,
+      fingerprintHash: fingerprintHash ?? this.fingerprintHash,
+      customerId: customerId ?? this.customerId,
+      saleInvoiceId: saleInvoiceId ?? this.saleInvoiceId,
+      returnType: returnType ?? this.returnType,
+      customerReturnId: customerReturnId ?? this.customerReturnId,
+      primaryReferenceId: primaryReferenceId ?? this.primaryReferenceId,
+      executionPath: executionPath ?? this.executionPath,
+      createdAt: createdAt ?? this.createdAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (idempotencyKey.present) {
+      map['idempotency_key'] = Variable<String>(idempotencyKey.value);
+    }
+    if (fingerprintHash.present) {
+      map['fingerprint_hash'] = Variable<String>(fingerprintHash.value);
+    }
+    if (customerId.present) {
+      map['customer_id'] = Variable<int>(customerId.value);
+    }
+    if (saleInvoiceId.present) {
+      map['sale_invoice_id'] = Variable<int>(saleInvoiceId.value);
+    }
+    if (returnType.present) {
+      map['return_type'] = Variable<String>(returnType.value);
+    }
+    if (customerReturnId.present) {
+      map['customer_return_id'] = Variable<int>(customerReturnId.value);
+    }
+    if (primaryReferenceId.present) {
+      map['primary_reference_id'] = Variable<int>(primaryReferenceId.value);
+    }
+    if (executionPath.present) {
+      map['execution_path'] = Variable<String>(executionPath.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CustomerInvoiceReturnIdempotencyCompanion(')
+          ..write('idempotencyKey: $idempotencyKey, ')
+          ..write('fingerprintHash: $fingerprintHash, ')
+          ..write('customerId: $customerId, ')
+          ..write('saleInvoiceId: $saleInvoiceId, ')
+          ..write('returnType: $returnType, ')
+          ..write('customerReturnId: $customerReturnId, ')
+          ..write('primaryReferenceId: $primaryReferenceId, ')
+          ..write('executionPath: $executionPath, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $SupplierAccountsTable extends SupplierAccounts
     with TableInfo<$SupplierAccountsTable, SupplierAccount> {
   @override
@@ -22014,6 +22537,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       $CustomerManualReturnIdempotencyTable(this);
   late final $SupplierReturnIdempotencyTable supplierReturnIdempotency =
       $SupplierReturnIdempotencyTable(this);
+  late final $CustomerInvoiceReturnIdempotencyTable
+      customerInvoiceReturnIdempotency =
+      $CustomerInvoiceReturnIdempotencyTable(this);
   late final $SupplierAccountsTable supplierAccounts =
       $SupplierAccountsTable(this);
   late final $SupplierTransactionsTable supplierTransactions =
@@ -22092,6 +22618,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       CustomerManualReturnIdempotencyDao(this as AppDatabase);
   late final SupplierReturnIdempotencyDao supplierReturnIdempotencyDao =
       SupplierReturnIdempotencyDao(this as AppDatabase);
+  late final CustomerInvoiceReturnIdempotencyDao
+      customerInvoiceReturnIdempotencyDao =
+      CustomerInvoiceReturnIdempotencyDao(this as AppDatabase);
   late final SupplierAccountsDao supplierAccountsDao =
       SupplierAccountsDao(this as AppDatabase);
   late final ProductsDao productsDao = ProductsDao(this as AppDatabase);
@@ -22132,6 +22661,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         customerQuickReturnIdempotency,
         customerManualReturnIdempotency,
         supplierReturnIdempotency,
+        customerInvoiceReturnIdempotency,
         supplierAccounts,
         supplierTransactions,
         products,
@@ -26201,6 +26731,257 @@ typedef $$SupplierReturnIdempotencyTableProcessedTableManager
               SupplierReturnIdempotencyData>
         ),
         SupplierReturnIdempotencyData,
+        PrefetchHooks Function()>;
+typedef $$CustomerInvoiceReturnIdempotencyTableCreateCompanionBuilder
+    = CustomerInvoiceReturnIdempotencyCompanion Function({
+  required String idempotencyKey,
+  required String fingerprintHash,
+  Value<int?> customerId,
+  required int saleInvoiceId,
+  required String returnType,
+  Value<int?> customerReturnId,
+  Value<int?> primaryReferenceId,
+  required String executionPath,
+  Value<DateTime> createdAt,
+  Value<int> rowid,
+});
+typedef $$CustomerInvoiceReturnIdempotencyTableUpdateCompanionBuilder
+    = CustomerInvoiceReturnIdempotencyCompanion Function({
+  Value<String> idempotencyKey,
+  Value<String> fingerprintHash,
+  Value<int?> customerId,
+  Value<int> saleInvoiceId,
+  Value<String> returnType,
+  Value<int?> customerReturnId,
+  Value<int?> primaryReferenceId,
+  Value<String> executionPath,
+  Value<DateTime> createdAt,
+  Value<int> rowid,
+});
+
+class $$CustomerInvoiceReturnIdempotencyTableFilterComposer
+    extends Composer<_$AppDatabase, $CustomerInvoiceReturnIdempotencyTable> {
+  $$CustomerInvoiceReturnIdempotencyTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get idempotencyKey => $composableBuilder(
+      column: $table.idempotencyKey,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get fingerprintHash => $composableBuilder(
+      column: $table.fingerprintHash,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get customerId => $composableBuilder(
+      column: $table.customerId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get saleInvoiceId => $composableBuilder(
+      column: $table.saleInvoiceId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get returnType => $composableBuilder(
+      column: $table.returnType, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get customerReturnId => $composableBuilder(
+      column: $table.customerReturnId,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get primaryReferenceId => $composableBuilder(
+      column: $table.primaryReferenceId,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get executionPath => $composableBuilder(
+      column: $table.executionPath, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnFilters(column));
+}
+
+class $$CustomerInvoiceReturnIdempotencyTableOrderingComposer
+    extends Composer<_$AppDatabase, $CustomerInvoiceReturnIdempotencyTable> {
+  $$CustomerInvoiceReturnIdempotencyTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get idempotencyKey => $composableBuilder(
+      column: $table.idempotencyKey,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get fingerprintHash => $composableBuilder(
+      column: $table.fingerprintHash,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get customerId => $composableBuilder(
+      column: $table.customerId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get saleInvoiceId => $composableBuilder(
+      column: $table.saleInvoiceId,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get returnType => $composableBuilder(
+      column: $table.returnType, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get customerReturnId => $composableBuilder(
+      column: $table.customerReturnId,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get primaryReferenceId => $composableBuilder(
+      column: $table.primaryReferenceId,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get executionPath => $composableBuilder(
+      column: $table.executionPath,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnOrderings(column));
+}
+
+class $$CustomerInvoiceReturnIdempotencyTableAnnotationComposer
+    extends Composer<_$AppDatabase, $CustomerInvoiceReturnIdempotencyTable> {
+  $$CustomerInvoiceReturnIdempotencyTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get idempotencyKey => $composableBuilder(
+      column: $table.idempotencyKey, builder: (column) => column);
+
+  GeneratedColumn<String> get fingerprintHash => $composableBuilder(
+      column: $table.fingerprintHash, builder: (column) => column);
+
+  GeneratedColumn<int> get customerId => $composableBuilder(
+      column: $table.customerId, builder: (column) => column);
+
+  GeneratedColumn<int> get saleInvoiceId => $composableBuilder(
+      column: $table.saleInvoiceId, builder: (column) => column);
+
+  GeneratedColumn<String> get returnType => $composableBuilder(
+      column: $table.returnType, builder: (column) => column);
+
+  GeneratedColumn<int> get customerReturnId => $composableBuilder(
+      column: $table.customerReturnId, builder: (column) => column);
+
+  GeneratedColumn<int> get primaryReferenceId => $composableBuilder(
+      column: $table.primaryReferenceId, builder: (column) => column);
+
+  GeneratedColumn<String> get executionPath => $composableBuilder(
+      column: $table.executionPath, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+}
+
+class $$CustomerInvoiceReturnIdempotencyTableTableManager
+    extends RootTableManager<
+        _$AppDatabase,
+        $CustomerInvoiceReturnIdempotencyTable,
+        CustomerInvoiceReturnIdempotencyData,
+        $$CustomerInvoiceReturnIdempotencyTableFilterComposer,
+        $$CustomerInvoiceReturnIdempotencyTableOrderingComposer,
+        $$CustomerInvoiceReturnIdempotencyTableAnnotationComposer,
+        $$CustomerInvoiceReturnIdempotencyTableCreateCompanionBuilder,
+        $$CustomerInvoiceReturnIdempotencyTableUpdateCompanionBuilder,
+        (
+          CustomerInvoiceReturnIdempotencyData,
+          BaseReferences<_$AppDatabase, $CustomerInvoiceReturnIdempotencyTable,
+              CustomerInvoiceReturnIdempotencyData>
+        ),
+        CustomerInvoiceReturnIdempotencyData,
+        PrefetchHooks Function()> {
+  $$CustomerInvoiceReturnIdempotencyTableTableManager(
+      _$AppDatabase db, $CustomerInvoiceReturnIdempotencyTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CustomerInvoiceReturnIdempotencyTableFilterComposer(
+                  $db: db, $table: table),
+          createOrderingComposer: () =>
+              $$CustomerInvoiceReturnIdempotencyTableOrderingComposer(
+                  $db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$CustomerInvoiceReturnIdempotencyTableAnnotationComposer(
+                  $db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<String> idempotencyKey = const Value.absent(),
+            Value<String> fingerprintHash = const Value.absent(),
+            Value<int?> customerId = const Value.absent(),
+            Value<int> saleInvoiceId = const Value.absent(),
+            Value<String> returnType = const Value.absent(),
+            Value<int?> customerReturnId = const Value.absent(),
+            Value<int?> primaryReferenceId = const Value.absent(),
+            Value<String> executionPath = const Value.absent(),
+            Value<DateTime> createdAt = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              CustomerInvoiceReturnIdempotencyCompanion(
+            idempotencyKey: idempotencyKey,
+            fingerprintHash: fingerprintHash,
+            customerId: customerId,
+            saleInvoiceId: saleInvoiceId,
+            returnType: returnType,
+            customerReturnId: customerReturnId,
+            primaryReferenceId: primaryReferenceId,
+            executionPath: executionPath,
+            createdAt: createdAt,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            required String idempotencyKey,
+            required String fingerprintHash,
+            Value<int?> customerId = const Value.absent(),
+            required int saleInvoiceId,
+            required String returnType,
+            Value<int?> customerReturnId = const Value.absent(),
+            Value<int?> primaryReferenceId = const Value.absent(),
+            required String executionPath,
+            Value<DateTime> createdAt = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              CustomerInvoiceReturnIdempotencyCompanion.insert(
+            idempotencyKey: idempotencyKey,
+            fingerprintHash: fingerprintHash,
+            customerId: customerId,
+            saleInvoiceId: saleInvoiceId,
+            returnType: returnType,
+            customerReturnId: customerReturnId,
+            primaryReferenceId: primaryReferenceId,
+            executionPath: executionPath,
+            createdAt: createdAt,
+            rowid: rowid,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$CustomerInvoiceReturnIdempotencyTableProcessedTableManager
+    = ProcessedTableManager<
+        _$AppDatabase,
+        $CustomerInvoiceReturnIdempotencyTable,
+        CustomerInvoiceReturnIdempotencyData,
+        $$CustomerInvoiceReturnIdempotencyTableFilterComposer,
+        $$CustomerInvoiceReturnIdempotencyTableOrderingComposer,
+        $$CustomerInvoiceReturnIdempotencyTableAnnotationComposer,
+        $$CustomerInvoiceReturnIdempotencyTableCreateCompanionBuilder,
+        $$CustomerInvoiceReturnIdempotencyTableUpdateCompanionBuilder,
+        (
+          CustomerInvoiceReturnIdempotencyData,
+          BaseReferences<_$AppDatabase, $CustomerInvoiceReturnIdempotencyTable,
+              CustomerInvoiceReturnIdempotencyData>
+        ),
+        CustomerInvoiceReturnIdempotencyData,
         PrefetchHooks Function()>;
 typedef $$SupplierAccountsTableCreateCompanionBuilder
     = SupplierAccountsCompanion Function({
@@ -39411,6 +40192,10 @@ class $AppDatabaseManager {
   $$SupplierReturnIdempotencyTableTableManager get supplierReturnIdempotency =>
       $$SupplierReturnIdempotencyTableTableManager(
           _db, _db.supplierReturnIdempotency);
+  $$CustomerInvoiceReturnIdempotencyTableTableManager
+      get customerInvoiceReturnIdempotency =>
+          $$CustomerInvoiceReturnIdempotencyTableTableManager(
+              _db, _db.customerInvoiceReturnIdempotency);
   $$SupplierAccountsTableTableManager get supplierAccounts =>
       $$SupplierAccountsTableTableManager(_db, _db.supplierAccounts);
   $$SupplierTransactionsTableTableManager get supplierTransactions =>

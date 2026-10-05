@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart' hide TextDirection;
+import 'package:uuid/uuid.dart';
 
 import '../../../core/constants/invoice_lifecycle.dart';
 import '../../../core/database/app_database.dart';
+import '../../../core/services/customer_invoice_return_fingerprint.dart';
+import '../../../core/services/customer_invoice_return_idempotency_conflict_exception.dart';
 import '../../../core/services/partial_return_service.dart';
 import '../../../core/activity/activity_categories.dart';
 import '../../../core/activity/activity_types.dart';
@@ -21,6 +24,7 @@ import '../../products/providers/products_provider.dart';
 import '../../customers/screens/widgets/customer_credit_refund_entry.dart';
 import '../../returns/models/customer_return_history_models.dart';
 import '../../returns/providers/customer_return_detail_provider.dart';
+import '../../returns/providers/customer_invoice_return_service_provider.dart';
 import '../../returns/providers/partial_return_provider.dart';
 import '../../returns/providers/return_analytics_provider.dart';
 import '../../returns/screens/customer_returns_screen.dart';
@@ -64,8 +68,17 @@ class InvoiceDetailsDialog extends ConsumerStatefulWidget {
       _InvoiceDetailsDialogState();
 }
 
+const _invoiceReturnUuid = Uuid();
+
 class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
   bool _returning = false;
+  String? _fullReturnIdempotencyKey;
+  String? _pendingFullFingerprint;
+
+  void _clearFullSubmitAttempt() {
+    _fullReturnIdempotencyKey = null;
+    _pendingFullFingerprint = null;
+  }
 
   Future<void> _reprint(BuildContext context, InvoiceDetailData data) async {
     final messenger = ScaffoldMessenger.maybeOf(context);
@@ -165,14 +178,41 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
       return;
     }
 
+    final invoice =
+        await AppDatabase.instance.salesDao.getInvoiceById(widget.invoiceId);
+    if (invoice == null) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        const SnackBar(
+          content: Text('الفاتورة غير موجودة'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+
+    final fingerprint = CustomerInvoiceReturnFingerprint.computeFull(
+      customerId: invoice.customerId,
+      saleInvoiceId: widget.invoiceId,
+      note: note,
+    );
+    if (_pendingFullFingerprint != null &&
+        _pendingFullFingerprint != fingerprint) {
+      _clearFullSubmitAttempt();
+    }
+    _pendingFullFingerprint = fingerprint;
+    _fullReturnIdempotencyKey ??= _invoiceReturnUuid.v4();
+
     setState(() => _returning = true);
     try {
-      await AppDatabase.instance.returnsDao.returnFullSaleInvoice(
-        widget.invoiceId,
-        note: note,
-        returnedByUserId: userId,
-      );
+      await ref.read(customerInvoiceReturnServiceProvider).processFullReturn(
+            idempotencyKey: _fullReturnIdempotencyKey!,
+            saleInvoiceId: widget.invoiceId,
+            returnedByUserId: userId,
+            note: note,
+          );
 
+      _clearFullSubmitAttempt();
       ref.invalidate(invoiceDetailProvider(widget.invoiceId));
       ref.invalidate(invoicePartialReturnQtysProvider(widget.invoiceId));
       ref.invalidate(invoiceLinkedCustomerReturnProvider(widget.invoiceId));
@@ -187,6 +227,17 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
         const SnackBar(
           content: Text('تم إرجاع الفاتورة بنجاح واستعادة المخزون.'),
           backgroundColor: AppColors.success,
+        ),
+      );
+    } on CustomerInvoiceReturnIdempotencyConflictException {
+      if (!context.mounted) return;
+      _clearFullSubmitAttempt();
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        const SnackBar(
+          content: Text(
+            'تعارض في عملية المرتجع. أعد فتح نافذة الفاتورة وحاول مرة أخرى.',
+          ),
+          backgroundColor: AppColors.error,
         ),
       );
     } on StateError catch (e) {
@@ -617,12 +668,21 @@ class _PartialReturnSection extends ConsumerStatefulWidget {
 class _PartialReturnSectionState extends ConsumerState<_PartialReturnSection> {
   final Map<int, TextEditingController> _controllers = {};
   bool _submitting = false;
+  String? _submitIdempotencyKey;
+  String? _pendingPartialFingerprint;
+
+  void _clearSubmitAttempt() {
+    _submitIdempotencyKey = null;
+    _pendingPartialFingerprint = null;
+  }
 
   @override
   void initState() {
     super.initState();
     for (final line in widget.lines) {
-      _controllers[line.id] = TextEditingController();
+      final controller = TextEditingController();
+      controller.addListener(_clearSubmitAttempt);
+      _controllers[line.id] = controller;
     }
   }
 
@@ -814,16 +874,52 @@ class _PartialReturnSectionState extends ConsumerState<_PartialReturnSection> {
       return;
     }
 
+    final invoice =
+        await AppDatabase.instance.salesDao.getInvoiceById(widget.invoiceId);
+    if (invoice == null) {
+      _showError(context, 'الفاتورة غير موجودة');
+      return;
+    }
+
+    final partialLines = lines
+        .map(
+          (line) => CustomerInvoicePartialReturnLine(
+            saleItemId: line.saleItemId,
+            quantity: line.quantity,
+          ),
+        )
+        .toList();
+    final fingerprint = CustomerInvoiceReturnFingerprint.computePartial(
+      customerId: invoice.customerId,
+      saleInvoiceId: widget.invoiceId,
+      lines: partialLines
+          .map(
+            (line) => CustomerInvoicePartialReturnLineInput(
+              saleItemId: line.saleItemId,
+              quantity: line.quantity,
+            ),
+          )
+          .toList(),
+      note: note,
+    );
+    if (_pendingPartialFingerprint != null &&
+        _pendingPartialFingerprint != fingerprint) {
+      _clearSubmitAttempt();
+    }
+    _pendingPartialFingerprint = fingerprint;
+    _submitIdempotencyKey ??= _invoiceReturnUuid.v4();
+
     setState(() => _submitting = true);
     try {
-      await ref.read(partialReturnServiceProvider).processPartialReturn(
+      await ref.read(customerInvoiceReturnServiceProvider).processPartialReturn(
+            idempotencyKey: _submitIdempotencyKey!,
             saleInvoiceId: widget.invoiceId,
-            lines: lines,
+            lines: partialLines,
             returnedByUserId: userId,
             note: note,
           );
 
-      // Clear all inputs
+      _clearSubmitAttempt();
       for (final c in _controllers.values) {
         c.clear();
       }
@@ -838,6 +934,13 @@ class _PartialReturnSectionState extends ConsumerState<_PartialReturnSection> {
 
       // Tell parent dialog to invalidate & reload
       widget.onDone();
+    } on CustomerInvoiceReturnIdempotencyConflictException {
+      if (!context.mounted) return;
+      _clearSubmitAttempt();
+      _showError(
+        context,
+        'تعارض في عملية المرتجع. أعد فتح نافذة الفاتورة وحاول مرة أخرى.',
+      );
     } on StateError catch (e) {
       if (!context.mounted) return;
       _showError(context, e.message);

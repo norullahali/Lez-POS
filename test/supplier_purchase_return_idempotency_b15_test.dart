@@ -626,7 +626,7 @@ void main() {
       final migrated = AppDatabase.test(NativeDatabase.opened(opened.rawDb));
       addTearDown(() async => migrated.close());
 
-      expect(migrated.schemaVersion, 43);
+      expect(migrated.schemaVersion, 44);
       expect(await idempotencyTableExists(migrated), isTrue);
     });
 

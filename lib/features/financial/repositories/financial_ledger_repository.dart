@@ -17,6 +17,47 @@ class FinancialLedgerRepository {
 
   /// Core UNION — approved sources only; double-count guards embedded (Rules A–D).
   static const _unionSql = '''
+WITH invoice_goods AS (
+  SELECT invoice_id, SUM(returned_amount) AS total_goods
+  FROM return_audit_logs
+  WHERE invoice_id IS NOT NULL
+  GROUP BY invoice_id
+),
+invoice_credit AS (
+  SELECT si.id AS invoice_id,
+         COALESCE((
+           SELECT SUM(ABS(ct.amount))
+           FROM customer_transactions ct
+           WHERE ct.customer_id = si.customer_id
+             AND ct.type = 'RETURN'
+             AND (
+               ct.reference_id IN (
+                 SELECT id FROM customer_returns WHERE original_invoice_id = si.id
+               )
+               OR ct.reference_id IN (
+                 SELECT id FROM sale_item_returns WHERE sale_invoice_id = si.id
+               )
+             )
+         ), 0) AS total_credit
+  FROM sales_invoices si
+),
+invoice_cash AS (
+  SELECT
+    ig.invoice_id,
+    ig.total_goods,
+    ic.total_credit,
+    MAX(0, ig.total_goods - ic.total_credit) AS non_credit,
+    CASE
+      WHEN (si.cash_paid + si.card_paid) > 0.0001
+        THEN si.cash_paid / (si.cash_paid + si.card_paid)
+      WHEN si.debt_amount <= 0.0001
+        THEN 1.0
+      ELSE 0.0
+    END AS cash_weight
+  FROM invoice_goods ig
+  JOIN invoice_credit ic ON ic.invoice_id = ig.invoice_id
+  JOIN sales_invoices si ON si.id = ig.invoice_id
+)
 SELECT
   'SALE_CASH:' || si.id AS ledger_id,
   si.sale_date AS event_ts,
@@ -141,11 +182,22 @@ WHERE st.type = 'REFUND'
 
 UNION ALL
 
+-- B17 / C17-1: Invoice-linked RETURN_REFUND — non-credit cash portion only.
+-- Credit-only returns: invoice_cash_pool = 0 (actual RETURN sum equals goods sum).
+-- Mixed invoices: cash = (goods - credit) * cash_paid / (cash_paid + card_paid).
+-- Card refund portion is excluded from the cash ledger (same contract as card sales).
+-- Non-invoice returns (invoice_id IS NULL): full returned_amount (quick/manual).
+-- Uses actual posted RETURN totals (CustomerAccountsDao linkage), not B12 recompute.
 SELECT
   'RETURN_REFUND:' || ral.id,
   ral.created_at,
   'RETURN_REFUND',
-  ral.returned_amount,
+  CASE
+    WHEN ral.invoice_id IS NULL THEN ral.returned_amount
+    WHEN icas.total_goods > 0.0001 THEN
+      ral.returned_amount * icas.non_credit * icas.cash_weight / icas.total_goods
+    ELSE 0
+  END AS amount,
   'outflow',
   'return_audit_log',
   ral.id,
@@ -155,27 +207,13 @@ SELECT
   ral.invoice_id,
   ('مرتجع — ' || COALESCE(ral.return_type, 'return'))
 FROM return_audit_logs ral
-WHERE ral.returned_amount > 0
-  AND NOT EXISTS (
-    SELECT 1
-    FROM customer_transactions ct2
-    WHERE ct2.type = 'RETURN'
-      AND ral.invoice_id IS NOT NULL
-      AND (
-        EXISTS (
-          SELECT 1
-          FROM customer_returns cr
-          WHERE cr.id = ct2.reference_id
-            AND cr.original_invoice_id = ral.invoice_id
-        )
-        OR EXISTS (
-          SELECT 1
-          FROM sale_item_returns sir
-          WHERE sir.id = ct2.reference_id
-            AND sir.sale_invoice_id = ral.invoice_id
-        )
-      )
-  )
+LEFT JOIN invoice_cash icas ON icas.invoice_id = ral.invoice_id
+WHERE CASE
+    WHEN ral.invoice_id IS NULL THEN ral.returned_amount
+    WHEN icas.total_goods > 0.0001 THEN
+      ral.returned_amount * icas.non_credit * icas.cash_weight / icas.total_goods
+    ELSE 0
+  END > 0.0001
 
 UNION ALL
 

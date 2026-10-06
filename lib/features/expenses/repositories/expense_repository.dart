@@ -64,29 +64,6 @@ class ExpenseRepository {
     return rows.map(ExpenseCategory.fromDrift).toList();
   }
 
-  Future<int> createExpense(ExpenseRecord record) async {
-    final id = await _db.expensesDao.createExpense(
-      db.ExpenseRecordsCompanion(
-        categoryId: Value(record.categoryId),
-        amount: Value(record.amount),
-        expenseDate: Value(record.expenseDate),
-        paidAt: Value(record.paidAt),
-        notes: Value(record.notes),
-        sessionId: Value(record.sessionId),
-        createdBy: Value(record.createdBy),
-      ),
-    );
-    await _activityLogger.logEntityCreate(
-      activityType: ActivityTypes.expenseCreated,
-      category: ActivityCategories.financial,
-      entityType: 'expense_record',
-      entityId: id,
-      title: '\u062a\u0633\u062c\u064a\u0644 \u0645\u0635\u0631\u0648\u0641',
-      description: record.amount.toStringAsFixed(2),
-    );
-    return id;
-  }
-
   Future<void> updateExpense(ExpenseRecord record) async {
     if (record.id == null) {
       throw ArgumentError('ExpenseRecord.id is required for update');

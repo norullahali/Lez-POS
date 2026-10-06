@@ -47,7 +47,8 @@ class ExpensesDao extends DatabaseAccessor<AppDatabase>
       (select(expenseCategories)..where((c) => c.id.equals(id)))
           .getSingleOrNull();
 
-  Future<int> createExpense(ExpenseRecordsCompanion entry) =>
+  /// Inserts an expense record. Must run inside caller's transaction.
+  Future<int> createExpenseInTransaction(ExpenseRecordsCompanion entry) =>
       into(expenseRecords).insert(entry);
 
   Future<bool> updateExpense(ExpenseRecordsCompanion entry) =>

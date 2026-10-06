@@ -22,6 +22,7 @@ import 'tables/customer_quick_return_idempotency_table.dart';
 import 'tables/customer_manual_return_idempotency_table.dart';
 import 'tables/supplier_return_idempotency_table.dart';
 import 'tables/customer_invoice_return_idempotency_table.dart';
+import 'tables/expense_idempotency_table.dart';
 import 'tables/products_table.dart';
 import 'tables/product_batches_table.dart';
 import 'tables/stock_ledger_table.dart';
@@ -73,6 +74,7 @@ import 'daos/customer_quick_return_idempotency_dao.dart';
 import 'daos/customer_manual_return_idempotency_dao.dart';
 import 'daos/supplier_return_idempotency_dao.dart';
 import 'daos/customer_invoice_return_idempotency_dao.dart';
+import 'daos/expense_idempotency_dao.dart';
 import 'daos/supplier_accounts_dao.dart';
 import 'daos/products_dao.dart';
 import 'daos/stock_dao.dart';
@@ -101,6 +103,7 @@ part 'app_database.g.dart';
     CustomerManualReturnIdempotency,
     SupplierReturnIdempotency,
     CustomerInvoiceReturnIdempotency,
+    ExpenseIdempotency,
     SupplierAccounts,
     SupplierTransactions,
     Products,
@@ -152,6 +155,7 @@ part 'app_database.g.dart';
     CustomerManualReturnIdempotencyDao,
     SupplierReturnIdempotencyDao,
     CustomerInvoiceReturnIdempotencyDao,
+    ExpenseIdempotencyDao,
     SupplierAccountsDao,
     ProductsDao,
     StockDao,
@@ -186,7 +190,7 @@ class AppDatabase extends _$AppDatabase {
   late final pricingDao = PricingDao(this);
 
   @override
-  int get schemaVersion => 44;
+  int get schemaVersion => 45;
 
   @override
   MigrationStrategy get migration {
@@ -233,6 +237,10 @@ class AppDatabase extends _$AppDatabase {
         await customStatement(
           'CREATE INDEX IF NOT EXISTS cir_invoice_idx '
           'ON customer_invoice_return_idempotency (sale_invoice_id, created_at)',
+        );
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS ei_expense_record_idx '
+          'ON expense_idempotency (expense_record_id)',
         );
         // Enable foreign keys
         await customStatement('PRAGMA foreign_keys = ON');
@@ -1091,6 +1099,20 @@ class AppDatabase extends _$AppDatabase {
             rethrow;
           }
           debugPrint('[Migration v44] customer_invoice_return_idempotency ready');
+        }
+        if (from < 45) {
+          debugPrint('[Migration v45] expense_idempotency table...');
+          await m.createTable(expenseIdempotency);
+          try {
+            await customStatement(
+              'CREATE INDEX IF NOT EXISTS ei_expense_record_idx '
+              'ON expense_idempotency (expense_record_id)',
+            );
+          } catch (e) {
+            debugPrint('[Migration v45] idempotency index skip/error: $e');
+            rethrow;
+          }
+          debugPrint('[Migration v45] expense_idempotency ready');
         }
       },
       beforeOpen: (details) async {

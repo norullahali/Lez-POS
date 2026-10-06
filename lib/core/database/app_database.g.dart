@@ -6286,6 +6286,295 @@ class CustomerInvoiceReturnIdempotencyCompanion
   }
 }
 
+class $ExpenseIdempotencyTable extends ExpenseIdempotency
+    with TableInfo<$ExpenseIdempotencyTable, ExpenseIdempotencyData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ExpenseIdempotencyTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idempotencyKeyMeta =
+      const VerificationMeta('idempotencyKey');
+  @override
+  late final GeneratedColumn<String> idempotencyKey = GeneratedColumn<String>(
+      'idempotency_key', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _fingerprintHashMeta =
+      const VerificationMeta('fingerprintHash');
+  @override
+  late final GeneratedColumn<String> fingerprintHash = GeneratedColumn<String>(
+      'fingerprint_hash', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _expenseRecordIdMeta =
+      const VerificationMeta('expenseRecordId');
+  @override
+  late final GeneratedColumn<int> expenseRecordId = GeneratedColumn<int>(
+      'expense_record_id', aliasedName, false,
+      type: DriftSqlType.int, requiredDuringInsert: true);
+  static const VerificationMeta _createdAtMeta =
+      const VerificationMeta('createdAt');
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+      'created_at', aliasedName, false,
+      type: DriftSqlType.dateTime,
+      requiredDuringInsert: false,
+      defaultValue: currentDateAndTime);
+  @override
+  List<GeneratedColumn> get $columns =>
+      [idempotencyKey, fingerprintHash, expenseRecordId, createdAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'expense_idempotency';
+  @override
+  VerificationContext validateIntegrity(
+      Insertable<ExpenseIdempotencyData> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('idempotency_key')) {
+      context.handle(
+          _idempotencyKeyMeta,
+          idempotencyKey.isAcceptableOrUnknown(
+              data['idempotency_key']!, _idempotencyKeyMeta));
+    } else if (isInserting) {
+      context.missing(_idempotencyKeyMeta);
+    }
+    if (data.containsKey('fingerprint_hash')) {
+      context.handle(
+          _fingerprintHashMeta,
+          fingerprintHash.isAcceptableOrUnknown(
+              data['fingerprint_hash']!, _fingerprintHashMeta));
+    } else if (isInserting) {
+      context.missing(_fingerprintHashMeta);
+    }
+    if (data.containsKey('expense_record_id')) {
+      context.handle(
+          _expenseRecordIdMeta,
+          expenseRecordId.isAcceptableOrUnknown(
+              data['expense_record_id']!, _expenseRecordIdMeta));
+    } else if (isInserting) {
+      context.missing(_expenseRecordIdMeta);
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(_createdAtMeta,
+          createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {idempotencyKey};
+  @override
+  ExpenseIdempotencyData map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ExpenseIdempotencyData(
+      idempotencyKey: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}idempotency_key'])!,
+      fingerprintHash: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}fingerprint_hash'])!,
+      expenseRecordId: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}expense_record_id'])!,
+      createdAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
+    );
+  }
+
+  @override
+  $ExpenseIdempotencyTable createAlias(String alias) {
+    return $ExpenseIdempotencyTable(attachedDatabase, alias);
+  }
+}
+
+class ExpenseIdempotencyData extends DataClass
+    implements Insertable<ExpenseIdempotencyData> {
+  final String idempotencyKey;
+  final String fingerprintHash;
+  final int expenseRecordId;
+  final DateTime createdAt;
+  const ExpenseIdempotencyData(
+      {required this.idempotencyKey,
+      required this.fingerprintHash,
+      required this.expenseRecordId,
+      required this.createdAt});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['idempotency_key'] = Variable<String>(idempotencyKey);
+    map['fingerprint_hash'] = Variable<String>(fingerprintHash);
+    map['expense_record_id'] = Variable<int>(expenseRecordId);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    return map;
+  }
+
+  ExpenseIdempotencyCompanion toCompanion(bool nullToAbsent) {
+    return ExpenseIdempotencyCompanion(
+      idempotencyKey: Value(idempotencyKey),
+      fingerprintHash: Value(fingerprintHash),
+      expenseRecordId: Value(expenseRecordId),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory ExpenseIdempotencyData.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ExpenseIdempotencyData(
+      idempotencyKey: serializer.fromJson<String>(json['idempotencyKey']),
+      fingerprintHash: serializer.fromJson<String>(json['fingerprintHash']),
+      expenseRecordId: serializer.fromJson<int>(json['expenseRecordId']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'idempotencyKey': serializer.toJson<String>(idempotencyKey),
+      'fingerprintHash': serializer.toJson<String>(fingerprintHash),
+      'expenseRecordId': serializer.toJson<int>(expenseRecordId),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+    };
+  }
+
+  ExpenseIdempotencyData copyWith(
+          {String? idempotencyKey,
+          String? fingerprintHash,
+          int? expenseRecordId,
+          DateTime? createdAt}) =>
+      ExpenseIdempotencyData(
+        idempotencyKey: idempotencyKey ?? this.idempotencyKey,
+        fingerprintHash: fingerprintHash ?? this.fingerprintHash,
+        expenseRecordId: expenseRecordId ?? this.expenseRecordId,
+        createdAt: createdAt ?? this.createdAt,
+      );
+  ExpenseIdempotencyData copyWithCompanion(ExpenseIdempotencyCompanion data) {
+    return ExpenseIdempotencyData(
+      idempotencyKey: data.idempotencyKey.present
+          ? data.idempotencyKey.value
+          : this.idempotencyKey,
+      fingerprintHash: data.fingerprintHash.present
+          ? data.fingerprintHash.value
+          : this.fingerprintHash,
+      expenseRecordId: data.expenseRecordId.present
+          ? data.expenseRecordId.value
+          : this.expenseRecordId,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ExpenseIdempotencyData(')
+          ..write('idempotencyKey: $idempotencyKey, ')
+          ..write('fingerprintHash: $fingerprintHash, ')
+          ..write('expenseRecordId: $expenseRecordId, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(idempotencyKey, fingerprintHash, expenseRecordId, createdAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ExpenseIdempotencyData &&
+          other.idempotencyKey == this.idempotencyKey &&
+          other.fingerprintHash == this.fingerprintHash &&
+          other.expenseRecordId == this.expenseRecordId &&
+          other.createdAt == this.createdAt);
+}
+
+class ExpenseIdempotencyCompanion
+    extends UpdateCompanion<ExpenseIdempotencyData> {
+  final Value<String> idempotencyKey;
+  final Value<String> fingerprintHash;
+  final Value<int> expenseRecordId;
+  final Value<DateTime> createdAt;
+  final Value<int> rowid;
+  const ExpenseIdempotencyCompanion({
+    this.idempotencyKey = const Value.absent(),
+    this.fingerprintHash = const Value.absent(),
+    this.expenseRecordId = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  ExpenseIdempotencyCompanion.insert({
+    required String idempotencyKey,
+    required String fingerprintHash,
+    required int expenseRecordId,
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  })  : idempotencyKey = Value(idempotencyKey),
+        fingerprintHash = Value(fingerprintHash),
+        expenseRecordId = Value(expenseRecordId);
+  static Insertable<ExpenseIdempotencyData> custom({
+    Expression<String>? idempotencyKey,
+    Expression<String>? fingerprintHash,
+    Expression<int>? expenseRecordId,
+    Expression<DateTime>? createdAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (idempotencyKey != null) 'idempotency_key': idempotencyKey,
+      if (fingerprintHash != null) 'fingerprint_hash': fingerprintHash,
+      if (expenseRecordId != null) 'expense_record_id': expenseRecordId,
+      if (createdAt != null) 'created_at': createdAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  ExpenseIdempotencyCompanion copyWith(
+      {Value<String>? idempotencyKey,
+      Value<String>? fingerprintHash,
+      Value<int>? expenseRecordId,
+      Value<DateTime>? createdAt,
+      Value<int>? rowid}) {
+    return ExpenseIdempotencyCompanion(
+      idempotencyKey: idempotencyKey ?? this.idempotencyKey,
+      fingerprintHash: fingerprintHash ?? this.fingerprintHash,
+      expenseRecordId: expenseRecordId ?? this.expenseRecordId,
+      createdAt: createdAt ?? this.createdAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (idempotencyKey.present) {
+      map['idempotency_key'] = Variable<String>(idempotencyKey.value);
+    }
+    if (fingerprintHash.present) {
+      map['fingerprint_hash'] = Variable<String>(fingerprintHash.value);
+    }
+    if (expenseRecordId.present) {
+      map['expense_record_id'] = Variable<int>(expenseRecordId.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ExpenseIdempotencyCompanion(')
+          ..write('idempotencyKey: $idempotencyKey, ')
+          ..write('fingerprintHash: $fingerprintHash, ')
+          ..write('expenseRecordId: $expenseRecordId, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $SupplierAccountsTable extends SupplierAccounts
     with TableInfo<$SupplierAccountsTable, SupplierAccount> {
   @override
@@ -22540,6 +22829,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $CustomerInvoiceReturnIdempotencyTable
       customerInvoiceReturnIdempotency =
       $CustomerInvoiceReturnIdempotencyTable(this);
+  late final $ExpenseIdempotencyTable expenseIdempotency =
+      $ExpenseIdempotencyTable(this);
   late final $SupplierAccountsTable supplierAccounts =
       $SupplierAccountsTable(this);
   late final $SupplierTransactionsTable supplierTransactions =
@@ -22621,6 +22912,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final CustomerInvoiceReturnIdempotencyDao
       customerInvoiceReturnIdempotencyDao =
       CustomerInvoiceReturnIdempotencyDao(this as AppDatabase);
+  late final ExpenseIdempotencyDao expenseIdempotencyDao =
+      ExpenseIdempotencyDao(this as AppDatabase);
   late final SupplierAccountsDao supplierAccountsDao =
       SupplierAccountsDao(this as AppDatabase);
   late final ProductsDao productsDao = ProductsDao(this as AppDatabase);
@@ -22662,6 +22955,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         customerManualReturnIdempotency,
         supplierReturnIdempotency,
         customerInvoiceReturnIdempotency,
+        expenseIdempotency,
         supplierAccounts,
         supplierTransactions,
         products,
@@ -26983,6 +27277,174 @@ typedef $$CustomerInvoiceReturnIdempotencyTableProcessedTableManager
         ),
         CustomerInvoiceReturnIdempotencyData,
         PrefetchHooks Function()>;
+typedef $$ExpenseIdempotencyTableCreateCompanionBuilder
+    = ExpenseIdempotencyCompanion Function({
+  required String idempotencyKey,
+  required String fingerprintHash,
+  required int expenseRecordId,
+  Value<DateTime> createdAt,
+  Value<int> rowid,
+});
+typedef $$ExpenseIdempotencyTableUpdateCompanionBuilder
+    = ExpenseIdempotencyCompanion Function({
+  Value<String> idempotencyKey,
+  Value<String> fingerprintHash,
+  Value<int> expenseRecordId,
+  Value<DateTime> createdAt,
+  Value<int> rowid,
+});
+
+class $$ExpenseIdempotencyTableFilterComposer
+    extends Composer<_$AppDatabase, $ExpenseIdempotencyTable> {
+  $$ExpenseIdempotencyTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get idempotencyKey => $composableBuilder(
+      column: $table.idempotencyKey,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get fingerprintHash => $composableBuilder(
+      column: $table.fingerprintHash,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get expenseRecordId => $composableBuilder(
+      column: $table.expenseRecordId,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnFilters(column));
+}
+
+class $$ExpenseIdempotencyTableOrderingComposer
+    extends Composer<_$AppDatabase, $ExpenseIdempotencyTable> {
+  $$ExpenseIdempotencyTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get idempotencyKey => $composableBuilder(
+      column: $table.idempotencyKey,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get fingerprintHash => $composableBuilder(
+      column: $table.fingerprintHash,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get expenseRecordId => $composableBuilder(
+      column: $table.expenseRecordId,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnOrderings(column));
+}
+
+class $$ExpenseIdempotencyTableAnnotationComposer
+    extends Composer<_$AppDatabase, $ExpenseIdempotencyTable> {
+  $$ExpenseIdempotencyTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get idempotencyKey => $composableBuilder(
+      column: $table.idempotencyKey, builder: (column) => column);
+
+  GeneratedColumn<String> get fingerprintHash => $composableBuilder(
+      column: $table.fingerprintHash, builder: (column) => column);
+
+  GeneratedColumn<int> get expenseRecordId => $composableBuilder(
+      column: $table.expenseRecordId, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+}
+
+class $$ExpenseIdempotencyTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $ExpenseIdempotencyTable,
+    ExpenseIdempotencyData,
+    $$ExpenseIdempotencyTableFilterComposer,
+    $$ExpenseIdempotencyTableOrderingComposer,
+    $$ExpenseIdempotencyTableAnnotationComposer,
+    $$ExpenseIdempotencyTableCreateCompanionBuilder,
+    $$ExpenseIdempotencyTableUpdateCompanionBuilder,
+    (
+      ExpenseIdempotencyData,
+      BaseReferences<_$AppDatabase, $ExpenseIdempotencyTable,
+          ExpenseIdempotencyData>
+    ),
+    ExpenseIdempotencyData,
+    PrefetchHooks Function()> {
+  $$ExpenseIdempotencyTableTableManager(
+      _$AppDatabase db, $ExpenseIdempotencyTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$ExpenseIdempotencyTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$ExpenseIdempotencyTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$ExpenseIdempotencyTableAnnotationComposer(
+                  $db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<String> idempotencyKey = const Value.absent(),
+            Value<String> fingerprintHash = const Value.absent(),
+            Value<int> expenseRecordId = const Value.absent(),
+            Value<DateTime> createdAt = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              ExpenseIdempotencyCompanion(
+            idempotencyKey: idempotencyKey,
+            fingerprintHash: fingerprintHash,
+            expenseRecordId: expenseRecordId,
+            createdAt: createdAt,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            required String idempotencyKey,
+            required String fingerprintHash,
+            required int expenseRecordId,
+            Value<DateTime> createdAt = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              ExpenseIdempotencyCompanion.insert(
+            idempotencyKey: idempotencyKey,
+            fingerprintHash: fingerprintHash,
+            expenseRecordId: expenseRecordId,
+            createdAt: createdAt,
+            rowid: rowid,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$ExpenseIdempotencyTableProcessedTableManager = ProcessedTableManager<
+    _$AppDatabase,
+    $ExpenseIdempotencyTable,
+    ExpenseIdempotencyData,
+    $$ExpenseIdempotencyTableFilterComposer,
+    $$ExpenseIdempotencyTableOrderingComposer,
+    $$ExpenseIdempotencyTableAnnotationComposer,
+    $$ExpenseIdempotencyTableCreateCompanionBuilder,
+    $$ExpenseIdempotencyTableUpdateCompanionBuilder,
+    (
+      ExpenseIdempotencyData,
+      BaseReferences<_$AppDatabase, $ExpenseIdempotencyTable,
+          ExpenseIdempotencyData>
+    ),
+    ExpenseIdempotencyData,
+    PrefetchHooks Function()>;
 typedef $$SupplierAccountsTableCreateCompanionBuilder
     = SupplierAccountsCompanion Function({
   Value<int> id,
@@ -40196,6 +40658,8 @@ class $AppDatabaseManager {
       get customerInvoiceReturnIdempotency =>
           $$CustomerInvoiceReturnIdempotencyTableTableManager(
               _db, _db.customerInvoiceReturnIdempotency);
+  $$ExpenseIdempotencyTableTableManager get expenseIdempotency =>
+      $$ExpenseIdempotencyTableTableManager(_db, _db.expenseIdempotency);
   $$SupplierAccountsTableTableManager get supplierAccounts =>
       $$SupplierAccountsTableTableManager(_db, _db.supplierAccounts);
   $$SupplierTransactionsTableTableManager get supplierTransactions =>

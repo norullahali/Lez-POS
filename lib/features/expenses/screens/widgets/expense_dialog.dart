@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart' show DateFormat;
+import 'package:uuid/uuid.dart';
+import '../../../../core/services/expense_creation_fingerprint.dart';
+import '../../../../core/services/expense_creation_idempotency_conflict_exception.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../features/auth/providers/auth_provider.dart';
 import '../../../../features/pos/providers/pos_provider.dart';
 import '../../models/expense_record.dart';
+import '../../providers/expense_creation_service_provider.dart';
 import '../../providers/expense_providers.dart';
 
 class ExpenseDialog extends ConsumerStatefulWidget {
@@ -25,8 +29,11 @@ class _ExpenseDialogState extends ConsumerState<ExpenseDialog> {
   late DateTime _paidAt;
   bool _linkSession = false;
   bool _saving = false;
+  String? _idempotencyKey;
+  String? _pendingFingerprint;
 
   static final _dateFmt = DateFormat('yyyy/MM/dd');
+  static const _expenseCreateUuid = Uuid();
 
   @override
   void initState() {
@@ -46,6 +53,11 @@ class _ExpenseDialogState extends ConsumerState<ExpenseDialog> {
     _amountCtrl.dispose();
     _notesCtrl.dispose();
     super.dispose();
+  }
+
+  void _resetCreateAttempt() {
+    _idempotencyKey = null;
+    _pendingFingerprint = null;
   }
 
   Future<void> _pickDate(bool isExpenseDate) async {
@@ -92,7 +104,6 @@ class _ExpenseDialogState extends ConsumerState<ExpenseDialog> {
 
     setState(() => _saving = true);
     try {
-      final repo = ref.read(expenseRepositoryProvider);
       final authState = ref.read(authProvider).valueOrNull;
       final userId = authState?.user?.id ?? 0;
       final sessionId = _linkSession
@@ -101,6 +112,7 @@ class _ExpenseDialogState extends ConsumerState<ExpenseDialog> {
 
       final isEdit = widget.existing != null;
       if (isEdit) {
+        final repo = ref.read(expenseRepositoryProvider);
         await repo.updateExpense(widget.existing!.copyWith(
           categoryId: _selectedCategoryId!,
           amount: amount,
@@ -110,7 +122,7 @@ class _ExpenseDialogState extends ConsumerState<ExpenseDialog> {
           sessionId: sessionId,
         ));
       } else {
-        await repo.createExpense(ExpenseRecord(
+        final fingerprint = ExpenseCreationFingerprint.compute(
           categoryId: _selectedCategoryId!,
           amount: amount,
           expenseDate: _expenseDate,
@@ -118,13 +130,40 @@ class _ExpenseDialogState extends ConsumerState<ExpenseDialog> {
           notes: _notesCtrl.text.trim(),
           sessionId: sessionId,
           createdBy: userId,
-          isVoided: false,
-          createdAt: DateTime.now(),
-        ));
+        );
+        if (_pendingFingerprint != null &&
+            _pendingFingerprint != fingerprint) {
+          _resetCreateAttempt();
+        }
+        _pendingFingerprint = fingerprint;
+        _idempotencyKey ??= _expenseCreateUuid.v4();
+
+        await ref.read(expenseCreationServiceProvider).processCreate(
+              idempotencyKey: _idempotencyKey!,
+              fingerprintHash: fingerprint,
+              categoryId: _selectedCategoryId!,
+              amount: amount,
+              expenseDate: _expenseDate,
+              paidAt: _paidAt,
+              notes: _notesCtrl.text.trim(),
+              createdBy: userId,
+              sessionId: sessionId,
+            );
+        _resetCreateAttempt();
       }
       ref.invalidate(expensesProvider);
       ref.invalidate(expenseSummaryProvider);
       if (mounted) Navigator.of(context).pop(true);
+    } on ExpenseCreationIdempotencyConflictException catch (e) {
+      _resetCreateAttempt();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('تعذر تسجيل المصروف: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

@@ -116,7 +116,7 @@ void main() {
 
   setUp(() async {
     db = AppDatabase.test();
-    expect(db.schemaVersion, 44);
+    expect(db.schemaVersion, 45);
     partialService = PartialReturnService(db);
     invoiceReturnService = CustomerInvoiceReturnService(db);
     ledger = FinancialLedgerRepository(db);

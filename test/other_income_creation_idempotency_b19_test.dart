@@ -1,15 +1,15 @@
-﻿import 'dart:io';
+import 'dart:io';
 
 import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lez_pos/core/database/app_database.dart';
-import 'package:lez_pos/core/services/expense_creation_fingerprint.dart';
-import 'package:lez_pos/core/services/expense_creation_idempotency_conflict_exception.dart';
-import 'package:lez_pos/core/services/expense_creation_result.dart';
-import 'package:lez_pos/core/services/expense_creation_service.dart';
-import 'package:lez_pos/features/expenses/models/expense_record.dart' as models;
-import 'package:lez_pos/features/expenses/repositories/expense_repository.dart';
+import 'package:lez_pos/core/services/other_income_creation_fingerprint.dart';
+import 'package:lez_pos/core/services/other_income_creation_idempotency_conflict_exception.dart';
+import 'package:lez_pos/core/services/other_income_creation_result.dart';
+import 'package:lez_pos/core/services/other_income_creation_service.dart';
+import 'package:lez_pos/features/other_income/models/other_income_record.dart' as models;
+import 'package:lez_pos/features/other_income/repositories/other_income_repository.dart';
 import 'package:lez_pos/features/financial/models/cash_ledger_event_type.dart';
 import 'package:lez_pos/features/financial/models/cash_ledger_filter.dart';
 import 'package:lez_pos/features/financial/repositories/financial_ledger_repository.dart';
@@ -17,53 +17,53 @@ import 'package:lez_pos/features/reports/core/models/report_date_preset.dart';
 import 'package:lez_pos/features/reports/core/models/report_filter_model.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite3;
 
-import 'support/expense_creation_test_keys.dart';
+import 'support/other_income_creation_test_keys.dart';
 
-Future<({sqlite3.Database rawDb, String path})> openSimulatedV44RawDatabase() async {
+Future<({sqlite3.Database rawDb, String path})> openSimulatedV45RawDatabase() async {
   final dbPath =
-      '${Directory.systemTemp.path}${Platform.pathSeparator}b18_v44_${DateTime.now().microsecondsSinceEpoch}.db';
+      '${Directory.systemTemp.path}${Platform.pathSeparator}b19_v44_${DateTime.now().microsecondsSinceEpoch}.db';
   final bootstrapHandle = sqlite3.sqlite3.open(dbPath);
   final bootstrap = AppDatabase.test(NativeDatabase.opened(bootstrapHandle));
   await bootstrap.select(bootstrap.products).get();
-  await bootstrap.customStatement('DROP TABLE IF EXISTS expense_idempotency');
-  await bootstrap.customStatement('DROP INDEX IF EXISTS ei_expense_record_idx');
-  await bootstrap.customStatement('PRAGMA user_version = 44');
+  await bootstrap.customStatement('DROP TABLE IF EXISTS other_income_idempotency');
+  await bootstrap.customStatement('DROP INDEX IF EXISTS oii_other_income_record_idx');
+  await bootstrap.customStatement('PRAGMA user_version = 45');
   await bootstrap.close();
 
   final rawDb = sqlite3.sqlite3.open(dbPath);
-  expect(rawDb.userVersion, 44);
+  expect(rawDb.userVersion, 45);
   return (rawDb: rawDb, path: dbPath);
 }
 
 void main() {
   late AppDatabase db;
-  late ExpenseCreationService service;
-  late ExpenseRepository repository;
+  late OtherIncomeCreationService service;
+  late OtherIncomeRepository repository;
   late int categoryId;
   late int userId;
-  late DateTime expenseDate;
-  late DateTime paidAt;
+  late DateTime incomeDate;
+  late DateTime receivedAt;
 
   setUp(() async {
     db = AppDatabase.test();
-    service = ExpenseCreationService(db);
-    repository = ExpenseRepository(db);
+    service = OtherIncomeCreationService(db);
+    repository = OtherIncomeRepository(db);
     userId = await db.into(db.usersTable).insert(
           UsersTableCompanion.insert(
-            fullName: 'B18 User',
-            username: 'b18_${DateTime.now().microsecondsSinceEpoch}',
+            fullName: 'B19 User',
+            username: 'b19_${DateTime.now().microsecondsSinceEpoch}',
             passwordHash: 'hash',
             roleId: 1,
           ),
         );
-    categoryId = await db.expensesDao.createCategory(
-      const ExpenseCategoriesCompanion(
-        name: Value('B18 Category'),
+    categoryId = await db.otherIncomeDao.createCategory(
+      const OtherIncomeCategoriesCompanion(
+        name: Value('B19 Category'),
         isActive: Value(true),
       ),
     );
-    expenseDate = DateTime(2026, 3, 15, 14, 30);
-    paidAt = DateTime(2026, 3, 15, 9, 45);
+    incomeDate = DateTime(2026, 3, 15, 14, 30);
+    receivedAt = DateTime(2026, 3, 15, 9, 45);
   });
 
   tearDown(() async {
@@ -73,32 +73,32 @@ void main() {
   String fingerprintFor({
     double amount = 100,
     int? categoryOverride,
-    DateTime? expenseDateOverride,
-    DateTime? paidAtOverride,
-    String notes = 'B18 note',
+    DateTime? incomeDateOverride,
+    DateTime? receivedAtOverride,
+    String notes = 'B19 note',
     int? createdByOverride,
     int? sessionId,
   }) {
-    return ExpenseCreationFingerprint.compute(
+    return OtherIncomeCreationFingerprint.compute(
       categoryId: categoryOverride ?? categoryId,
       amount: amount,
-      expenseDate: expenseDateOverride ?? expenseDate,
-      paidAt: paidAtOverride ?? paidAt,
+      incomeDate: incomeDateOverride ?? incomeDate,
+      receivedAt: receivedAtOverride ?? receivedAt,
       notes: notes,
       createdBy: createdByOverride ?? userId,
       sessionId: sessionId,
     );
   }
 
-  Future<ExpenseCreationResult> postExpense({
-    ExpenseCreationService? targetService,
+  Future<OtherIncomeCreationResult> postIncome({
+    OtherIncomeCreationService? targetService,
     required String idempotencyKey,
     double amount = 100,
-    String notes = 'B18 note',
+    String notes = 'B19 note',
     String? fingerprint,
     int? categoryOverride,
-    DateTime? expenseDateOverride,
-    DateTime? paidAtOverride,
+    DateTime? incomeDateOverride,
+    DateTime? receivedAtOverride,
     int? createdByOverride,
     int? sessionId,
   }) {
@@ -108,8 +108,8 @@ void main() {
           amount: amount,
           notes: notes,
           categoryOverride: categoryOverride,
-          expenseDateOverride: expenseDateOverride,
-          paidAtOverride: paidAtOverride,
+          incomeDateOverride: incomeDateOverride,
+          receivedAtOverride: receivedAtOverride,
           createdByOverride: createdByOverride,
         );
     return svc.processCreate(
@@ -117,22 +117,22 @@ void main() {
       fingerprintHash: fp,
       categoryId: categoryOverride ?? categoryId,
       amount: amount,
-      expenseDate: expenseDateOverride ?? expenseDate,
-      paidAt: paidAtOverride ?? paidAt,
+      incomeDate: incomeDateOverride ?? incomeDate,
+      receivedAt: receivedAtOverride ?? receivedAt,
       notes: notes,
       createdBy: createdByOverride ?? userId,
       sessionId: sessionId,
     );
   }
 
-  Future<int> expenseCount([AppDatabase? database]) async {
+  Future<int> incomeCount([AppDatabase? database]) async {
     final target = database ?? db;
-    return (await target.select(target.expenseRecords).get()).length;
+    return (await target.select(target.otherIncomeRecords).get()).length;
   }
 
   Future<int> idempotencyRowCount([AppDatabase? database]) async {
     final target = database ?? db;
-    return (await target.select(target.expenseIdempotency).get()).length;
+    return (await target.select(target.otherIncomeIdempotency).get()).length;
   }
 
   Future<int> activityLogCount([AppDatabase? database]) async {
@@ -140,7 +140,7 @@ void main() {
     return (await target.select(target.activityLogs).get()).length;
   }
 
-  Future<int> expenseLedgerCount([AppDatabase? database]) async {
+  Future<int> otherIncomeLedgerCount([AppDatabase? database]) async {
     final target = database ?? db;
     final ledger = FinancialLedgerRepository(target);
     const ledgerFilter = CashLedgerFilter(
@@ -150,11 +150,11 @@ void main() {
     );
     return (await ledger.getEntries(ledgerFilter))
         .entries
-        .where((e) => e.eventType == CashLedgerEventType.expense)
+        .where((e) => e.eventType == CashLedgerEventType.otherIncome)
         .length;
   }
 
-  Future<int> expenseLedgerCountForId(int expenseId, [AppDatabase? database]) async {
+  Future<int> otherIncomeLedgerCountForId(int incomeId, [AppDatabase? database]) async {
     final target = database ?? db;
     final ledger = FinancialLedgerRepository(target);
     const ledgerFilter = CashLedgerFilter(
@@ -165,64 +165,71 @@ void main() {
     return (await ledger.getEntries(ledgerFilter))
         .entries
         .where((e) =>
-            e.eventType == CashLedgerEventType.expense &&
-            e.referenceId == expenseId)
+            e.eventType == CashLedgerEventType.otherIncome &&
+            e.referenceId == incomeId)
         .length;
   }
 
   Future<bool> idempotencyTableExists(AppDatabase database) async {
     final rows = await database.customSelect(
-      "SELECT name FROM sqlite_master WHERE type='table' AND name='expense_idempotency'",
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='other_income_idempotency'",
     ).get();
     return rows.isNotEmpty;
   }
 
-  group('B18 expense creation idempotency', () {
+  Future<bool> idempotencyIndexExists(AppDatabase database) async {
+    final rows = await database.customSelect(
+      "SELECT name FROM sqlite_master WHERE type='index' AND name='oii_other_income_record_idx'",
+    ).get();
+    return rows.isNotEmpty;
+  }
+
+  group('B19 other income creation idempotency', () {
     test('1) first create succeeds', () async {
-      final key = b18ExpenseCreationIdempotencyKey();
-      final result = await postExpense(idempotencyKey: key);
+      final key = b19OtherIncomeCreationIdempotencyKey();
+      final result = await postIncome(idempotencyKey: key);
 
       expect(result.idempotentReplay, isFalse);
-      expect(result.expenseRecordId, greaterThan(0));
-      expect(await expenseCount(), 1);
+      expect(result.otherIncomeRecordId, greaterThan(0));
+      expect(await incomeCount(), 1);
       expect(await idempotencyRowCount(), 1);
       expect(await activityLogCount(), 1);
     });
 
     test('2) same key + same fingerprint replay', () async {
-      final key = b18ExpenseCreationIdempotencyKey();
+      final key = b19OtherIncomeCreationIdempotencyKey();
       final fp = fingerprintFor();
-      final first = await postExpense(idempotencyKey: key, fingerprint: fp);
-      final second = await postExpense(idempotencyKey: key, fingerprint: fp);
+      final first = await postIncome(idempotencyKey: key, fingerprint: fp);
+      final second = await postIncome(idempotencyKey: key, fingerprint: fp);
 
       expect(second.idempotentReplay, isTrue);
-      expect(second.expenseRecordId, first.expenseRecordId);
-      expect(await expenseCount(), 1);
+      expect(second.otherIncomeRecordId, first.otherIncomeRecordId);
+      expect(await incomeCount(), 1);
     });
 
     test('3) same key + different fingerprint conflict', () async {
-      final key = b18ExpenseCreationIdempotencyKey();
-      await postExpense(idempotencyKey: key, amount: 100);
+      final key = b19OtherIncomeCreationIdempotencyKey();
+      await postIncome(idempotencyKey: key, amount: 100);
 
       await expectLater(
-        postExpense(idempotencyKey: key, amount: 200),
-        throwsA(isA<ExpenseCreationIdempotencyConflictException>()),
+        postIncome(idempotencyKey: key, amount: 200),
+        throwsA(isA<OtherIncomeCreationIdempotencyConflictException>()),
       );
 
-      expect(await expenseCount(), 1);
+      expect(await incomeCount(), 1);
     });
 
     test('4) sequential double submit same key', () async {
-      final key = b18ExpenseCreationIdempotencyKey();
+      final key = b19OtherIncomeCreationIdempotencyKey();
       final fp = fingerprintFor();
-      await postExpense(idempotencyKey: key, fingerprint: fp);
-      await postExpense(idempotencyKey: key, fingerprint: fp);
-      expect(await expenseCount(), 1);
+      await postIncome(idempotencyKey: key, fingerprint: fp);
+      await postIncome(idempotencyKey: key, fingerprint: fp);
+      expect(await incomeCount(), 1);
     });
 
     test('5) concurrent same key + same fingerprint', () async {
       final dbPath =
-          '${Directory.systemTemp.path}${Platform.pathSeparator}b18_same_${DateTime.now().microsecondsSinceEpoch}.db';
+          '${Directory.systemTemp.path}${Platform.pathSeparator}b19_same_${DateTime.now().microsecondsSinceEpoch}.db';
       final rawA = sqlite3.sqlite3.open(dbPath);
       final rawB = sqlite3.sqlite3.open(dbPath);
       rawA.execute('PRAGMA busy_timeout = 15000');
@@ -248,21 +255,21 @@ void main() {
               roleId: 1,
             ),
           );
-      final cid = await dbA.expensesDao.createCategory(
-        const ExpenseCategoriesCompanion(
+      final cid = await dbA.otherIncomeDao.createCategory(
+        const OtherIncomeCategoriesCompanion(
           name: Value('Conc Cat'),
           isActive: Value(true),
         ),
       );
 
-      final serviceA = ExpenseCreationService(dbA);
-      final serviceB = ExpenseCreationService(dbB);
-      final sameKey = b18ExpenseCreationIdempotencyKey();
-      final fp = ExpenseCreationFingerprint.compute(
+      final serviceA = OtherIncomeCreationService(dbA);
+      final serviceB = OtherIncomeCreationService(dbB);
+      final sameKey = b19OtherIncomeCreationIdempotencyKey();
+      final fp = OtherIncomeCreationFingerprint.compute(
         categoryId: cid,
         amount: 50,
-        expenseDate: expenseDate,
-        paidAt: paidAt,
+        incomeDate: incomeDate,
+        receivedAt: receivedAt,
         notes: 'conc',
         createdBy: uid,
       );
@@ -273,8 +280,8 @@ void main() {
           fingerprintHash: fp,
           categoryId: cid,
           amount: 50,
-          expenseDate: expenseDate,
-          paidAt: paidAt,
+          incomeDate: incomeDate,
+          receivedAt: receivedAt,
           notes: 'conc',
           createdBy: uid,
         ),
@@ -283,21 +290,21 @@ void main() {
           fingerprintHash: fp,
           categoryId: cid,
           amount: 50,
-          expenseDate: expenseDate,
-          paidAt: paidAt,
+          incomeDate: incomeDate,
+          receivedAt: receivedAt,
           notes: 'conc',
           createdBy: uid,
         ),
       ]);
 
-      expect(await expenseCount(dbA), 1);
+      expect(await incomeCount(dbA), 1);
       expect(await idempotencyRowCount(dbA), 1);
-      expect(outcomes.map((r) => r.expenseRecordId).toSet().length, 1);
+      expect(outcomes.map((r) => r.otherIncomeRecordId).toSet().length, 1);
     });
 
     test('6) concurrent same key + different fingerprint conflict', () async {
       final dbPath =
-          '${Directory.systemTemp.path}${Platform.pathSeparator}b18_conflict_${DateTime.now().microsecondsSinceEpoch}.db';
+          '${Directory.systemTemp.path}${Platform.pathSeparator}b19_conflict_${DateTime.now().microsecondsSinceEpoch}.db';
       final rawA = sqlite3.sqlite3.open(dbPath);
       final rawB = sqlite3.sqlite3.open(dbPath);
       rawA.execute('PRAGMA busy_timeout = 15000');
@@ -323,29 +330,29 @@ void main() {
               roleId: 1,
             ),
           );
-      final cid = await dbA.expensesDao.createCategory(
-        const ExpenseCategoriesCompanion(
+      final cid = await dbA.otherIncomeDao.createCategory(
+        const OtherIncomeCategoriesCompanion(
           name: Value('Conflict Cat'),
           isActive: Value(true),
         ),
       );
 
-      final serviceA = ExpenseCreationService(dbA);
-      final serviceB = ExpenseCreationService(dbB);
-      final sameKey = b18ExpenseCreationIdempotencyKey();
-      final fpA = ExpenseCreationFingerprint.compute(
+      final serviceA = OtherIncomeCreationService(dbA);
+      final serviceB = OtherIncomeCreationService(dbB);
+      final sameKey = b19OtherIncomeCreationIdempotencyKey();
+      final fpA = OtherIncomeCreationFingerprint.compute(
         categoryId: cid,
         amount: 50,
-        expenseDate: expenseDate,
-        paidAt: paidAt,
+        incomeDate: incomeDate,
+        receivedAt: receivedAt,
         notes: 'a',
         createdBy: uid,
       );
-      final fpB = ExpenseCreationFingerprint.compute(
+      final fpB = OtherIncomeCreationFingerprint.compute(
         categoryId: cid,
         amount: 75,
-        expenseDate: expenseDate,
-        paidAt: paidAt,
+        incomeDate: incomeDate,
+        receivedAt: receivedAt,
         notes: 'b',
         createdBy: uid,
       );
@@ -357,12 +364,12 @@ void main() {
             fingerprintHash: fpB,
             categoryId: cid,
             amount: 75,
-            expenseDate: expenseDate,
-            paidAt: paidAt,
+            incomeDate: incomeDate,
+            receivedAt: receivedAt,
             notes: 'b',
             createdBy: uid,
           );
-        } on ExpenseCreationIdempotencyConflictException catch (e) {
+        } on OtherIncomeCreationIdempotencyConflictException catch (e) {
           return e;
         }
       }
@@ -373,50 +380,50 @@ void main() {
           fingerprintHash: fpA,
           categoryId: cid,
           amount: 50,
-          expenseDate: expenseDate,
-          paidAt: paidAt,
+          incomeDate: incomeDate,
+          receivedAt: receivedAt,
           notes: 'a',
           createdBy: uid,
         ),
         runConflictAttempt(),
       ]);
 
-      expect(await expenseCount(dbA), 1);
+      expect(await incomeCount(dbA), 1);
       expect(
-        outcomes.whereType<ExpenseCreationIdempotencyConflictException>().length,
+        outcomes.whereType<OtherIncomeCreationIdempotencyConflictException>().length,
         1,
       );
     });
 
-    test('7) different keys create two expenses', () async {
-      await postExpense(idempotencyKey: b18ExpenseCreationIdempotencyKey());
-      await postExpense(idempotencyKey: b18ExpenseCreationIdempotencyKey());
-      expect(await expenseCount(), 2);
+    test('7) different keys create two income records', () async {
+      await postIncome(idempotencyKey: b19OtherIncomeCreationIdempotencyKey());
+      await postIncome(idempotencyKey: b19OtherIncomeCreationIdempotencyKey());
+      expect(await incomeCount(), 2);
     });
 
-    test('8) expense INSERT failure rolls back', () async {
-      final failing = ExpenseCreationService(
+    test('8) income INSERT failure rolls back', () async {
+      final failing = OtherIncomeCreationService(
         db,
-        beforeExpenseInsertHook: () async {
+        beforeIncomeInsertHook: () async {
           throw Exception('forced insert failure');
         },
       );
 
       await expectLater(
-        postExpense(
+        postIncome(
           targetService: failing,
-          idempotencyKey: b18ExpenseCreationIdempotencyKey(),
+          idempotencyKey: b19OtherIncomeCreationIdempotencyKey(),
         ),
         throwsA(isA<Exception>()),
       );
 
-      expect(await expenseCount(), 0);
+      expect(await incomeCount(), 0);
       expect(await idempotencyRowCount(), 0);
     });
 
     test('9) production activity log failure rolls back', () async {
       await db.customStatement('''
-        CREATE TRIGGER b18_block_activity_log
+        CREATE TRIGGER b19_block_activity_log
         BEFORE INSERT ON activity_logs
         BEGIN
           SELECT RAISE(FAIL, 'forced activity log failure');
@@ -424,19 +431,21 @@ void main() {
       ''');
 
       await expectLater(
-        postExpense(idempotencyKey: b18ExpenseCreationIdempotencyKey()),
+        postIncome(idempotencyKey: b19OtherIncomeCreationIdempotencyKey()),
         throwsA(isA<Exception>()),
       );
 
-      expect(await expenseCount(), 0);
+      expect(await incomeCount(), 0);
       expect(await idempotencyRowCount(), 0);
+      expect(await activityLogCount(), 0);
+      expect(await otherIncomeLedgerCount(), 0);
     });
 
     test('10) seal race preSealHook then retry succeeds once', () async {
-      final key = b18ExpenseCreationIdempotencyKey();
+      final key = b19OtherIncomeCreationIdempotencyKey();
       final fp = fingerprintFor();
       var hookCalls = 0;
-      final flaky = ExpenseCreationService(
+      final flaky = OtherIncomeCreationService(
         db,
         preSealHook: () async {
           hookCalls++;
@@ -445,22 +454,22 @@ void main() {
       );
 
       await expectLater(
-        postExpense(targetService: flaky, idempotencyKey: key, fingerprint: fp),
+        postIncome(targetService: flaky, idempotencyKey: key, fingerprint: fp),
         throwsA(isA<Exception>()),
       );
 
-      final retry = await postExpense(
+      final retry = await postIncome(
         targetService: flaky,
         idempotencyKey: key,
         fingerprint: fp,
       );
       expect(retry.idempotentReplay, isFalse);
-      expect(await expenseCount(), 1);
+      expect(await incomeCount(), 1);
     });
 
     test('11) SQLITE_BUSY retry succeeds under dual connection contention', () async {
       final dbPath =
-          '${Directory.systemTemp.path}${Platform.pathSeparator}b18_busy_${DateTime.now().microsecondsSinceEpoch}.db';
+          '${Directory.systemTemp.path}${Platform.pathSeparator}b19_busy_${DateTime.now().microsecondsSinceEpoch}.db';
       final rawA = sqlite3.sqlite3.open(dbPath);
       final rawB = sqlite3.sqlite3.open(dbPath);
       rawA.execute('PRAGMA busy_timeout = 10000');
@@ -486,21 +495,21 @@ void main() {
               roleId: 1,
             ),
           );
-      final cid = await dbA.expensesDao.createCategory(
-        const ExpenseCategoriesCompanion(
+      final cid = await dbA.otherIncomeDao.createCategory(
+        const OtherIncomeCategoriesCompanion(
           name: Value('Busy Cat'),
           isActive: Value(true),
         ),
       );
 
-      final serviceA = ExpenseCreationService(dbA);
-      final serviceB = ExpenseCreationService(dbB);
-      final sameKey = b18ExpenseCreationIdempotencyKey();
-      final fp = ExpenseCreationFingerprint.compute(
+      final serviceA = OtherIncomeCreationService(dbA);
+      final serviceB = OtherIncomeCreationService(dbB);
+      final sameKey = b19OtherIncomeCreationIdempotencyKey();
+      final fp = OtherIncomeCreationFingerprint.compute(
         categoryId: cid,
         amount: 40,
-        expenseDate: expenseDate,
-        paidAt: paidAt,
+        incomeDate: incomeDate,
+        receivedAt: receivedAt,
         notes: 'busy',
         createdBy: uid,
       );
@@ -511,8 +520,8 @@ void main() {
           fingerprintHash: fp,
           categoryId: cid,
           amount: 40,
-          expenseDate: expenseDate,
-          paidAt: paidAt,
+          incomeDate: incomeDate,
+          receivedAt: receivedAt,
           notes: 'busy',
           createdBy: uid,
         ),
@@ -521,70 +530,70 @@ void main() {
           fingerprintHash: fp,
           categoryId: cid,
           amount: 40,
-          expenseDate: expenseDate,
-          paidAt: paidAt,
+          incomeDate: incomeDate,
+          receivedAt: receivedAt,
           notes: 'busy',
           createdBy: uid,
         ),
       ]);
 
-      expect(await expenseCount(dbA), 1);
-      expect(outcomes.map((r) => r.expenseRecordId).toSet().length, 1);
+      expect(await incomeCount(dbA), 1);
+      expect(outcomes.map((r) => r.otherIncomeRecordId).toSet().length, 1);
     });
 
-    test('12) post-commit ambiguous-result replay returns same expense ID', () async {
-      final key = b18ExpenseCreationIdempotencyKey();
+    test('12) post-commit ambiguous-result replay returns same income ID', () async {
+      final key = b19OtherIncomeCreationIdempotencyKey();
       final fp = fingerprintFor();
-      final first = await postExpense(idempotencyKey: key, fingerprint: fp);
-      final replay = await postExpense(idempotencyKey: key, fingerprint: fp);
+      final first = await postIncome(idempotencyKey: key, fingerprint: fp);
+      final replay = await postIncome(idempotencyKey: key, fingerprint: fp);
 
       expect(replay.idempotentReplay, isTrue);
-      expect(replay.expenseRecordId, first.expenseRecordId);
+      expect(replay.otherIncomeRecordId, first.otherIncomeRecordId);
     });
 
     test('13) void after create excludes ledger row', () async {
-      final created = await postExpense(idempotencyKey: b18ExpenseCreationIdempotencyKey(), amount: 80);
-      expect(await expenseLedgerCountForId(created.expenseRecordId), 1);
-      await repository.voidExpense(created.expenseRecordId);
-      expect(await expenseLedgerCountForId(created.expenseRecordId), 0);
+      final created = await postIncome(idempotencyKey: b19OtherIncomeCreationIdempotencyKey(), amount: 80);
+      expect(await otherIncomeLedgerCountForId(created.otherIncomeRecordId), 1);
+      await repository.voidIncome(created.otherIncomeRecordId);
+      expect(await otherIncomeLedgerCountForId(created.otherIncomeRecordId), 0);
     });
 
-    test('14) edit after create keeps single ledger row for expense ID', () async {
-      final created = await postExpense(idempotencyKey: b18ExpenseCreationIdempotencyKey(), amount: 80);
-      final row = await db.expensesDao.getExpenseById(created.expenseRecordId);
+    test('14) edit after create keeps single ledger row for income ID', () async {
+      final created = await postIncome(idempotencyKey: b19OtherIncomeCreationIdempotencyKey(), amount: 80);
+      final row = await db.otherIncomeDao.getIncomeById(created.otherIncomeRecordId);
       expect(row, isNotNull);
 
-      await repository.updateExpense(
-        models.ExpenseRecord(
-          id: created.expenseRecordId,
+      await repository.updateIncome(
+        models.OtherIncomeRecord(
+          id: created.otherIncomeRecordId,
           categoryId: categoryId,
           amount: 120,
-          expenseDate: row!.expenseDate,
-          paidAt: row.paidAt,
+          incomeDate: row!.incomeDate,
+          receivedAt: row.receivedAt,
           notes: row.notes,
           createdBy: userId,
           isVoided: false,
         ),
       );
 
-      expect(await expenseLedgerCountForId(created.expenseRecordId), 1);
+      expect(await otherIncomeLedgerCountForId(created.otherIncomeRecordId), 1);
     });
 
-    test('15) exactly one EXPENSE ledger event after replay', () async {
-      final key = b18ExpenseCreationIdempotencyKey();
+    test('15) exactly one OTHER_INCOME ledger event after replay', () async {
+      final key = b19OtherIncomeCreationIdempotencyKey();
       final fp = fingerprintFor(amount: 55);
-      final first = await postExpense(idempotencyKey: key, fingerprint: fp, amount: 55);
-      await postExpense(idempotencyKey: key, fingerprint: fp, amount: 55);
-      expect(await expenseLedgerCount(), 1);
-      expect(await expenseLedgerCountForId(first.expenseRecordId), 1);
+      final first = await postIncome(idempotencyKey: key, fingerprint: fp, amount: 55);
+      await postIncome(idempotencyKey: key, fingerprint: fp, amount: 55);
+      expect(await otherIncomeLedgerCount(), 1);
+      expect(await otherIncomeLedgerCountForId(first.otherIncomeRecordId), 1);
     });
 
-    test('16) migration v44 -> v45 creates expense_idempotency', () async {
-      final opened = await openSimulatedV44RawDatabase();
+    test('16) migration v45 -> v46 creates other_income_idempotency', () async {
+      final opened = await openSimulatedV45RawDatabase();
       addTearDown(opened.rawDb.dispose);
 
       final before = opened.rawDb.select(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name='expense_idempotency'",
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='other_income_idempotency'",
       );
       expect(before, isEmpty);
 
@@ -593,6 +602,7 @@ void main() {
 
       expect(migrated.schemaVersion, 46);
       expect(await idempotencyTableExists(migrated), isTrue);
+      expect(await idempotencyIndexExists(migrated), isTrue);
     });
 
     test('17) date normalization matches same calendar day with different times', () async {
@@ -600,61 +610,61 @@ void main() {
       final evening = DateTime(2026, 6, 10, 19, 45);
       final fpMorning = fingerprintFor(
         amount: 30,
-        expenseDateOverride: morning,
-        paidAtOverride: morning,
+        incomeDateOverride: morning,
+        receivedAtOverride: morning,
         notes: 'date norm',
       );
       final fpEvening = fingerprintFor(
         amount: 30,
-        expenseDateOverride: evening,
-        paidAtOverride: evening,
+        incomeDateOverride: evening,
+        receivedAtOverride: evening,
         notes: 'date norm',
       );
       expect(fpMorning, fpEvening);
 
-      final created = await postExpense(
-        idempotencyKey: b18ExpenseCreationIdempotencyKey(),
+      final created = await postIncome(
+        idempotencyKey: b19OtherIncomeCreationIdempotencyKey(),
         fingerprint: fpMorning,
         amount: 30,
-        expenseDateOverride: morning,
-        paidAtOverride: morning,
+        incomeDateOverride: morning,
+        receivedAtOverride: morning,
         notes: 'date norm',
       );
-      final row = await db.expensesDao.getExpenseById(created.expenseRecordId);
-      expect(row!.expenseDate, ExpenseCreationFingerprint.normalizeDate(morning));
-      expect(row.paidAt, ExpenseCreationFingerprint.normalizeDate(morning));
+      final row = await db.otherIncomeDao.getIncomeById(created.otherIncomeRecordId);
+      expect(row!.incomeDate, OtherIncomeCreationFingerprint.normalizeDate(morning));
+      expect(row.receivedAt, OtherIncomeCreationFingerprint.normalizeDate(morning));
     });
 
     test('18) createdBy validation rejects zero', () async {
       await expectLater(
-        postExpense(
-          idempotencyKey: b18ExpenseCreationIdempotencyKey(),
+        postIncome(
+          idempotencyKey: b19OtherIncomeCreationIdempotencyKey(),
           createdByOverride: 0,
         ),
         throwsA(isA<ArgumentError>()),
       );
-      expect(await expenseCount(), 0);
+      expect(await incomeCount(), 0);
     });
 
     test('19) category existence and active validation', () async {
       await expectLater(
-        postExpense(
-          idempotencyKey: b18ExpenseCreationIdempotencyKey(),
+        postIncome(
+          idempotencyKey: b19OtherIncomeCreationIdempotencyKey(),
           categoryOverride: 999999,
         ),
         throwsA(isA<StateError>()),
       );
 
-      final inactiveId = await db.expensesDao.createCategory(
-        const ExpenseCategoriesCompanion(
+      final inactiveId = await db.otherIncomeDao.createCategory(
+        const OtherIncomeCategoriesCompanion(
           name: Value('Inactive'),
           isActive: Value(false),
         ),
       );
 
       await expectLater(
-        postExpense(
-          idempotencyKey: b18ExpenseCreationIdempotencyKey(),
+        postIncome(
+          idempotencyKey: b19OtherIncomeCreationIdempotencyKey(),
           categoryOverride: inactiveId,
         ),
         throwsA(isA<StateError>()),
@@ -662,16 +672,16 @@ void main() {
     });
 
     test('20) fingerprint change with same key conflicts', () async {
-      final key = b18ExpenseCreationIdempotencyKey();
+      final key = b19OtherIncomeCreationIdempotencyKey();
       final fpA = fingerprintFor(amount: 100, notes: 'first');
-      await postExpense(idempotencyKey: key, fingerprint: fpA, notes: 'first');
+      await postIncome(idempotencyKey: key, fingerprint: fpA, notes: 'first');
 
       final fpB = fingerprintFor(amount: 100, notes: 'second');
       expect(fpA, isNot(fpB));
 
       await expectLater(
-        postExpense(idempotencyKey: key, fingerprint: fpB, notes: 'second'),
-        throwsA(isA<ExpenseCreationIdempotencyConflictException>()),
+        postIncome(idempotencyKey: key, fingerprint: fpB, notes: 'second'),
+        throwsA(isA<OtherIncomeCreationIdempotencyConflictException>()),
       );
     });
   });

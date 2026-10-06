@@ -23,6 +23,7 @@ import 'tables/customer_manual_return_idempotency_table.dart';
 import 'tables/supplier_return_idempotency_table.dart';
 import 'tables/customer_invoice_return_idempotency_table.dart';
 import 'tables/expense_idempotency_table.dart';
+import 'tables/other_income_idempotency_table.dart';
 import 'tables/products_table.dart';
 import 'tables/product_batches_table.dart';
 import 'tables/stock_ledger_table.dart';
@@ -75,6 +76,7 @@ import 'daos/customer_manual_return_idempotency_dao.dart';
 import 'daos/supplier_return_idempotency_dao.dart';
 import 'daos/customer_invoice_return_idempotency_dao.dart';
 import 'daos/expense_idempotency_dao.dart';
+import 'daos/other_income_idempotency_dao.dart';
 import 'daos/supplier_accounts_dao.dart';
 import 'daos/products_dao.dart';
 import 'daos/stock_dao.dart';
@@ -104,6 +106,7 @@ part 'app_database.g.dart';
     SupplierReturnIdempotency,
     CustomerInvoiceReturnIdempotency,
     ExpenseIdempotency,
+    OtherIncomeIdempotency,
     SupplierAccounts,
     SupplierTransactions,
     Products,
@@ -156,6 +159,7 @@ part 'app_database.g.dart';
     SupplierReturnIdempotencyDao,
     CustomerInvoiceReturnIdempotencyDao,
     ExpenseIdempotencyDao,
+    OtherIncomeIdempotencyDao,
     SupplierAccountsDao,
     ProductsDao,
     StockDao,
@@ -190,7 +194,7 @@ class AppDatabase extends _$AppDatabase {
   late final pricingDao = PricingDao(this);
 
   @override
-  int get schemaVersion => 45;
+  int get schemaVersion => 46;
 
   @override
   MigrationStrategy get migration {
@@ -241,6 +245,10 @@ class AppDatabase extends _$AppDatabase {
         await customStatement(
           'CREATE INDEX IF NOT EXISTS ei_expense_record_idx '
           'ON expense_idempotency (expense_record_id)',
+        );
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS oii_other_income_record_idx '
+          'ON other_income_idempotency (other_income_record_id)',
         );
         // Enable foreign keys
         await customStatement('PRAGMA foreign_keys = ON');
@@ -1113,6 +1121,20 @@ class AppDatabase extends _$AppDatabase {
             rethrow;
           }
           debugPrint('[Migration v45] expense_idempotency ready');
+        }
+        if (from < 46) {
+          debugPrint('[Migration v46] other_income_idempotency table...');
+          await m.createTable(otherIncomeIdempotency);
+          try {
+            await customStatement(
+              'CREATE INDEX IF NOT EXISTS oii_other_income_record_idx '
+              'ON other_income_idempotency (other_income_record_id)',
+            );
+          } catch (e) {
+            debugPrint('[Migration v46] idempotency index skip/error: $e');
+            rethrow;
+          }
+          debugPrint('[Migration v46] other_income_idempotency ready');
         }
       },
       beforeOpen: (details) async {

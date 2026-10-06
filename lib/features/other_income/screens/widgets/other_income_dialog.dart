@@ -1,10 +1,14 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart' show DateFormat;
+import 'package:uuid/uuid.dart';
+import '../../../../core/services/other_income_creation_fingerprint.dart';
+import '../../../../core/services/other_income_creation_idempotency_conflict_exception.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../features/auth/providers/auth_provider.dart';
 import '../../../../features/pos/providers/pos_provider.dart';
 import '../../models/other_income_record.dart';
+import '../../providers/other_income_creation_service_provider.dart';
 import '../../providers/other_income_providers.dart';
 
 class OtherIncomeDialog extends ConsumerStatefulWidget {
@@ -25,8 +29,11 @@ class _OtherIncomeDialogState extends ConsumerState<OtherIncomeDialog> {
   late DateTime _receivedAt;
   bool _linkSession = false;
   bool _saving = false;
+  String? _idempotencyKey;
+  String? _pendingFingerprint;
 
   static final _dateFmt = DateFormat('yyyy/MM/dd');
+  static const _otherIncomeCreateUuid = Uuid();
 
   @override
   void initState() {
@@ -46,6 +53,11 @@ class _OtherIncomeDialogState extends ConsumerState<OtherIncomeDialog> {
     _amountCtrl.dispose();
     _notesCtrl.dispose();
     super.dispose();
+  }
+
+  void _resetCreateAttempt() {
+    _idempotencyKey = null;
+    _pendingFingerprint = null;
   }
 
   Future<void> _pickDate(bool isIncomeDate) async {
@@ -92,7 +104,6 @@ class _OtherIncomeDialogState extends ConsumerState<OtherIncomeDialog> {
 
     setState(() => _saving = true);
     try {
-      final repo = ref.read(otherIncomeRepositoryProvider);
       final authState = ref.read(authProvider).valueOrNull;
       final userId = authState?.user?.id ?? 0;
       final isEdit = widget.existing != null;
@@ -103,6 +114,7 @@ class _OtherIncomeDialogState extends ConsumerState<OtherIncomeDialog> {
           ? widget.existing!.sessionId
           : (_linkSession ? activeSession?.id : null);
       if (isEdit) {
+        final repo = ref.read(otherIncomeRepositoryProvider);
         await repo.updateIncome(widget.existing!.copyWith(
           categoryId: _selectedCategoryId!,
           amount: amount,
@@ -112,7 +124,7 @@ class _OtherIncomeDialogState extends ConsumerState<OtherIncomeDialog> {
           sessionId: sessionId,
         ));
       } else {
-        await repo.createIncome(OtherIncomeRecord(
+        final fingerprint = OtherIncomeCreationFingerprint.compute(
           categoryId: _selectedCategoryId!,
           amount: amount,
           incomeDate: _incomeDate,
@@ -120,13 +132,40 @@ class _OtherIncomeDialogState extends ConsumerState<OtherIncomeDialog> {
           notes: _notesCtrl.text.trim(),
           sessionId: sessionId,
           createdBy: userId,
-          isVoided: false,
-          createdAt: DateTime.now(),
-        ));
+        );
+        if (_pendingFingerprint != null &&
+            _pendingFingerprint != fingerprint) {
+          _resetCreateAttempt();
+        }
+        _pendingFingerprint = fingerprint;
+        _idempotencyKey ??= _otherIncomeCreateUuid.v4();
+
+        await ref.read(otherIncomeCreationServiceProvider).processCreate(
+              idempotencyKey: _idempotencyKey!,
+              fingerprintHash: fingerprint,
+              categoryId: _selectedCategoryId!,
+              amount: amount,
+              incomeDate: _incomeDate,
+              receivedAt: _receivedAt,
+              notes: _notesCtrl.text.trim(),
+              createdBy: userId,
+              sessionId: sessionId,
+            );
+        _resetCreateAttempt();
       }
       ref.invalidate(otherIncomeProvider);
       ref.invalidate(otherIncomeSummaryProvider);
       if (mounted) Navigator.of(context).pop(true);
+    } on OtherIncomeCreationIdempotencyConflictException catch (e) {
+      _resetCreateAttempt();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('تعذر تسجيل الإيراد: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

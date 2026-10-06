@@ -71,29 +71,6 @@ class OtherIncomeRepository {
 
   // ── Records ───────────────────────────────────────────────────────────────
 
-  Future<int> createIncome(OtherIncomeRecord record) async {
-    final id = await _db.otherIncomeDao.createIncome(
-      db.OtherIncomeRecordsCompanion(
-        categoryId: Value(record.categoryId),
-        amount: Value(record.amount),
-        incomeDate: Value(record.incomeDate),
-        receivedAt: Value(record.receivedAt),
-        notes: Value(record.notes),
-        sessionId: Value(record.sessionId),
-        createdBy: Value(record.createdBy),
-      ),
-    );
-    await _activityLogger.logEntityCreate(
-      activityType: ActivityTypes.incomeCreated,
-      category: ActivityCategories.financial,
-      entityType: 'other_income_record',
-      entityId: id,
-      title: '\u062a\u0633\u062c\u064a\u0644 \u0625\u064a\u0631\u0627\u062f',
-      description: record.amount.toStringAsFixed(2),
-    );
-    return id;
-  }
-
   /// Updates a non-voided income record inside a Drift transaction (TOCTOU-safe).
   ///
   /// Rules:

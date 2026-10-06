@@ -51,7 +51,8 @@ class OtherIncomeDao extends DatabaseAccessor<AppDatabase>
 
   // ── Records ───────────────────────────────────────────────────────────────
 
-  Future<int> createIncome(OtherIncomeRecordsCompanion entry) =>
+  /// Inserts an other income record. Must run inside caller's transaction.
+  Future<int> createIncomeInTransaction(OtherIncomeRecordsCompanion entry) =>
       into(otherIncomeRecords).insert(entry);
 
   Future<bool> updateIncome(OtherIncomeRecordsCompanion entry) =>

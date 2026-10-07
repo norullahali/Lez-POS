@@ -2,9 +2,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart' hide TextDirection;
+import 'package:uuid/uuid.dart';
+import '../../../core/services/opening_stock_live_activity_exception.dart';
+import '../../../core/services/opening_stock_product_already_opened_exception.dart';
+import '../../../core/services/opening_stock_save_idempotency_conflict_exception.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/confirmation_dialog.dart';
 import '../../../core/widgets/loading_overlay.dart';
+import '../../auth/providers/auth_provider.dart';
 import '../../products/providers/products_provider.dart';
 import '../providers/opening_stock_provider.dart';
 
@@ -18,11 +23,20 @@ class OpeningStockScreen extends ConsumerStatefulWidget {
 class _OpeningStockScreenState extends ConsumerState<OpeningStockScreen> {
   final _searchCtrl = TextEditingController();
   bool _isSaving = false;
+  String? _idempotencyKey;
+  String? _pendingFingerprint;
+
+  static const _openingStockSaveUuid = Uuid();
 
   @override
   void dispose() {
     _searchCtrl.dispose();
     super.dispose();
+  }
+
+  void _resetSaveAttempt() {
+    _idempotencyKey = null;
+    _pendingFingerprint = null;
   }
 
   @override
@@ -240,12 +254,74 @@ class _OpeningStockScreenState extends ConsumerState<OpeningStockScreen> {
       confirmColor: AppColors.success,
     );
     if (!confirmed) return;
+
+    final authState = ref.read(authProvider).valueOrNull;
+    final userId = authState?.user?.id ?? 0;
+    if (userId <= 0) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('\u064a\u062c\u0628 \u062a\u0633\u062c\u064a\u0644 \u0627\u0644\u062f\u062e\u0648\u0644 \u0644\u062d\u0641\u0638 \u0627\u0644\u0631\u0635\u064a\u062f \u0627\u0644\u0627\u0641\u062a\u062a\u0627\u062d\u064a'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+      return;
+    }
+
+    final notifier = ref.read(openingStockNotifierProvider.notifier);
+    final fingerprint = notifier.computeFingerprint(userId);
+    if (_pendingFingerprint != null && _pendingFingerprint != fingerprint) {
+      _resetSaveAttempt();
+    }
+    _pendingFingerprint = fingerprint;
+    _idempotencyKey ??= _openingStockSaveUuid.v4();
+
     setState(() => _isSaving = true);
     try {
-      await ref.read(openingStockNotifierProvider.notifier).save();
+      await notifier.save(
+        idempotencyKey: _idempotencyKey!,
+        fingerprintHash: fingerprint,
+        createdBy: userId,
+      );
+      _resetSaveAttempt();
       ref.invalidate(productsNotifierProvider);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم حفظ الرصيد الافتتاحي بنجاح'), backgroundColor: AppColors.success));
+      }
+    } on OpeningStockSaveIdempotencyConflictException catch (e) {
+      _resetSaveAttempt();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('\u062a\u0639\u0630\u0631 \u062d\u0641\u0638 \u0627\u0644\u0631\u0635\u064a\u062f \u0627\u0644\u0627\u0641\u062a\u062a\u0627\u062d\u064a: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } on OpeningStockProductAlreadyOpenedException catch (e) {
+      _resetSaveAttempt();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '\u0627\u0644\u0645\u0646\u062a\u062c \u0644\u062f\u064a\u0647 \u0631\u0635\u064a\u062f \u0627\u0641\u062a\u062a\u0627\u062d\u064a \u0645\u0633\u0628\u0642\u0627\u064b. \u0627\u0633\u062a\u062e\u062f\u0645 \u062a\u0633\u0648\u064a\u0629 \u0627\u0644\u0645\u062e\u0632\u0646 \u0644\u0644\u062a\u0635\u062d\u064a\u062d: $e',
+            ),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } on OpeningStockLiveActivityException catch (e) {
+      _resetSaveAttempt();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '\u0627\u0644\u0645\u0646\u062a\u062c \u0644\u062f\u064a\u0647 \u0646\u0634\u0627\u0637 \u0645\u062e\u0632\u0646\u064a \u0648\u0644\u0627 \u064a\u0645\u0643\u0646 \u0625\u062f\u062e\u0627\u0644 \u0631\u0635\u064a\u062f \u0627\u0641\u062a\u062a\u0627\u062d\u064a. \u0627\u0633\u062a\u062e\u062f\u0645 \u062a\u0633\u0648\u064a\u0629 \u0627\u0644\u0645\u062e\u0632\u0646 \u0628\u062f\u0644\u0627\u064b \u0645\u0646 \u0630\u0644\u0643: $e',
+            ),
+            backgroundColor: AppColors.error,
+          ),
+        );
       }
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطأ: $e'), backgroundColor: AppColors.error));

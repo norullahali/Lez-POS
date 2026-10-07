@@ -6868,6 +6868,598 @@ class OtherIncomeIdempotencyCompanion
   }
 }
 
+class $OpeningStockIdempotencyTable extends OpeningStockIdempotency
+    with TableInfo<$OpeningStockIdempotencyTable, OpeningStockIdempotencyData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $OpeningStockIdempotencyTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idempotencyKeyMeta =
+      const VerificationMeta('idempotencyKey');
+  @override
+  late final GeneratedColumn<String> idempotencyKey = GeneratedColumn<String>(
+      'idempotency_key', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _fingerprintHashMeta =
+      const VerificationMeta('fingerprintHash');
+  @override
+  late final GeneratedColumn<String> fingerprintHash = GeneratedColumn<String>(
+      'fingerprint_hash', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _createdAtMeta =
+      const VerificationMeta('createdAt');
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+      'created_at', aliasedName, false,
+      type: DriftSqlType.dateTime,
+      requiredDuringInsert: false,
+      defaultValue: currentDateAndTime);
+  @override
+  List<GeneratedColumn> get $columns =>
+      [idempotencyKey, fingerprintHash, createdAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'opening_stock_idempotency';
+  @override
+  VerificationContext validateIntegrity(
+      Insertable<OpeningStockIdempotencyData> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('idempotency_key')) {
+      context.handle(
+          _idempotencyKeyMeta,
+          idempotencyKey.isAcceptableOrUnknown(
+              data['idempotency_key']!, _idempotencyKeyMeta));
+    } else if (isInserting) {
+      context.missing(_idempotencyKeyMeta);
+    }
+    if (data.containsKey('fingerprint_hash')) {
+      context.handle(
+          _fingerprintHashMeta,
+          fingerprintHash.isAcceptableOrUnknown(
+              data['fingerprint_hash']!, _fingerprintHashMeta));
+    } else if (isInserting) {
+      context.missing(_fingerprintHashMeta);
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(_createdAtMeta,
+          createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {idempotencyKey};
+  @override
+  OpeningStockIdempotencyData map(Map<String, dynamic> data,
+      {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return OpeningStockIdempotencyData(
+      idempotencyKey: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}idempotency_key'])!,
+      fingerprintHash: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}fingerprint_hash'])!,
+      createdAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
+    );
+  }
+
+  @override
+  $OpeningStockIdempotencyTable createAlias(String alias) {
+    return $OpeningStockIdempotencyTable(attachedDatabase, alias);
+  }
+}
+
+class OpeningStockIdempotencyData extends DataClass
+    implements Insertable<OpeningStockIdempotencyData> {
+  final String idempotencyKey;
+  final String fingerprintHash;
+  final DateTime createdAt;
+  const OpeningStockIdempotencyData(
+      {required this.idempotencyKey,
+      required this.fingerprintHash,
+      required this.createdAt});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['idempotency_key'] = Variable<String>(idempotencyKey);
+    map['fingerprint_hash'] = Variable<String>(fingerprintHash);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    return map;
+  }
+
+  OpeningStockIdempotencyCompanion toCompanion(bool nullToAbsent) {
+    return OpeningStockIdempotencyCompanion(
+      idempotencyKey: Value(idempotencyKey),
+      fingerprintHash: Value(fingerprintHash),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory OpeningStockIdempotencyData.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return OpeningStockIdempotencyData(
+      idempotencyKey: serializer.fromJson<String>(json['idempotencyKey']),
+      fingerprintHash: serializer.fromJson<String>(json['fingerprintHash']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'idempotencyKey': serializer.toJson<String>(idempotencyKey),
+      'fingerprintHash': serializer.toJson<String>(fingerprintHash),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+    };
+  }
+
+  OpeningStockIdempotencyData copyWith(
+          {String? idempotencyKey,
+          String? fingerprintHash,
+          DateTime? createdAt}) =>
+      OpeningStockIdempotencyData(
+        idempotencyKey: idempotencyKey ?? this.idempotencyKey,
+        fingerprintHash: fingerprintHash ?? this.fingerprintHash,
+        createdAt: createdAt ?? this.createdAt,
+      );
+  OpeningStockIdempotencyData copyWithCompanion(
+      OpeningStockIdempotencyCompanion data) {
+    return OpeningStockIdempotencyData(
+      idempotencyKey: data.idempotencyKey.present
+          ? data.idempotencyKey.value
+          : this.idempotencyKey,
+      fingerprintHash: data.fingerprintHash.present
+          ? data.fingerprintHash.value
+          : this.fingerprintHash,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('OpeningStockIdempotencyData(')
+          ..write('idempotencyKey: $idempotencyKey, ')
+          ..write('fingerprintHash: $fingerprintHash, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(idempotencyKey, fingerprintHash, createdAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is OpeningStockIdempotencyData &&
+          other.idempotencyKey == this.idempotencyKey &&
+          other.fingerprintHash == this.fingerprintHash &&
+          other.createdAt == this.createdAt);
+}
+
+class OpeningStockIdempotencyCompanion
+    extends UpdateCompanion<OpeningStockIdempotencyData> {
+  final Value<String> idempotencyKey;
+  final Value<String> fingerprintHash;
+  final Value<DateTime> createdAt;
+  final Value<int> rowid;
+  const OpeningStockIdempotencyCompanion({
+    this.idempotencyKey = const Value.absent(),
+    this.fingerprintHash = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  OpeningStockIdempotencyCompanion.insert({
+    required String idempotencyKey,
+    required String fingerprintHash,
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  })  : idempotencyKey = Value(idempotencyKey),
+        fingerprintHash = Value(fingerprintHash);
+  static Insertable<OpeningStockIdempotencyData> custom({
+    Expression<String>? idempotencyKey,
+    Expression<String>? fingerprintHash,
+    Expression<DateTime>? createdAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (idempotencyKey != null) 'idempotency_key': idempotencyKey,
+      if (fingerprintHash != null) 'fingerprint_hash': fingerprintHash,
+      if (createdAt != null) 'created_at': createdAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  OpeningStockIdempotencyCompanion copyWith(
+      {Value<String>? idempotencyKey,
+      Value<String>? fingerprintHash,
+      Value<DateTime>? createdAt,
+      Value<int>? rowid}) {
+    return OpeningStockIdempotencyCompanion(
+      idempotencyKey: idempotencyKey ?? this.idempotencyKey,
+      fingerprintHash: fingerprintHash ?? this.fingerprintHash,
+      createdAt: createdAt ?? this.createdAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (idempotencyKey.present) {
+      map['idempotency_key'] = Variable<String>(idempotencyKey.value);
+    }
+    if (fingerprintHash.present) {
+      map['fingerprint_hash'] = Variable<String>(fingerprintHash.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('OpeningStockIdempotencyCompanion(')
+          ..write('idempotencyKey: $idempotencyKey, ')
+          ..write('fingerprintHash: $fingerprintHash, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $ProductOpeningStockSealsTable extends ProductOpeningStockSeals
+    with TableInfo<$ProductOpeningStockSealsTable, ProductOpeningStockSeal> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ProductOpeningStockSealsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _productIdMeta =
+      const VerificationMeta('productId');
+  @override
+  late final GeneratedColumn<int> productId = GeneratedColumn<int>(
+      'product_id', aliasedName, false,
+      type: DriftSqlType.int, requiredDuringInsert: false);
+  static const VerificationMeta _quantityMeta =
+      const VerificationMeta('quantity');
+  @override
+  late final GeneratedColumn<double> quantity = GeneratedColumn<double>(
+      'quantity', aliasedName, false,
+      type: DriftSqlType.double, requiredDuringInsert: true);
+  static const VerificationMeta _unitCostMeta =
+      const VerificationMeta('unitCost');
+  @override
+  late final GeneratedColumn<double> unitCost = GeneratedColumn<double>(
+      'unit_cost', aliasedName, false,
+      type: DriftSqlType.double, requiredDuringInsert: true);
+  static const VerificationMeta _idempotencyKeyMeta =
+      const VerificationMeta('idempotencyKey');
+  @override
+  late final GeneratedColumn<String> idempotencyKey = GeneratedColumn<String>(
+      'idempotency_key', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _createdByMeta =
+      const VerificationMeta('createdBy');
+  @override
+  late final GeneratedColumn<int> createdBy = GeneratedColumn<int>(
+      'created_by', aliasedName, false,
+      type: DriftSqlType.int, requiredDuringInsert: true);
+  static const VerificationMeta _createdAtMeta =
+      const VerificationMeta('createdAt');
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+      'created_at', aliasedName, false,
+      type: DriftSqlType.dateTime,
+      requiredDuringInsert: false,
+      defaultValue: currentDateAndTime);
+  @override
+  List<GeneratedColumn> get $columns =>
+      [productId, quantity, unitCost, idempotencyKey, createdBy, createdAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'product_opening_stock_seals';
+  @override
+  VerificationContext validateIntegrity(
+      Insertable<ProductOpeningStockSeal> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('product_id')) {
+      context.handle(_productIdMeta,
+          productId.isAcceptableOrUnknown(data['product_id']!, _productIdMeta));
+    }
+    if (data.containsKey('quantity')) {
+      context.handle(_quantityMeta,
+          quantity.isAcceptableOrUnknown(data['quantity']!, _quantityMeta));
+    } else if (isInserting) {
+      context.missing(_quantityMeta);
+    }
+    if (data.containsKey('unit_cost')) {
+      context.handle(_unitCostMeta,
+          unitCost.isAcceptableOrUnknown(data['unit_cost']!, _unitCostMeta));
+    } else if (isInserting) {
+      context.missing(_unitCostMeta);
+    }
+    if (data.containsKey('idempotency_key')) {
+      context.handle(
+          _idempotencyKeyMeta,
+          idempotencyKey.isAcceptableOrUnknown(
+              data['idempotency_key']!, _idempotencyKeyMeta));
+    } else if (isInserting) {
+      context.missing(_idempotencyKeyMeta);
+    }
+    if (data.containsKey('created_by')) {
+      context.handle(_createdByMeta,
+          createdBy.isAcceptableOrUnknown(data['created_by']!, _createdByMeta));
+    } else if (isInserting) {
+      context.missing(_createdByMeta);
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(_createdAtMeta,
+          createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {productId};
+  @override
+  ProductOpeningStockSeal map(Map<String, dynamic> data,
+      {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ProductOpeningStockSeal(
+      productId: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}product_id'])!,
+      quantity: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}quantity'])!,
+      unitCost: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}unit_cost'])!,
+      idempotencyKey: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}idempotency_key'])!,
+      createdBy: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}created_by'])!,
+      createdAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
+    );
+  }
+
+  @override
+  $ProductOpeningStockSealsTable createAlias(String alias) {
+    return $ProductOpeningStockSealsTable(attachedDatabase, alias);
+  }
+}
+
+class ProductOpeningStockSeal extends DataClass
+    implements Insertable<ProductOpeningStockSeal> {
+  final int productId;
+  final double quantity;
+  final double unitCost;
+  final String idempotencyKey;
+  final int createdBy;
+  final DateTime createdAt;
+  const ProductOpeningStockSeal(
+      {required this.productId,
+      required this.quantity,
+      required this.unitCost,
+      required this.idempotencyKey,
+      required this.createdBy,
+      required this.createdAt});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['product_id'] = Variable<int>(productId);
+    map['quantity'] = Variable<double>(quantity);
+    map['unit_cost'] = Variable<double>(unitCost);
+    map['idempotency_key'] = Variable<String>(idempotencyKey);
+    map['created_by'] = Variable<int>(createdBy);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    return map;
+  }
+
+  ProductOpeningStockSealsCompanion toCompanion(bool nullToAbsent) {
+    return ProductOpeningStockSealsCompanion(
+      productId: Value(productId),
+      quantity: Value(quantity),
+      unitCost: Value(unitCost),
+      idempotencyKey: Value(idempotencyKey),
+      createdBy: Value(createdBy),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory ProductOpeningStockSeal.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ProductOpeningStockSeal(
+      productId: serializer.fromJson<int>(json['productId']),
+      quantity: serializer.fromJson<double>(json['quantity']),
+      unitCost: serializer.fromJson<double>(json['unitCost']),
+      idempotencyKey: serializer.fromJson<String>(json['idempotencyKey']),
+      createdBy: serializer.fromJson<int>(json['createdBy']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'productId': serializer.toJson<int>(productId),
+      'quantity': serializer.toJson<double>(quantity),
+      'unitCost': serializer.toJson<double>(unitCost),
+      'idempotencyKey': serializer.toJson<String>(idempotencyKey),
+      'createdBy': serializer.toJson<int>(createdBy),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+    };
+  }
+
+  ProductOpeningStockSeal copyWith(
+          {int? productId,
+          double? quantity,
+          double? unitCost,
+          String? idempotencyKey,
+          int? createdBy,
+          DateTime? createdAt}) =>
+      ProductOpeningStockSeal(
+        productId: productId ?? this.productId,
+        quantity: quantity ?? this.quantity,
+        unitCost: unitCost ?? this.unitCost,
+        idempotencyKey: idempotencyKey ?? this.idempotencyKey,
+        createdBy: createdBy ?? this.createdBy,
+        createdAt: createdAt ?? this.createdAt,
+      );
+  ProductOpeningStockSeal copyWithCompanion(
+      ProductOpeningStockSealsCompanion data) {
+    return ProductOpeningStockSeal(
+      productId: data.productId.present ? data.productId.value : this.productId,
+      quantity: data.quantity.present ? data.quantity.value : this.quantity,
+      unitCost: data.unitCost.present ? data.unitCost.value : this.unitCost,
+      idempotencyKey: data.idempotencyKey.present
+          ? data.idempotencyKey.value
+          : this.idempotencyKey,
+      createdBy: data.createdBy.present ? data.createdBy.value : this.createdBy,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ProductOpeningStockSeal(')
+          ..write('productId: $productId, ')
+          ..write('quantity: $quantity, ')
+          ..write('unitCost: $unitCost, ')
+          ..write('idempotencyKey: $idempotencyKey, ')
+          ..write('createdBy: $createdBy, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+      productId, quantity, unitCost, idempotencyKey, createdBy, createdAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ProductOpeningStockSeal &&
+          other.productId == this.productId &&
+          other.quantity == this.quantity &&
+          other.unitCost == this.unitCost &&
+          other.idempotencyKey == this.idempotencyKey &&
+          other.createdBy == this.createdBy &&
+          other.createdAt == this.createdAt);
+}
+
+class ProductOpeningStockSealsCompanion
+    extends UpdateCompanion<ProductOpeningStockSeal> {
+  final Value<int> productId;
+  final Value<double> quantity;
+  final Value<double> unitCost;
+  final Value<String> idempotencyKey;
+  final Value<int> createdBy;
+  final Value<DateTime> createdAt;
+  const ProductOpeningStockSealsCompanion({
+    this.productId = const Value.absent(),
+    this.quantity = const Value.absent(),
+    this.unitCost = const Value.absent(),
+    this.idempotencyKey = const Value.absent(),
+    this.createdBy = const Value.absent(),
+    this.createdAt = const Value.absent(),
+  });
+  ProductOpeningStockSealsCompanion.insert({
+    this.productId = const Value.absent(),
+    required double quantity,
+    required double unitCost,
+    required String idempotencyKey,
+    required int createdBy,
+    this.createdAt = const Value.absent(),
+  })  : quantity = Value(quantity),
+        unitCost = Value(unitCost),
+        idempotencyKey = Value(idempotencyKey),
+        createdBy = Value(createdBy);
+  static Insertable<ProductOpeningStockSeal> custom({
+    Expression<int>? productId,
+    Expression<double>? quantity,
+    Expression<double>? unitCost,
+    Expression<String>? idempotencyKey,
+    Expression<int>? createdBy,
+    Expression<DateTime>? createdAt,
+  }) {
+    return RawValuesInsertable({
+      if (productId != null) 'product_id': productId,
+      if (quantity != null) 'quantity': quantity,
+      if (unitCost != null) 'unit_cost': unitCost,
+      if (idempotencyKey != null) 'idempotency_key': idempotencyKey,
+      if (createdBy != null) 'created_by': createdBy,
+      if (createdAt != null) 'created_at': createdAt,
+    });
+  }
+
+  ProductOpeningStockSealsCompanion copyWith(
+      {Value<int>? productId,
+      Value<double>? quantity,
+      Value<double>? unitCost,
+      Value<String>? idempotencyKey,
+      Value<int>? createdBy,
+      Value<DateTime>? createdAt}) {
+    return ProductOpeningStockSealsCompanion(
+      productId: productId ?? this.productId,
+      quantity: quantity ?? this.quantity,
+      unitCost: unitCost ?? this.unitCost,
+      idempotencyKey: idempotencyKey ?? this.idempotencyKey,
+      createdBy: createdBy ?? this.createdBy,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (productId.present) {
+      map['product_id'] = Variable<int>(productId.value);
+    }
+    if (quantity.present) {
+      map['quantity'] = Variable<double>(quantity.value);
+    }
+    if (unitCost.present) {
+      map['unit_cost'] = Variable<double>(unitCost.value);
+    }
+    if (idempotencyKey.present) {
+      map['idempotency_key'] = Variable<String>(idempotencyKey.value);
+    }
+    if (createdBy.present) {
+      map['created_by'] = Variable<int>(createdBy.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ProductOpeningStockSealsCompanion(')
+          ..write('productId: $productId, ')
+          ..write('quantity: $quantity, ')
+          ..write('unitCost: $unitCost, ')
+          ..write('idempotencyKey: $idempotencyKey, ')
+          ..write('createdBy: $createdBy, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $SupplierAccountsTable extends SupplierAccounts
     with TableInfo<$SupplierAccountsTable, SupplierAccount> {
   @override
@@ -23126,6 +23718,10 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       $ExpenseIdempotencyTable(this);
   late final $OtherIncomeIdempotencyTable otherIncomeIdempotency =
       $OtherIncomeIdempotencyTable(this);
+  late final $OpeningStockIdempotencyTable openingStockIdempotency =
+      $OpeningStockIdempotencyTable(this);
+  late final $ProductOpeningStockSealsTable productOpeningStockSeals =
+      $ProductOpeningStockSealsTable(this);
   late final $SupplierAccountsTable supplierAccounts =
       $SupplierAccountsTable(this);
   late final $SupplierTransactionsTable supplierTransactions =
@@ -23211,6 +23807,10 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       ExpenseIdempotencyDao(this as AppDatabase);
   late final OtherIncomeIdempotencyDao otherIncomeIdempotencyDao =
       OtherIncomeIdempotencyDao(this as AppDatabase);
+  late final OpeningStockIdempotencyDao openingStockIdempotencyDao =
+      OpeningStockIdempotencyDao(this as AppDatabase);
+  late final ProductOpeningStockSealsDao productOpeningStockSealsDao =
+      ProductOpeningStockSealsDao(this as AppDatabase);
   late final SupplierAccountsDao supplierAccountsDao =
       SupplierAccountsDao(this as AppDatabase);
   late final ProductsDao productsDao = ProductsDao(this as AppDatabase);
@@ -23254,6 +23854,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         customerInvoiceReturnIdempotency,
         expenseIdempotency,
         otherIncomeIdempotency,
+        openingStockIdempotency,
+        productOpeningStockSeals,
         supplierAccounts,
         supplierTransactions,
         products,
@@ -27913,6 +28515,351 @@ typedef $$OtherIncomeIdempotencyTableProcessedTableManager
               OtherIncomeIdempotencyData>
         ),
         OtherIncomeIdempotencyData,
+        PrefetchHooks Function()>;
+typedef $$OpeningStockIdempotencyTableCreateCompanionBuilder
+    = OpeningStockIdempotencyCompanion Function({
+  required String idempotencyKey,
+  required String fingerprintHash,
+  Value<DateTime> createdAt,
+  Value<int> rowid,
+});
+typedef $$OpeningStockIdempotencyTableUpdateCompanionBuilder
+    = OpeningStockIdempotencyCompanion Function({
+  Value<String> idempotencyKey,
+  Value<String> fingerprintHash,
+  Value<DateTime> createdAt,
+  Value<int> rowid,
+});
+
+class $$OpeningStockIdempotencyTableFilterComposer
+    extends Composer<_$AppDatabase, $OpeningStockIdempotencyTable> {
+  $$OpeningStockIdempotencyTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get idempotencyKey => $composableBuilder(
+      column: $table.idempotencyKey,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get fingerprintHash => $composableBuilder(
+      column: $table.fingerprintHash,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnFilters(column));
+}
+
+class $$OpeningStockIdempotencyTableOrderingComposer
+    extends Composer<_$AppDatabase, $OpeningStockIdempotencyTable> {
+  $$OpeningStockIdempotencyTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get idempotencyKey => $composableBuilder(
+      column: $table.idempotencyKey,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get fingerprintHash => $composableBuilder(
+      column: $table.fingerprintHash,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnOrderings(column));
+}
+
+class $$OpeningStockIdempotencyTableAnnotationComposer
+    extends Composer<_$AppDatabase, $OpeningStockIdempotencyTable> {
+  $$OpeningStockIdempotencyTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get idempotencyKey => $composableBuilder(
+      column: $table.idempotencyKey, builder: (column) => column);
+
+  GeneratedColumn<String> get fingerprintHash => $composableBuilder(
+      column: $table.fingerprintHash, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+}
+
+class $$OpeningStockIdempotencyTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $OpeningStockIdempotencyTable,
+    OpeningStockIdempotencyData,
+    $$OpeningStockIdempotencyTableFilterComposer,
+    $$OpeningStockIdempotencyTableOrderingComposer,
+    $$OpeningStockIdempotencyTableAnnotationComposer,
+    $$OpeningStockIdempotencyTableCreateCompanionBuilder,
+    $$OpeningStockIdempotencyTableUpdateCompanionBuilder,
+    (
+      OpeningStockIdempotencyData,
+      BaseReferences<_$AppDatabase, $OpeningStockIdempotencyTable,
+          OpeningStockIdempotencyData>
+    ),
+    OpeningStockIdempotencyData,
+    PrefetchHooks Function()> {
+  $$OpeningStockIdempotencyTableTableManager(
+      _$AppDatabase db, $OpeningStockIdempotencyTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$OpeningStockIdempotencyTableFilterComposer(
+                  $db: db, $table: table),
+          createOrderingComposer: () =>
+              $$OpeningStockIdempotencyTableOrderingComposer(
+                  $db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$OpeningStockIdempotencyTableAnnotationComposer(
+                  $db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<String> idempotencyKey = const Value.absent(),
+            Value<String> fingerprintHash = const Value.absent(),
+            Value<DateTime> createdAt = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              OpeningStockIdempotencyCompanion(
+            idempotencyKey: idempotencyKey,
+            fingerprintHash: fingerprintHash,
+            createdAt: createdAt,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            required String idempotencyKey,
+            required String fingerprintHash,
+            Value<DateTime> createdAt = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              OpeningStockIdempotencyCompanion.insert(
+            idempotencyKey: idempotencyKey,
+            fingerprintHash: fingerprintHash,
+            createdAt: createdAt,
+            rowid: rowid,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$OpeningStockIdempotencyTableProcessedTableManager
+    = ProcessedTableManager<
+        _$AppDatabase,
+        $OpeningStockIdempotencyTable,
+        OpeningStockIdempotencyData,
+        $$OpeningStockIdempotencyTableFilterComposer,
+        $$OpeningStockIdempotencyTableOrderingComposer,
+        $$OpeningStockIdempotencyTableAnnotationComposer,
+        $$OpeningStockIdempotencyTableCreateCompanionBuilder,
+        $$OpeningStockIdempotencyTableUpdateCompanionBuilder,
+        (
+          OpeningStockIdempotencyData,
+          BaseReferences<_$AppDatabase, $OpeningStockIdempotencyTable,
+              OpeningStockIdempotencyData>
+        ),
+        OpeningStockIdempotencyData,
+        PrefetchHooks Function()>;
+typedef $$ProductOpeningStockSealsTableCreateCompanionBuilder
+    = ProductOpeningStockSealsCompanion Function({
+  Value<int> productId,
+  required double quantity,
+  required double unitCost,
+  required String idempotencyKey,
+  required int createdBy,
+  Value<DateTime> createdAt,
+});
+typedef $$ProductOpeningStockSealsTableUpdateCompanionBuilder
+    = ProductOpeningStockSealsCompanion Function({
+  Value<int> productId,
+  Value<double> quantity,
+  Value<double> unitCost,
+  Value<String> idempotencyKey,
+  Value<int> createdBy,
+  Value<DateTime> createdAt,
+});
+
+class $$ProductOpeningStockSealsTableFilterComposer
+    extends Composer<_$AppDatabase, $ProductOpeningStockSealsTable> {
+  $$ProductOpeningStockSealsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get productId => $composableBuilder(
+      column: $table.productId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get quantity => $composableBuilder(
+      column: $table.quantity, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get unitCost => $composableBuilder(
+      column: $table.unitCost, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get idempotencyKey => $composableBuilder(
+      column: $table.idempotencyKey,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get createdBy => $composableBuilder(
+      column: $table.createdBy, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnFilters(column));
+}
+
+class $$ProductOpeningStockSealsTableOrderingComposer
+    extends Composer<_$AppDatabase, $ProductOpeningStockSealsTable> {
+  $$ProductOpeningStockSealsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get productId => $composableBuilder(
+      column: $table.productId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get quantity => $composableBuilder(
+      column: $table.quantity, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get unitCost => $composableBuilder(
+      column: $table.unitCost, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get idempotencyKey => $composableBuilder(
+      column: $table.idempotencyKey,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get createdBy => $composableBuilder(
+      column: $table.createdBy, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnOrderings(column));
+}
+
+class $$ProductOpeningStockSealsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $ProductOpeningStockSealsTable> {
+  $$ProductOpeningStockSealsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get productId =>
+      $composableBuilder(column: $table.productId, builder: (column) => column);
+
+  GeneratedColumn<double> get quantity =>
+      $composableBuilder(column: $table.quantity, builder: (column) => column);
+
+  GeneratedColumn<double> get unitCost =>
+      $composableBuilder(column: $table.unitCost, builder: (column) => column);
+
+  GeneratedColumn<String> get idempotencyKey => $composableBuilder(
+      column: $table.idempotencyKey, builder: (column) => column);
+
+  GeneratedColumn<int> get createdBy =>
+      $composableBuilder(column: $table.createdBy, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+}
+
+class $$ProductOpeningStockSealsTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $ProductOpeningStockSealsTable,
+    ProductOpeningStockSeal,
+    $$ProductOpeningStockSealsTableFilterComposer,
+    $$ProductOpeningStockSealsTableOrderingComposer,
+    $$ProductOpeningStockSealsTableAnnotationComposer,
+    $$ProductOpeningStockSealsTableCreateCompanionBuilder,
+    $$ProductOpeningStockSealsTableUpdateCompanionBuilder,
+    (
+      ProductOpeningStockSeal,
+      BaseReferences<_$AppDatabase, $ProductOpeningStockSealsTable,
+          ProductOpeningStockSeal>
+    ),
+    ProductOpeningStockSeal,
+    PrefetchHooks Function()> {
+  $$ProductOpeningStockSealsTableTableManager(
+      _$AppDatabase db, $ProductOpeningStockSealsTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$ProductOpeningStockSealsTableFilterComposer(
+                  $db: db, $table: table),
+          createOrderingComposer: () =>
+              $$ProductOpeningStockSealsTableOrderingComposer(
+                  $db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$ProductOpeningStockSealsTableAnnotationComposer(
+                  $db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<int> productId = const Value.absent(),
+            Value<double> quantity = const Value.absent(),
+            Value<double> unitCost = const Value.absent(),
+            Value<String> idempotencyKey = const Value.absent(),
+            Value<int> createdBy = const Value.absent(),
+            Value<DateTime> createdAt = const Value.absent(),
+          }) =>
+              ProductOpeningStockSealsCompanion(
+            productId: productId,
+            quantity: quantity,
+            unitCost: unitCost,
+            idempotencyKey: idempotencyKey,
+            createdBy: createdBy,
+            createdAt: createdAt,
+          ),
+          createCompanionCallback: ({
+            Value<int> productId = const Value.absent(),
+            required double quantity,
+            required double unitCost,
+            required String idempotencyKey,
+            required int createdBy,
+            Value<DateTime> createdAt = const Value.absent(),
+          }) =>
+              ProductOpeningStockSealsCompanion.insert(
+            productId: productId,
+            quantity: quantity,
+            unitCost: unitCost,
+            idempotencyKey: idempotencyKey,
+            createdBy: createdBy,
+            createdAt: createdAt,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$ProductOpeningStockSealsTableProcessedTableManager
+    = ProcessedTableManager<
+        _$AppDatabase,
+        $ProductOpeningStockSealsTable,
+        ProductOpeningStockSeal,
+        $$ProductOpeningStockSealsTableFilterComposer,
+        $$ProductOpeningStockSealsTableOrderingComposer,
+        $$ProductOpeningStockSealsTableAnnotationComposer,
+        $$ProductOpeningStockSealsTableCreateCompanionBuilder,
+        $$ProductOpeningStockSealsTableUpdateCompanionBuilder,
+        (
+          ProductOpeningStockSeal,
+          BaseReferences<_$AppDatabase, $ProductOpeningStockSealsTable,
+              ProductOpeningStockSeal>
+        ),
+        ProductOpeningStockSeal,
         PrefetchHooks Function()>;
 typedef $$SupplierAccountsTableCreateCompanionBuilder
     = SupplierAccountsCompanion Function({
@@ -41132,6 +42079,12 @@ class $AppDatabaseManager {
   $$OtherIncomeIdempotencyTableTableManager get otherIncomeIdempotency =>
       $$OtherIncomeIdempotencyTableTableManager(
           _db, _db.otherIncomeIdempotency);
+  $$OpeningStockIdempotencyTableTableManager get openingStockIdempotency =>
+      $$OpeningStockIdempotencyTableTableManager(
+          _db, _db.openingStockIdempotency);
+  $$ProductOpeningStockSealsTableTableManager get productOpeningStockSeals =>
+      $$ProductOpeningStockSealsTableTableManager(
+          _db, _db.productOpeningStockSeals);
   $$SupplierAccountsTableTableManager get supplierAccounts =>
       $$SupplierAccountsTableTableManager(_db, _db.supplierAccounts);
   $$SupplierTransactionsTableTableManager get supplierTransactions =>

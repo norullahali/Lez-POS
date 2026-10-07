@@ -24,6 +24,8 @@ import 'tables/supplier_return_idempotency_table.dart';
 import 'tables/customer_invoice_return_idempotency_table.dart';
 import 'tables/expense_idempotency_table.dart';
 import 'tables/other_income_idempotency_table.dart';
+import 'tables/opening_stock_idempotency_table.dart';
+import 'tables/product_opening_stock_seals_table.dart';
 import 'tables/products_table.dart';
 import 'tables/product_batches_table.dart';
 import 'tables/stock_ledger_table.dart';
@@ -77,6 +79,8 @@ import 'daos/supplier_return_idempotency_dao.dart';
 import 'daos/customer_invoice_return_idempotency_dao.dart';
 import 'daos/expense_idempotency_dao.dart';
 import 'daos/other_income_idempotency_dao.dart';
+import 'daos/opening_stock_idempotency_dao.dart';
+import 'daos/product_opening_stock_seals_dao.dart';
 import 'daos/supplier_accounts_dao.dart';
 import 'daos/products_dao.dart';
 import 'daos/stock_dao.dart';
@@ -107,6 +111,8 @@ part 'app_database.g.dart';
     CustomerInvoiceReturnIdempotency,
     ExpenseIdempotency,
     OtherIncomeIdempotency,
+    OpeningStockIdempotency,
+    ProductOpeningStockSeals,
     SupplierAccounts,
     SupplierTransactions,
     Products,
@@ -160,6 +166,8 @@ part 'app_database.g.dart';
     CustomerInvoiceReturnIdempotencyDao,
     ExpenseIdempotencyDao,
     OtherIncomeIdempotencyDao,
+    OpeningStockIdempotencyDao,
+    ProductOpeningStockSealsDao,
     SupplierAccountsDao,
     ProductsDao,
     StockDao,
@@ -194,7 +202,7 @@ class AppDatabase extends _$AppDatabase {
   late final pricingDao = PricingDao(this);
 
   @override
-  int get schemaVersion => 46;
+  int get schemaVersion => 47;
 
   @override
   MigrationStrategy get migration {
@@ -1135,6 +1143,37 @@ class AppDatabase extends _$AppDatabase {
             rethrow;
           }
           debugPrint('[Migration v46] other_income_idempotency ready');
+        }
+        if (from < 47) {
+          debugPrint('[Migration v47] opening stock protection tables...');
+          await m.createTable(openingStockIdempotency);
+          await m.createTable(productOpeningStockSeals);
+          await customStatement('''
+            INSERT OR IGNORE INTO product_opening_stock_seals (
+              product_id,
+              quantity,
+              unit_cost,
+              idempotency_key,
+              created_by,
+              created_at
+            )
+            SELECT
+              sl.product_id,
+              sl.quantity_change,
+              sl.unit_cost,
+              '__legacy_v47_backfill__',
+              0,
+              COALESCE(sl.created_at, CURRENT_TIMESTAMP)
+            FROM stock_ledger sl
+            WHERE sl.movement_type = 'OPENING'
+              AND sl.id = (
+                SELECT MAX(sl2.id)
+                FROM stock_ledger sl2
+                WHERE sl2.product_id = sl.product_id
+                  AND sl2.movement_type = 'OPENING'
+              )
+          ''');
+          debugPrint('[Migration v47] opening stock protection ready');
         }
       },
       beforeOpen: (details) async {

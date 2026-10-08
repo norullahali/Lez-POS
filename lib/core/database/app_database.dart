@@ -26,6 +26,7 @@ import 'tables/expense_idempotency_table.dart';
 import 'tables/other_income_idempotency_table.dart';
 import 'tables/opening_stock_idempotency_table.dart';
 import 'tables/product_opening_stock_seals_table.dart';
+import 'tables/stock_adjustment_idempotency_table.dart';
 import 'tables/products_table.dart';
 import 'tables/product_batches_table.dart';
 import 'tables/stock_ledger_table.dart';
@@ -81,6 +82,7 @@ import 'daos/expense_idempotency_dao.dart';
 import 'daos/other_income_idempotency_dao.dart';
 import 'daos/opening_stock_idempotency_dao.dart';
 import 'daos/product_opening_stock_seals_dao.dart';
+import 'daos/stock_adjustment_idempotency_dao.dart';
 import 'daos/supplier_accounts_dao.dart';
 import 'daos/products_dao.dart';
 import 'daos/stock_dao.dart';
@@ -113,6 +115,7 @@ part 'app_database.g.dart';
     OtherIncomeIdempotency,
     OpeningStockIdempotency,
     ProductOpeningStockSeals,
+    StockAdjustmentIdempotency,
     SupplierAccounts,
     SupplierTransactions,
     Products,
@@ -168,6 +171,7 @@ part 'app_database.g.dart';
     OtherIncomeIdempotencyDao,
     OpeningStockIdempotencyDao,
     ProductOpeningStockSealsDao,
+    StockAdjustmentIdempotencyDao,
     SupplierAccountsDao,
     ProductsDao,
     StockDao,
@@ -202,7 +206,7 @@ class AppDatabase extends _$AppDatabase {
   late final pricingDao = PricingDao(this);
 
   @override
-  int get schemaVersion => 47;
+  int get schemaVersion => 48;
 
   @override
   MigrationStrategy get migration {
@@ -257,6 +261,10 @@ class AppDatabase extends _$AppDatabase {
         await customStatement(
           'CREATE INDEX IF NOT EXISTS oii_other_income_record_idx '
           'ON other_income_idempotency (other_income_record_id)',
+        );
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS sai_stock_adjustment_idx '
+          'ON stock_adjustment_idempotency (stock_adjustment_id)',
         );
         // Enable foreign keys
         await customStatement('PRAGMA foreign_keys = ON');
@@ -1174,6 +1182,20 @@ class AppDatabase extends _$AppDatabase {
               )
           ''');
           debugPrint('[Migration v47] opening stock protection ready');
+        }
+        if (from < 48) {
+          debugPrint('[Migration v48] stock_adjustment_idempotency table...');
+          await m.createTable(stockAdjustmentIdempotency);
+          try {
+            await customStatement(
+              'CREATE INDEX IF NOT EXISTS sai_stock_adjustment_idx '
+              'ON stock_adjustment_idempotency (stock_adjustment_id)',
+            );
+          } catch (e) {
+            debugPrint('[Migration v48] idempotency index skip/error: $e');
+            rethrow;
+          }
+          debugPrint('[Migration v48] stock_adjustment_idempotency ready');
         }
       },
       beforeOpen: (details) async {

@@ -422,13 +422,13 @@ void main() {
       final migrated = AppDatabase.test(NativeDatabase.opened(opened.rawDb));
       addTearDown(() async => migrated.close());
 
-      expect(migrated.schemaVersion, 47);
+      expect(migrated.schemaVersion, 48);
       expect(await idempotencyTableExists(migrated), isTrue);
       expect(await idempotencyIndexExists(migrated), isTrue);
     });
 
     test('14) fresh schema v41 includes table and index', () async {
-      expect(db.schemaVersion, 47);
+      expect(db.schemaVersion, 48);
       expect(await idempotencyTableExists(db), isTrue);
       expect(await idempotencyIndexExists(db), isTrue);
     });

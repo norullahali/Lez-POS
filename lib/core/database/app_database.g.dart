@@ -7460,6 +7460,299 @@ class ProductOpeningStockSealsCompanion
   }
 }
 
+class $StockAdjustmentIdempotencyTable extends StockAdjustmentIdempotency
+    with
+        TableInfo<$StockAdjustmentIdempotencyTable,
+            StockAdjustmentIdempotencyData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $StockAdjustmentIdempotencyTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idempotencyKeyMeta =
+      const VerificationMeta('idempotencyKey');
+  @override
+  late final GeneratedColumn<String> idempotencyKey = GeneratedColumn<String>(
+      'idempotency_key', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _fingerprintHashMeta =
+      const VerificationMeta('fingerprintHash');
+  @override
+  late final GeneratedColumn<String> fingerprintHash = GeneratedColumn<String>(
+      'fingerprint_hash', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _stockAdjustmentIdMeta =
+      const VerificationMeta('stockAdjustmentId');
+  @override
+  late final GeneratedColumn<int> stockAdjustmentId = GeneratedColumn<int>(
+      'stock_adjustment_id', aliasedName, false,
+      type: DriftSqlType.int, requiredDuringInsert: true);
+  static const VerificationMeta _createdAtMeta =
+      const VerificationMeta('createdAt');
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+      'created_at', aliasedName, false,
+      type: DriftSqlType.dateTime,
+      requiredDuringInsert: false,
+      defaultValue: currentDateAndTime);
+  @override
+  List<GeneratedColumn> get $columns =>
+      [idempotencyKey, fingerprintHash, stockAdjustmentId, createdAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'stock_adjustment_idempotency';
+  @override
+  VerificationContext validateIntegrity(
+      Insertable<StockAdjustmentIdempotencyData> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('idempotency_key')) {
+      context.handle(
+          _idempotencyKeyMeta,
+          idempotencyKey.isAcceptableOrUnknown(
+              data['idempotency_key']!, _idempotencyKeyMeta));
+    } else if (isInserting) {
+      context.missing(_idempotencyKeyMeta);
+    }
+    if (data.containsKey('fingerprint_hash')) {
+      context.handle(
+          _fingerprintHashMeta,
+          fingerprintHash.isAcceptableOrUnknown(
+              data['fingerprint_hash']!, _fingerprintHashMeta));
+    } else if (isInserting) {
+      context.missing(_fingerprintHashMeta);
+    }
+    if (data.containsKey('stock_adjustment_id')) {
+      context.handle(
+          _stockAdjustmentIdMeta,
+          stockAdjustmentId.isAcceptableOrUnknown(
+              data['stock_adjustment_id']!, _stockAdjustmentIdMeta));
+    } else if (isInserting) {
+      context.missing(_stockAdjustmentIdMeta);
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(_createdAtMeta,
+          createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {idempotencyKey};
+  @override
+  StockAdjustmentIdempotencyData map(Map<String, dynamic> data,
+      {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return StockAdjustmentIdempotencyData(
+      idempotencyKey: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}idempotency_key'])!,
+      fingerprintHash: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}fingerprint_hash'])!,
+      stockAdjustmentId: attachedDatabase.typeMapping.read(
+          DriftSqlType.int, data['${effectivePrefix}stock_adjustment_id'])!,
+      createdAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
+    );
+  }
+
+  @override
+  $StockAdjustmentIdempotencyTable createAlias(String alias) {
+    return $StockAdjustmentIdempotencyTable(attachedDatabase, alias);
+  }
+}
+
+class StockAdjustmentIdempotencyData extends DataClass
+    implements Insertable<StockAdjustmentIdempotencyData> {
+  final String idempotencyKey;
+  final String fingerprintHash;
+  final int stockAdjustmentId;
+  final DateTime createdAt;
+  const StockAdjustmentIdempotencyData(
+      {required this.idempotencyKey,
+      required this.fingerprintHash,
+      required this.stockAdjustmentId,
+      required this.createdAt});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['idempotency_key'] = Variable<String>(idempotencyKey);
+    map['fingerprint_hash'] = Variable<String>(fingerprintHash);
+    map['stock_adjustment_id'] = Variable<int>(stockAdjustmentId);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    return map;
+  }
+
+  StockAdjustmentIdempotencyCompanion toCompanion(bool nullToAbsent) {
+    return StockAdjustmentIdempotencyCompanion(
+      idempotencyKey: Value(idempotencyKey),
+      fingerprintHash: Value(fingerprintHash),
+      stockAdjustmentId: Value(stockAdjustmentId),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory StockAdjustmentIdempotencyData.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return StockAdjustmentIdempotencyData(
+      idempotencyKey: serializer.fromJson<String>(json['idempotencyKey']),
+      fingerprintHash: serializer.fromJson<String>(json['fingerprintHash']),
+      stockAdjustmentId: serializer.fromJson<int>(json['stockAdjustmentId']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'idempotencyKey': serializer.toJson<String>(idempotencyKey),
+      'fingerprintHash': serializer.toJson<String>(fingerprintHash),
+      'stockAdjustmentId': serializer.toJson<int>(stockAdjustmentId),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+    };
+  }
+
+  StockAdjustmentIdempotencyData copyWith(
+          {String? idempotencyKey,
+          String? fingerprintHash,
+          int? stockAdjustmentId,
+          DateTime? createdAt}) =>
+      StockAdjustmentIdempotencyData(
+        idempotencyKey: idempotencyKey ?? this.idempotencyKey,
+        fingerprintHash: fingerprintHash ?? this.fingerprintHash,
+        stockAdjustmentId: stockAdjustmentId ?? this.stockAdjustmentId,
+        createdAt: createdAt ?? this.createdAt,
+      );
+  StockAdjustmentIdempotencyData copyWithCompanion(
+      StockAdjustmentIdempotencyCompanion data) {
+    return StockAdjustmentIdempotencyData(
+      idempotencyKey: data.idempotencyKey.present
+          ? data.idempotencyKey.value
+          : this.idempotencyKey,
+      fingerprintHash: data.fingerprintHash.present
+          ? data.fingerprintHash.value
+          : this.fingerprintHash,
+      stockAdjustmentId: data.stockAdjustmentId.present
+          ? data.stockAdjustmentId.value
+          : this.stockAdjustmentId,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('StockAdjustmentIdempotencyData(')
+          ..write('idempotencyKey: $idempotencyKey, ')
+          ..write('fingerprintHash: $fingerprintHash, ')
+          ..write('stockAdjustmentId: $stockAdjustmentId, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+      idempotencyKey, fingerprintHash, stockAdjustmentId, createdAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is StockAdjustmentIdempotencyData &&
+          other.idempotencyKey == this.idempotencyKey &&
+          other.fingerprintHash == this.fingerprintHash &&
+          other.stockAdjustmentId == this.stockAdjustmentId &&
+          other.createdAt == this.createdAt);
+}
+
+class StockAdjustmentIdempotencyCompanion
+    extends UpdateCompanion<StockAdjustmentIdempotencyData> {
+  final Value<String> idempotencyKey;
+  final Value<String> fingerprintHash;
+  final Value<int> stockAdjustmentId;
+  final Value<DateTime> createdAt;
+  final Value<int> rowid;
+  const StockAdjustmentIdempotencyCompanion({
+    this.idempotencyKey = const Value.absent(),
+    this.fingerprintHash = const Value.absent(),
+    this.stockAdjustmentId = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  StockAdjustmentIdempotencyCompanion.insert({
+    required String idempotencyKey,
+    required String fingerprintHash,
+    required int stockAdjustmentId,
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  })  : idempotencyKey = Value(idempotencyKey),
+        fingerprintHash = Value(fingerprintHash),
+        stockAdjustmentId = Value(stockAdjustmentId);
+  static Insertable<StockAdjustmentIdempotencyData> custom({
+    Expression<String>? idempotencyKey,
+    Expression<String>? fingerprintHash,
+    Expression<int>? stockAdjustmentId,
+    Expression<DateTime>? createdAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (idempotencyKey != null) 'idempotency_key': idempotencyKey,
+      if (fingerprintHash != null) 'fingerprint_hash': fingerprintHash,
+      if (stockAdjustmentId != null) 'stock_adjustment_id': stockAdjustmentId,
+      if (createdAt != null) 'created_at': createdAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  StockAdjustmentIdempotencyCompanion copyWith(
+      {Value<String>? idempotencyKey,
+      Value<String>? fingerprintHash,
+      Value<int>? stockAdjustmentId,
+      Value<DateTime>? createdAt,
+      Value<int>? rowid}) {
+    return StockAdjustmentIdempotencyCompanion(
+      idempotencyKey: idempotencyKey ?? this.idempotencyKey,
+      fingerprintHash: fingerprintHash ?? this.fingerprintHash,
+      stockAdjustmentId: stockAdjustmentId ?? this.stockAdjustmentId,
+      createdAt: createdAt ?? this.createdAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (idempotencyKey.present) {
+      map['idempotency_key'] = Variable<String>(idempotencyKey.value);
+    }
+    if (fingerprintHash.present) {
+      map['fingerprint_hash'] = Variable<String>(fingerprintHash.value);
+    }
+    if (stockAdjustmentId.present) {
+      map['stock_adjustment_id'] = Variable<int>(stockAdjustmentId.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('StockAdjustmentIdempotencyCompanion(')
+          ..write('idempotencyKey: $idempotencyKey, ')
+          ..write('fingerprintHash: $fingerprintHash, ')
+          ..write('stockAdjustmentId: $stockAdjustmentId, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $SupplierAccountsTable extends SupplierAccounts
     with TableInfo<$SupplierAccountsTable, SupplierAccount> {
   @override
@@ -23722,6 +24015,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       $OpeningStockIdempotencyTable(this);
   late final $ProductOpeningStockSealsTable productOpeningStockSeals =
       $ProductOpeningStockSealsTable(this);
+  late final $StockAdjustmentIdempotencyTable stockAdjustmentIdempotency =
+      $StockAdjustmentIdempotencyTable(this);
   late final $SupplierAccountsTable supplierAccounts =
       $SupplierAccountsTable(this);
   late final $SupplierTransactionsTable supplierTransactions =
@@ -23811,6 +24106,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       OpeningStockIdempotencyDao(this as AppDatabase);
   late final ProductOpeningStockSealsDao productOpeningStockSealsDao =
       ProductOpeningStockSealsDao(this as AppDatabase);
+  late final StockAdjustmentIdempotencyDao stockAdjustmentIdempotencyDao =
+      StockAdjustmentIdempotencyDao(this as AppDatabase);
   late final SupplierAccountsDao supplierAccountsDao =
       SupplierAccountsDao(this as AppDatabase);
   late final ProductsDao productsDao = ProductsDao(this as AppDatabase);
@@ -23856,6 +24153,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         otherIncomeIdempotency,
         openingStockIdempotency,
         productOpeningStockSeals,
+        stockAdjustmentIdempotency,
         supplierAccounts,
         supplierTransactions,
         products,
@@ -28860,6 +29158,177 @@ typedef $$ProductOpeningStockSealsTableProcessedTableManager
               ProductOpeningStockSeal>
         ),
         ProductOpeningStockSeal,
+        PrefetchHooks Function()>;
+typedef $$StockAdjustmentIdempotencyTableCreateCompanionBuilder
+    = StockAdjustmentIdempotencyCompanion Function({
+  required String idempotencyKey,
+  required String fingerprintHash,
+  required int stockAdjustmentId,
+  Value<DateTime> createdAt,
+  Value<int> rowid,
+});
+typedef $$StockAdjustmentIdempotencyTableUpdateCompanionBuilder
+    = StockAdjustmentIdempotencyCompanion Function({
+  Value<String> idempotencyKey,
+  Value<String> fingerprintHash,
+  Value<int> stockAdjustmentId,
+  Value<DateTime> createdAt,
+  Value<int> rowid,
+});
+
+class $$StockAdjustmentIdempotencyTableFilterComposer
+    extends Composer<_$AppDatabase, $StockAdjustmentIdempotencyTable> {
+  $$StockAdjustmentIdempotencyTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get idempotencyKey => $composableBuilder(
+      column: $table.idempotencyKey,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get fingerprintHash => $composableBuilder(
+      column: $table.fingerprintHash,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get stockAdjustmentId => $composableBuilder(
+      column: $table.stockAdjustmentId,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnFilters(column));
+}
+
+class $$StockAdjustmentIdempotencyTableOrderingComposer
+    extends Composer<_$AppDatabase, $StockAdjustmentIdempotencyTable> {
+  $$StockAdjustmentIdempotencyTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get idempotencyKey => $composableBuilder(
+      column: $table.idempotencyKey,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get fingerprintHash => $composableBuilder(
+      column: $table.fingerprintHash,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get stockAdjustmentId => $composableBuilder(
+      column: $table.stockAdjustmentId,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnOrderings(column));
+}
+
+class $$StockAdjustmentIdempotencyTableAnnotationComposer
+    extends Composer<_$AppDatabase, $StockAdjustmentIdempotencyTable> {
+  $$StockAdjustmentIdempotencyTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get idempotencyKey => $composableBuilder(
+      column: $table.idempotencyKey, builder: (column) => column);
+
+  GeneratedColumn<String> get fingerprintHash => $composableBuilder(
+      column: $table.fingerprintHash, builder: (column) => column);
+
+  GeneratedColumn<int> get stockAdjustmentId => $composableBuilder(
+      column: $table.stockAdjustmentId, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+}
+
+class $$StockAdjustmentIdempotencyTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $StockAdjustmentIdempotencyTable,
+    StockAdjustmentIdempotencyData,
+    $$StockAdjustmentIdempotencyTableFilterComposer,
+    $$StockAdjustmentIdempotencyTableOrderingComposer,
+    $$StockAdjustmentIdempotencyTableAnnotationComposer,
+    $$StockAdjustmentIdempotencyTableCreateCompanionBuilder,
+    $$StockAdjustmentIdempotencyTableUpdateCompanionBuilder,
+    (
+      StockAdjustmentIdempotencyData,
+      BaseReferences<_$AppDatabase, $StockAdjustmentIdempotencyTable,
+          StockAdjustmentIdempotencyData>
+    ),
+    StockAdjustmentIdempotencyData,
+    PrefetchHooks Function()> {
+  $$StockAdjustmentIdempotencyTableTableManager(
+      _$AppDatabase db, $StockAdjustmentIdempotencyTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$StockAdjustmentIdempotencyTableFilterComposer(
+                  $db: db, $table: table),
+          createOrderingComposer: () =>
+              $$StockAdjustmentIdempotencyTableOrderingComposer(
+                  $db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$StockAdjustmentIdempotencyTableAnnotationComposer(
+                  $db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<String> idempotencyKey = const Value.absent(),
+            Value<String> fingerprintHash = const Value.absent(),
+            Value<int> stockAdjustmentId = const Value.absent(),
+            Value<DateTime> createdAt = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              StockAdjustmentIdempotencyCompanion(
+            idempotencyKey: idempotencyKey,
+            fingerprintHash: fingerprintHash,
+            stockAdjustmentId: stockAdjustmentId,
+            createdAt: createdAt,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            required String idempotencyKey,
+            required String fingerprintHash,
+            required int stockAdjustmentId,
+            Value<DateTime> createdAt = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              StockAdjustmentIdempotencyCompanion.insert(
+            idempotencyKey: idempotencyKey,
+            fingerprintHash: fingerprintHash,
+            stockAdjustmentId: stockAdjustmentId,
+            createdAt: createdAt,
+            rowid: rowid,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$StockAdjustmentIdempotencyTableProcessedTableManager
+    = ProcessedTableManager<
+        _$AppDatabase,
+        $StockAdjustmentIdempotencyTable,
+        StockAdjustmentIdempotencyData,
+        $$StockAdjustmentIdempotencyTableFilterComposer,
+        $$StockAdjustmentIdempotencyTableOrderingComposer,
+        $$StockAdjustmentIdempotencyTableAnnotationComposer,
+        $$StockAdjustmentIdempotencyTableCreateCompanionBuilder,
+        $$StockAdjustmentIdempotencyTableUpdateCompanionBuilder,
+        (
+          StockAdjustmentIdempotencyData,
+          BaseReferences<_$AppDatabase, $StockAdjustmentIdempotencyTable,
+              StockAdjustmentIdempotencyData>
+        ),
+        StockAdjustmentIdempotencyData,
         PrefetchHooks Function()>;
 typedef $$SupplierAccountsTableCreateCompanionBuilder
     = SupplierAccountsCompanion Function({
@@ -42085,6 +42554,10 @@ class $AppDatabaseManager {
   $$ProductOpeningStockSealsTableTableManager get productOpeningStockSeals =>
       $$ProductOpeningStockSealsTableTableManager(
           _db, _db.productOpeningStockSeals);
+  $$StockAdjustmentIdempotencyTableTableManager
+      get stockAdjustmentIdempotency =>
+          $$StockAdjustmentIdempotencyTableTableManager(
+              _db, _db.stockAdjustmentIdempotency);
   $$SupplierAccountsTableTableManager get supplierAccounts =>
       $$SupplierAccountsTableTableManager(_db, _db.supplierAccounts);
   $$SupplierTransactionsTableTableManager get supplierTransactions =>

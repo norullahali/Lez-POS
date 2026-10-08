@@ -5,8 +5,7 @@ import '../app_database.dart';
 import '../tables/stock_ledger_table.dart';
 import '../tables/stock_adjustments_table.dart';
 import '../tables/products_table.dart';
-import '../../constants/movement_types.dart';
-import '../../services/stock_guard.dart';
+import '../../services/stock_adjustment_in_transaction_writer.dart';
 
 part 'stock_dao.g.dart';
 
@@ -125,7 +124,7 @@ class StockDao extends DatabaseAccessor<AppDatabase> with _$StockDaoMixin {
     }
   }
 
-  // Save adjustment and add ledger entry in one transaction
+  /// Test-only adjustment path. Production must use [StockAdjustmentSaveService].
   Future<void> createAdjustment({
     required int productId,
     required double quantityChange,
@@ -135,43 +134,15 @@ class StockDao extends DatabaseAccessor<AppDatabase> with _$StockDaoMixin {
     int? createdByUserId,
   }) async {
     await transaction(() async {
-      final adjId = await into(stockAdjustments).insert(
-        StockAdjustmentsCompanion(
-          productId: Value(productId),
-          adjustmentType: Value(adjustmentType),
-          quantityChange: Value(quantityChange),
-          reason: Value(reason),
-          note: Value(note),
-          createdByUserId: Value(createdByUserId),
-        ),
+      await StockAdjustmentInTransactionWriter(attachedDatabase)
+          .applyAdjustmentInTransaction(
+        productId: productId,
+        quantityChange: quantityChange,
+        adjustmentType: adjustmentType,
+        reason: reason,
+        note: note,
+        createdByUserId: createdByUserId ?? 0,
       );
-      await into(stockLedger).insert(
-        StockLedgerCompanion(
-          productId: Value(productId),
-          movementType: Value(StockMovementType.adjustment.code),
-          referenceId: Value(adjId),
-          referenceType: const Value('stock_adjustments'),
-          quantityChange: Value(quantityChange),
-          note: Value('$reason: $note'),
-        ),
-      );
-
-      // Apply signed delta to current stock.
-      // Positive → safe increment; Negative → guarded deduction (never goes below 0).
-      if (quantityChange > 0) {
-        await customUpdate(
-          'UPDATE products SET current_stock = current_stock + ? WHERE id = ?',
-          variables: [Variable.withReal(quantityChange), Variable.withInt(productId)],
-          updates: {products},
-        );
-      } else if (quantityChange < 0) {
-        await StockGuard.deductStock(
-          db: attachedDatabase,
-          productId: productId,
-          quantity: quantityChange.abs(),
-        );
-      }
-      // quantityChange == 0: no-op, ledger entry already recorded above.
     });
   }
 

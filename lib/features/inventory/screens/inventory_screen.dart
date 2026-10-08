@@ -2,15 +2,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart' hide TextDirection;
+import 'package:uuid/uuid.dart';
+import '../../../core/services/stock_adjustment_save_idempotency_conflict_exception.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/loading_overlay.dart';
 import '../../auth/permissions/permission_keys.dart';
+import '../../auth/providers/auth_provider.dart';
 import '../../auth/utils/permission_actions.dart';
 import '../../products/providers/products_provider.dart';
 import '../providers/inventory_provider.dart';
-import '../../../core/activity/activity_categories.dart';
-import '../../../core/activity/activity_types.dart';
-import '../../activity/providers/activity_context_provider.dart';
 
 class InventoryScreen extends ConsumerStatefulWidget {
   const InventoryScreen({super.key});
@@ -23,6 +23,11 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> with SingleTi
   late TabController _tabCtrl;
   final _nf = NumberFormat('#,##0.##');
   bool _isLoading = false;
+  bool _submitting = false;
+  String? _idempotencyKey;
+  String? _pendingFingerprint;
+
+  static const _adjustmentSaveUuid = Uuid();
 
   @override
   void initState() {
@@ -34,6 +39,11 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> with SingleTi
   void dispose() {
     _tabCtrl.dispose();
     super.dispose();
+  }
+
+  void _resetSaveAttempt() {
+    _idempotencyKey = null;
+    _pendingFingerprint = null;
   }
 
   @override
@@ -124,6 +134,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> with SingleTi
 
     if (confirmed == true) {
       if (!mounted) return;
+      if (_submitting) return;
       if (!PermissionActions.guard(
         ref,
         context,
@@ -132,33 +143,85 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> with SingleTi
         return;
       }
 
+      final authState = ref.read(authProvider).valueOrNull;
+      final userId = authState?.user?.id ?? 0;
+      if (userId <= 0) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('\u064a\u062c\u0628 \u062a\u0633\u062c\u064a\u0644 \u0627\u0644\u062f\u062e\u0648\u0644 \u0644\u062d\u0641\u0638 \u062a\u0633\u0648\u064a\u0629 \u0627\u0644\u0645\u062e\u0632\u0646'),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
+        return;
+      }
+
       final qty = double.tryParse(qtyCtrl.text) ?? 0;
       if (qty <= 0) return;
-      setState(() => _isLoading = true);
+
+      final quantityChange = isAddition ? qty : -qty;
+      final reason = reasonCtrl.text.trim();
+      final notifier = ref.read(inventoryNotifierProvider.notifier);
+      final fingerprint = notifier.computeFingerprint(
+        productId: productId,
+        quantityChange: quantityChange,
+        adjustmentType: adjustmentType,
+        reason: reason,
+        createdBy: userId,
+      );
+      if (_pendingFingerprint != null && _pendingFingerprint != fingerprint) {
+        _resetSaveAttempt();
+      }
+      _pendingFingerprint = fingerprint;
+      _idempotencyKey ??= _adjustmentSaveUuid.v4();
+
+      setState(() {
+        _isLoading = true;
+        _submitting = true;
+      });
       try {
-        await ref.read(inventoryNotifierProvider.notifier).adjust(
+        await notifier.adjust(
+          idempotencyKey: _idempotencyKey!,
+          fingerprintHash: fingerprint,
           productId: productId,
-          quantityChange: isAddition ? qty : -qty,
+          quantityChange: quantityChange,
           adjustmentType: adjustmentType,
-          reason: reasonCtrl.text.trim(),
+          reason: reason,
+          createdBy: userId,
         );
-        await ref.read(activityLoggerProvider).logWarning(
-          activityType: ActivityTypes.stockAdjusted,
-          category: ActivityCategories.inventory,
-          action: 'adjust',
-          title: 'تسوية مخزون',
-          entityType: 'product',
-          entityId: productId,
-          metadata: {
-            'productName': productName,
-            'quantityChange': isAddition ? qty : -qty,
-            'adjustmentType': adjustmentType,
-            'reason': reasonCtrl.text.trim(),
-          },
-        );
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تمت التسوية بنجاح'), backgroundColor: AppColors.success));
+        _resetSaveAttempt();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('تمت التسوية بنجاح'),
+              backgroundColor: AppColors.success,
+            ),
+          );
+        }
+      } on StockAdjustmentSaveIdempotencyConflictException catch (e) {
+        _resetSaveAttempt();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('\u062a\u0639\u0630\u0631 \u062d\u0641\u0638 \u0627\u0644\u062a\u0633\u0648\u064a\u0629: $e'),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('خطأ: $e'), backgroundColor: AppColors.error),
+          );
+        }
       } finally {
-        if (mounted) setState(() => _isLoading = false);
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+            _submitting = false;
+          });
+        }
       }
     }
   }

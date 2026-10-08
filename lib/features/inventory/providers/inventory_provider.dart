@@ -2,11 +2,16 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/database/app_database.dart';
-import '../../auth/providers/auth_provider.dart';
+import '../../../core/services/stock_adjustment_save_fingerprint.dart';
+import '../../../core/services/stock_adjustment_save_result.dart';
 import '../repositories/inventory_repository.dart';
+import 'stock_adjustment_save_service_provider.dart';
 
 final inventoryRepositoryProvider = Provider<InventoryRepository>((ref) {
-  return InventoryRepository(AppDatabase.instance);
+  return InventoryRepository(
+    AppDatabase.instance,
+    ref.read(stockAdjustmentSaveServiceProvider),
+  );
 });
 
 class StockOverviewItem {
@@ -51,29 +56,49 @@ class InventoryNotifier extends StreamNotifier<List<StockOverviewItem>> {
     return future;
   }
 
-  Future<void> adjust({
+  Future<StockAdjustmentSaveResult> adjust({
+    required String idempotencyKey,
+    required String fingerprintHash,
     required int productId,
     required double quantityChange,
     required String adjustmentType,
     required String reason,
     String note = '',
+    required int createdBy,
   }) async {
     try {
-      final userId = ref.read(authProvider).valueOrNull?.user?.id;
-      await ref.read(inventoryRepositoryProvider).createAdjustment(
-        productId: productId,
-        quantityChange: quantityChange,
-        adjustmentType: adjustmentType,
-        reason: reason,
-        note: note,
-        createdByUserId: userId,
-      );
-      // No invalidateSelf needed — watchStockOverview() stream auto-emits
-      // when products.current_stock is updated by createAdjustment()
+      return await ref.read(inventoryRepositoryProvider).saveAdjustment(
+            idempotencyKey: idempotencyKey,
+            fingerprintHash: fingerprintHash,
+            productId: productId,
+            quantityChange: quantityChange,
+            adjustmentType: adjustmentType,
+            reason: reason,
+            note: note,
+            createdBy: createdBy,
+          );
     } catch (e, st) {
       debugPrint('[InventoryNotifier] adjust error: $e\n$st');
       rethrow;
     }
+  }
+
+  String computeFingerprint({
+    required int productId,
+    required double quantityChange,
+    required String adjustmentType,
+    required String reason,
+    String note = '',
+    required int createdBy,
+  }) {
+    return StockAdjustmentSaveFingerprint.compute(
+      productId: productId,
+      quantityChange: quantityChange,
+      adjustmentType: adjustmentType,
+      reason: reason,
+      note: note,
+      createdBy: createdBy,
+    );
   }
 }
 

@@ -2,11 +2,15 @@
 import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
 import '../../../core/database/app_database.dart';
+import '../../../core/services/stock_adjustment_save_result.dart';
+import '../../../core/services/stock_adjustment_save_service.dart';
 import '../providers/inventory_provider.dart';
 
 class InventoryRepository {
   final AppDatabase _db;
-  InventoryRepository(this._db);
+  final StockAdjustmentSaveService _saveService;
+
+  InventoryRepository(this._db, this._saveService);
 
   Future<List<StockOverviewItem>> getStockOverview() async {
     try {
@@ -81,26 +85,32 @@ class InventoryRepository {
     }
   }
 
-  Future<void> createAdjustment({
+  Future<StockAdjustmentSaveResult> saveAdjustment({
+    required String idempotencyKey,
+    required String fingerprintHash,
     required int productId,
     required double quantityChange,
     required String adjustmentType,
     required String reason,
     String note = '',
-    int? createdByUserId,
+    required int createdBy,
   }) async {
     try {
-      debugPrint('[InventoryRepository] createAdjustment: product=$productId qty=$quantityChange');
-      return await _db.stockDao.createAdjustment(
+      debugPrint(
+        '[InventoryRepository] saveAdjustment: product=$productId qty=$quantityChange',
+      );
+      return await _saveService.processSave(
+        idempotencyKey: idempotencyKey,
+        fingerprintHash: fingerprintHash,
         productId: productId,
         quantityChange: quantityChange,
         adjustmentType: adjustmentType,
         reason: reason,
         note: note,
-        createdByUserId: createdByUserId,
+        createdBy: createdBy,
       );
     } catch (e, st) {
-      debugPrint('[InventoryRepository] createAdjustment error: $e\n$st');
+      debugPrint('[InventoryRepository] saveAdjustment error: $e\n$st');
       rethrow;
     }
   }

@@ -984,7 +984,7 @@ void main() {
       final migrated = AppDatabase.test(NativeDatabase.opened(opened.rawDb));
       addTearDown(() async => migrated.close());
 
-      expect(migrated.schemaVersion, 48);
+      expect(migrated.schemaVersion, 49);
       final tables = await migrated.customSelect(
         "SELECT name FROM sqlite_master WHERE type='table' AND name='stock_adjustment_idempotency'",
       ).get();

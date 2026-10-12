@@ -4,11 +4,14 @@ import 'package:intl/intl.dart' show DateFormat;
 import 'package:uuid/uuid.dart';
 import '../../../../core/services/expense_creation_fingerprint.dart';
 import '../../../../core/services/expense_creation_idempotency_conflict_exception.dart';
+import '../../../../core/services/expense_mutation_fingerprint.dart';
+import '../../../../core/services/expense_mutation_save_idempotency_conflict_exception.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../features/auth/providers/auth_provider.dart';
 import '../../../../features/pos/providers/pos_provider.dart';
 import '../../models/expense_record.dart';
 import '../../providers/expense_creation_service_provider.dart';
+import '../../providers/expense_mutation_save_service_provider.dart';
 import '../../providers/expense_providers.dart';
 
 class ExpenseDialog extends ConsumerStatefulWidget {
@@ -55,7 +58,7 @@ class _ExpenseDialogState extends ConsumerState<ExpenseDialog> {
     super.dispose();
   }
 
-  void _resetCreateAttempt() {
+  void _resetSaveAttempt() {
     _idempotencyKey = null;
     _pendingFingerprint = null;
   }
@@ -102,25 +105,63 @@ class _ExpenseDialogState extends ConsumerState<ExpenseDialog> {
       return;
     }
 
+    if (_saving) return;
+
+    final authState = ref.read(authProvider).valueOrNull;
+    final userId = authState?.user?.id ?? 0;
+    if (userId <= 0) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              '\u064a\u062c\u0628 \u062a\u0633\u062c\u064a\u0644 \u0627\u0644\u062f\u062e\u0648\u0644 \u0644\u062d\u0641\u0638 \u0627\u0644\u0645\u0635\u0631\u0648\u0641',
+            ),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+      return;
+    }
+
+    final sessionId = _linkSession
+        ? ref.read(posSessionProvider).valueOrNull?.id
+        : null;
+
     setState(() => _saving = true);
     try {
-      final authState = ref.read(authProvider).valueOrNull;
-      final userId = authState?.user?.id ?? 0;
-      final sessionId = _linkSession
-          ? ref.read(posSessionProvider).valueOrNull?.id
-          : null;
-
       final isEdit = widget.existing != null;
       if (isEdit) {
-        final repo = ref.read(expenseRepositoryProvider);
-        await repo.updateExpense(widget.existing!.copyWith(
+        final expenseId = widget.existing!.id!;
+        final fingerprint = ExpenseMutationFingerprint.computeUpdate(
+          expenseId: expenseId,
           categoryId: _selectedCategoryId!,
           amount: amount,
           expenseDate: _expenseDate,
           paidAt: _paidAt,
           notes: _notesCtrl.text.trim(),
           sessionId: sessionId,
-        ));
+          updatedBy: userId,
+        );
+        if (_pendingFingerprint != null &&
+            _pendingFingerprint != fingerprint) {
+          _resetSaveAttempt();
+        }
+        _pendingFingerprint = fingerprint;
+        _idempotencyKey ??= _expenseCreateUuid.v4();
+
+        await ref.read(expenseMutationSaveServiceProvider).processUpdate(
+              idempotencyKey: _idempotencyKey!,
+              fingerprintHash: fingerprint,
+              expenseId: expenseId,
+              categoryId: _selectedCategoryId!,
+              amount: amount,
+              expenseDate: _expenseDate,
+              paidAt: _paidAt,
+              notes: _notesCtrl.text.trim(),
+              updatedBy: userId,
+              sessionId: sessionId,
+            );
+        _resetSaveAttempt();
       } else {
         final fingerprint = ExpenseCreationFingerprint.compute(
           categoryId: _selectedCategoryId!,
@@ -133,7 +174,7 @@ class _ExpenseDialogState extends ConsumerState<ExpenseDialog> {
         );
         if (_pendingFingerprint != null &&
             _pendingFingerprint != fingerprint) {
-          _resetCreateAttempt();
+          _resetSaveAttempt();
         }
         _pendingFingerprint = fingerprint;
         _idempotencyKey ??= _expenseCreateUuid.v4();
@@ -149,13 +190,23 @@ class _ExpenseDialogState extends ConsumerState<ExpenseDialog> {
               createdBy: userId,
               sessionId: sessionId,
             );
-        _resetCreateAttempt();
+        _resetSaveAttempt();
       }
       ref.invalidate(expensesProvider);
       ref.invalidate(expenseSummaryProvider);
       if (mounted) Navigator.of(context).pop(true);
+    } on ExpenseMutationSaveIdempotencyConflictException catch (e) {
+      _resetSaveAttempt();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('تعذر تعديل المصروف: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
     } on ExpenseCreationIdempotencyConflictException catch (e) {
-      _resetCreateAttempt();
+      _resetSaveAttempt();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

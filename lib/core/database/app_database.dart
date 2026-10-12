@@ -23,6 +23,7 @@ import 'tables/customer_manual_return_idempotency_table.dart';
 import 'tables/supplier_return_idempotency_table.dart';
 import 'tables/customer_invoice_return_idempotency_table.dart';
 import 'tables/expense_idempotency_table.dart';
+import 'tables/expense_mutation_idempotency_table.dart';
 import 'tables/other_income_idempotency_table.dart';
 import 'tables/opening_stock_idempotency_table.dart';
 import 'tables/product_opening_stock_seals_table.dart';
@@ -79,6 +80,7 @@ import 'daos/customer_manual_return_idempotency_dao.dart';
 import 'daos/supplier_return_idempotency_dao.dart';
 import 'daos/customer_invoice_return_idempotency_dao.dart';
 import 'daos/expense_idempotency_dao.dart';
+import 'daos/expense_mutation_idempotency_dao.dart';
 import 'daos/other_income_idempotency_dao.dart';
 import 'daos/opening_stock_idempotency_dao.dart';
 import 'daos/product_opening_stock_seals_dao.dart';
@@ -112,6 +114,7 @@ part 'app_database.g.dart';
     SupplierReturnIdempotency,
     CustomerInvoiceReturnIdempotency,
     ExpenseIdempotency,
+    ExpenseMutationIdempotency,
     OtherIncomeIdempotency,
     OpeningStockIdempotency,
     ProductOpeningStockSeals,
@@ -168,6 +171,7 @@ part 'app_database.g.dart';
     SupplierReturnIdempotencyDao,
     CustomerInvoiceReturnIdempotencyDao,
     ExpenseIdempotencyDao,
+    ExpenseMutationIdempotencyDao,
     OtherIncomeIdempotencyDao,
     OpeningStockIdempotencyDao,
     ProductOpeningStockSealsDao,
@@ -206,7 +210,7 @@ class AppDatabase extends _$AppDatabase {
   late final pricingDao = PricingDao(this);
 
   @override
-  int get schemaVersion => 48;
+  int get schemaVersion => 49;
 
   @override
   MigrationStrategy get migration {
@@ -265,6 +269,10 @@ class AppDatabase extends _$AppDatabase {
         await customStatement(
           'CREATE INDEX IF NOT EXISTS sai_stock_adjustment_idx '
           'ON stock_adjustment_idempotency (stock_adjustment_id)',
+        );
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS emi_expense_record_idx '
+          'ON expense_mutation_idempotency (expense_record_id)',
         );
         // Enable foreign keys
         await customStatement('PRAGMA foreign_keys = ON');
@@ -1196,6 +1204,20 @@ class AppDatabase extends _$AppDatabase {
             rethrow;
           }
           debugPrint('[Migration v48] stock_adjustment_idempotency ready');
+        }
+        if (from < 49) {
+          debugPrint('[Migration v49] expense_mutation_idempotency table...');
+          await m.createTable(expenseMutationIdempotency);
+          try {
+            await customStatement(
+              'CREATE INDEX IF NOT EXISTS emi_expense_record_idx '
+              'ON expense_mutation_idempotency (expense_record_id)',
+            );
+          } catch (e) {
+            debugPrint('[Migration v49] idempotency index skip/error: $e');
+            rethrow;
+          }
+          debugPrint('[Migration v49] expense_mutation_idempotency ready');
         }
       },
       beforeOpen: (details) async {

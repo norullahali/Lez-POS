@@ -1,4 +1,4 @@
-import 'dart:io';
+﻿import 'dart:io';
 
 import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:drift/native.dart';
@@ -545,7 +545,11 @@ void main() {
     test('13) void after create excludes ledger row', () async {
       final created = await postExpense(idempotencyKey: b18ExpenseCreationIdempotencyKey(), amount: 80);
       expect(await expenseLedgerCountForId(created.expenseRecordId), 1);
-      await repository.voidExpense(created.expenseRecordId);
+      await repository.voidExpenseForTest(
+        idempotencyKey: b18ExpenseCreationIdempotencyKey(),
+        expenseId: created.expenseRecordId,
+        voidedBy: userId,
+      );
       expect(await expenseLedgerCountForId(created.expenseRecordId), 0);
     });
 
@@ -554,8 +558,10 @@ void main() {
       final row = await db.expensesDao.getExpenseById(created.expenseRecordId);
       expect(row, isNotNull);
 
-      await repository.updateExpense(
-        models.ExpenseRecord(
+      await repository.updateExpenseForTest(
+        idempotencyKey: b18ExpenseCreationIdempotencyKey(),
+        updatedBy: userId,
+        record: models.ExpenseRecord(
           id: created.expenseRecordId,
           categoryId: categoryId,
           amount: 120,
@@ -591,7 +597,7 @@ void main() {
       final migrated = AppDatabase.test(NativeDatabase.opened(opened.rawDb));
       addTearDown(() async => migrated.close());
 
-      expect(migrated.schemaVersion, 48);
+      expect(migrated.schemaVersion, 49);
       expect(await idempotencyTableExists(migrated), isTrue);
     });
 

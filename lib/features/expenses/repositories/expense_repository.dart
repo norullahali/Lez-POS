@@ -1,9 +1,12 @@
 import 'package:drift/drift.dart';
+import 'package:flutter/foundation.dart';
 
 import '../../../core/activity/activity_categories.dart';
 import '../../../core/activity/activity_types.dart';
 import '../../../core/database/app_database.dart' as db;
 import '../../../core/services/activity_logger_service.dart';
+import '../../../core/services/expense_mutation_fingerprint.dart';
+import '../../../core/services/expense_mutation_save_service.dart';
 import '../models/expense_category.dart';
 import '../models/expense_page.dart';
 import '../models/expense_record.dart';
@@ -64,59 +67,56 @@ class ExpenseRepository {
     return rows.map(ExpenseCategory.fromDrift).toList();
   }
 
-  Future<void> updateExpense(ExpenseRecord record) async {
+  /// Test-only update path. Production must use [ExpenseMutationSaveService.processUpdate].
+  @visibleForTesting
+  Future<void> updateExpenseForTest({
+    required String idempotencyKey,
+    required ExpenseRecord record,
+    required int updatedBy,
+  }) async {
     if (record.id == null) {
       throw ArgumentError('ExpenseRecord.id is required for update');
     }
-    late db.ExpenseRecord before;
-    await _db.transaction(() async {
-      final fetched = await _db.expensesDao.getExpenseById(record.id!);
-      if (fetched == null) throw StateError('Expense record not found');
-      if (fetched.isVoided) throw StateError('Cannot update voided expense');
-      before = fetched;
-      await _db.expensesDao.updateExpense(
-        db.ExpenseRecordsCompanion(
-          id: Value(record.id!),
-          categoryId: Value(record.categoryId),
-          amount: Value(record.amount),
-          expenseDate: Value(record.expenseDate),
-          paidAt: Value(record.paidAt),
-          notes: Value(record.notes),
-          sessionId: Value(record.sessionId),
-          createdBy: Value(record.createdBy),
-          updatedAt: Value(DateTime.now()),
-          isVoided: const Value(false),
-        ),
-      );
-    });
-    await _activityLogger.logEntityUpdate(
-      activityType: ActivityTypes.expenseUpdated,
-      category: ActivityCategories.financial,
-      entityType: 'expense_record',
-      entityId: record.id!,
-      title: '\u062a\u0639\u062f\u064a\u0644 \u0645\u0635\u0631\u0648\u0641',
-      description: '${before.amount} -> ${record.amount}',
+    final fp = ExpenseMutationFingerprint.computeUpdate(
+      expenseId: record.id!,
+      categoryId: record.categoryId,
+      amount: record.amount,
+      expenseDate: record.expenseDate,
+      paidAt: record.paidAt,
+      notes: record.notes,
+      updatedBy: updatedBy,
+      sessionId: record.sessionId,
+    );
+    await ExpenseMutationSaveService(_db).processUpdate(
+      idempotencyKey: idempotencyKey,
+      fingerprintHash: fp,
+      expenseId: record.id!,
+      categoryId: record.categoryId,
+      amount: record.amount,
+      expenseDate: record.expenseDate,
+      paidAt: record.paidAt,
+      notes: record.notes,
+      updatedBy: updatedBy,
+      sessionId: record.sessionId,
     );
   }
 
-  Future<void> voidExpense(int id) async {
-    db.ExpenseRecord? before;
-    await _db.transaction(() async {
-      final fetched = await _db.expensesDao.getExpenseById(id);
-      if (fetched == null) throw StateError('Expense record not found');
-      if (fetched.isVoided) return;
-      before = fetched;
-      final voided = await _db.expensesDao.voidExpense(id);
-      if (!voided) throw StateError('Failed to void expense');
-    });
-    if (before == null) return;
-    await _activityLogger.logInfo(
-      activityType: ActivityTypes.expenseVoided,
-      category: ActivityCategories.financial,
-      action: 'void',
-      title: '\u0625\u0644\u063a\u0627\u0621 \u0645\u0635\u0631\u0648\u0641',
-      description: before!.notes,
-      entityId: id,
+  /// Test-only void path. Production must use [ExpenseMutationSaveService.processVoid].
+  @visibleForTesting
+  Future<void> voidExpenseForTest({
+    required String idempotencyKey,
+    required int expenseId,
+    required int voidedBy,
+  }) async {
+    final fp = ExpenseMutationFingerprint.computeVoid(
+      expenseId: expenseId,
+      voidedBy: voidedBy,
+    );
+    await ExpenseMutationSaveService(_db).processVoid(
+      idempotencyKey: idempotencyKey,
+      fingerprintHash: fp,
+      expenseId: expenseId,
+      voidedBy: voidedBy,
     );
   }
 

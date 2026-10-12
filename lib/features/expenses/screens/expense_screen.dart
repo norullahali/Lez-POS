@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart' show DateFormat, NumberFormat;
+import 'package:uuid/uuid.dart';
+import '../../../core/services/expense_mutation_fingerprint.dart';
+import '../../../core/services/expense_mutation_save_idempotency_conflict_exception.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/confirmation_dialog.dart';
 import '../../../features/auth/permissions/permission_keys.dart';
+import '../../../features/auth/providers/auth_provider.dart';
 import '../../../features/auth/widgets/permission_gate.dart';
 import '../models/expense_record.dart';
+import '../providers/expense_mutation_save_service_provider.dart';
 import '../providers/expense_providers.dart';
 import 'widgets/expense_category_dialog.dart';
 import 'widgets/expense_dialog.dart';
@@ -637,12 +642,92 @@ class _StatusBadge extends StatelessWidget {
   }
 }
 
-class _ActionButtons extends ConsumerWidget {
+class _ActionButtons extends ConsumerStatefulWidget {
   const _ActionButtons({required this.record});
   final ExpenseRecord record;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_ActionButtons> createState() => _ActionButtonsState();
+}
+
+class _ActionButtonsState extends ConsumerState<_ActionButtons> {
+  bool _voidInFlight = false;
+  String? _voidIdempotencyKey;
+
+  static const _voidUuid = Uuid();
+
+  Future<void> _confirmVoid(BuildContext context) async {
+    if (_voidInFlight) return;
+
+    final confirmed = await ConfirmationDialog.show(
+      context,
+      title:
+          '\u0625\u0644\u063a\u0627\u0621 \u0627\u0644\u0645\u0635\u0631\u0648\u0641',
+      message:
+          '\u0647\u0644 \u0623\u0646\u062a \u0645\u062a\u0623\u0643\u062f \u0645\u0646 \u0625\u0644\u063a\u0627\u0621 \u0647\u0630\u0627 \u0627\u0644\u0645\u0635\u0631\u0648\u0641\u061f',
+      confirmLabel:
+          '\u0646\u0639\u0645\u060c \u0625\u0644\u063a\u0627\u0621',
+      confirmColor: AppColors.error,
+    );
+    if (!confirmed) return;
+
+    final authState = ref.read(authProvider).valueOrNull;
+    final userId = authState?.user?.id ?? 0;
+    if (userId <= 0) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              '\u064a\u062c\u0628 \u062a\u0633\u062c\u064a\u0644 \u0627\u0644\u062f\u062e\u0648\u0644 \u0644\u0625\u0644\u063a\u0627\u0621 \u0627\u0644\u0645\u0635\u0631\u0648\u0641',
+            ),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+      return;
+    }
+
+    final expenseId = widget.record.id!;
+    final fingerprint = ExpenseMutationFingerprint.computeVoid(
+      expenseId: expenseId,
+      voidedBy: userId,
+    );
+    _voidIdempotencyKey ??= _voidUuid.v4();
+
+    setState(() => _voidInFlight = true);
+    try {
+      await ref.read(expenseMutationSaveServiceProvider).processVoid(
+            idempotencyKey: _voidIdempotencyKey!,
+            fingerprintHash: fingerprint,
+            expenseId: expenseId,
+            voidedBy: userId,
+          );
+      _voidIdempotencyKey = null;
+      ref.invalidate(expensesProvider);
+      ref.invalidate(expenseSummaryProvider);
+    } on ExpenseMutationSaveIdempotencyConflictException catch (e) {
+      _voidIdempotencyKey = null;
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('تعذر إلغاء المصروف: $e'),
+          backgroundColor: AppColors.error,
+        ));
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(e.toString()),
+          backgroundColor: AppColors.error,
+        ));
+      }
+    } finally {
+      if (mounted) setState(() => _voidInFlight = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final record = widget.record;
     if (record.isVoided) return const SizedBox.shrink();
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -670,37 +755,11 @@ class _ActionButtons extends ConsumerWidget {
                 size: 17, color: AppColors.error),
             tooltip:
                 '\u0625\u0644\u063a\u0627\u0621 \u0627\u0644\u0645\u0635\u0631\u0648\u0641',
-            onPressed: () => _confirmVoid(context, ref),
+            onPressed: _voidInFlight ? null : () => _confirmVoid(context),
           ),
         ),
       ],
     );
-  }
-
-  Future<void> _confirmVoid(BuildContext context, WidgetRef ref) async {
-    final confirmed = await ConfirmationDialog.show(
-      context,
-      title:
-          '\u0625\u0644\u063a\u0627\u0621 \u0627\u0644\u0645\u0635\u0631\u0648\u0641',
-      message:
-          '\u0647\u0644 \u0623\u0646\u062a \u0645\u062a\u0623\u0643\u062f \u0645\u0646 \u0625\u0644\u063a\u0627\u0621 \u0647\u0630\u0627 \u0627\u0644\u0645\u0635\u0631\u0648\u0641\u061f',
-      confirmLabel:
-          '\u0646\u0639\u0645\u060c \u0625\u0644\u063a\u0627\u0621',
-      confirmColor: AppColors.error,
-    );
-    if (!confirmed) return;
-    try {
-      await ref.read(expenseRepositoryProvider).voidExpense(record.id!);
-      ref.invalidate(expensesProvider);
-      ref.invalidate(expenseSummaryProvider);
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(e.toString()),
-          backgroundColor: AppColors.error,
-        ));
-      }
-    }
   }
 }
 

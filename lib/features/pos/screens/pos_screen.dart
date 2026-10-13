@@ -26,6 +26,7 @@ import 'package:lez_pos/core/services/receipt_service.dart';
 import '../../../core/services/credit_limit_exception.dart';
 import '../../../core/services/pos_sale_idempotency_conflict_exception.dart';
 import '../../../core/services/customer_payment_idempotency_conflict_exception.dart';
+import '../settle_debt_idempotency.dart';
 import 'package:uuid/uuid.dart';
 
 import '../models/invoice_models.dart';
@@ -601,6 +602,8 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
   final _invoiceDiscountCtrl = TextEditingController(text: '0');
   bool _checkoutInFlight = false;
   bool _settleDebtInFlight = false;
+  final PosSettleDebtIdempotencyState _settleDebtIdempotency =
+      PosSettleDebtIdempotencyState();
 
   static const _settleDebtUuid = Uuid();
 
@@ -719,15 +722,21 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
         final amt = double.tryParse(amtCtrl.text.trim()) ?? 0;
         if (amt <= 0) return;
 
-        final idempotencyKey = _settleDebtUuid.v4();
+        final idempotencyKey = _settleDebtIdempotency.prepareKey(
+          customerId: customerId,
+          amount: amt,
+          note: kPosSettleDebtNote,
+          generateUuid: _settleDebtUuid.v4,
+        );
         setState(() => _settleDebtInFlight = true);
         try {
           await ref.read(posRepositoryProvider).settleDebt(
                 idempotencyKey: idempotencyKey,
                 customerId: customerId,
                 amount: amt,
-                note: 'تسوية دين من POS',
+                note: kPosSettleDebtNote,
               );
+          _settleDebtIdempotency.onSuccessfulPayment();
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(SnackBar(
               content: Text(
@@ -736,6 +745,7 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
             ));
           }
         } on CustomerPaymentIdempotencyConflictException catch (e) {
+          _settleDebtIdempotency.onIdempotencyConflict();
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(SnackBar(
               content: Text('تعذر تنفيذ الدفعة: $e'),

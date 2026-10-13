@@ -554,7 +554,11 @@ void main() {
     test('13) void after create excludes ledger row', () async {
       final created = await postIncome(idempotencyKey: b19OtherIncomeCreationIdempotencyKey(), amount: 80);
       expect(await otherIncomeLedgerCountForId(created.otherIncomeRecordId), 1);
-      await repository.voidIncome(created.otherIncomeRecordId);
+      await repository.voidIncomeForTest(
+        idempotencyKey: b19OtherIncomeCreationIdempotencyKey(),
+        otherIncomeRecordId: created.otherIncomeRecordId,
+        voidedBy: userId,
+      );
       expect(await otherIncomeLedgerCountForId(created.otherIncomeRecordId), 0);
     });
 
@@ -563,8 +567,9 @@ void main() {
       final row = await db.otherIncomeDao.getIncomeById(created.otherIncomeRecordId);
       expect(row, isNotNull);
 
-      await repository.updateIncome(
-        models.OtherIncomeRecord(
+      await repository.updateIncomeForTest(
+        idempotencyKey: b19OtherIncomeCreationIdempotencyKey(),
+        record: models.OtherIncomeRecord(
           id: created.otherIncomeRecordId,
           categoryId: categoryId,
           amount: 120,
@@ -574,6 +579,7 @@ void main() {
           createdBy: userId,
           isVoided: false,
         ),
+        updatedBy: userId,
       );
 
       expect(await otherIncomeLedgerCountForId(created.otherIncomeRecordId), 1);
@@ -600,7 +606,7 @@ void main() {
       final migrated = AppDatabase.test(NativeDatabase.opened(opened.rawDb));
       addTearDown(() async => migrated.close());
 
-      expect(migrated.schemaVersion, 49);
+      expect(migrated.schemaVersion, 50);
       expect(await idempotencyTableExists(migrated), isTrue);
       expect(await idempotencyIndexExists(migrated), isTrue);
     });

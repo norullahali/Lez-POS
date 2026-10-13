@@ -4,11 +4,14 @@ import 'package:intl/intl.dart' show DateFormat;
 import 'package:uuid/uuid.dart';
 import '../../../../core/services/other_income_creation_fingerprint.dart';
 import '../../../../core/services/other_income_creation_idempotency_conflict_exception.dart';
+import '../../../../core/services/other_income_mutation_fingerprint.dart';
+import '../../../../core/services/other_income_mutation_save_idempotency_conflict_exception.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../features/auth/providers/auth_provider.dart';
 import '../../../../features/pos/providers/pos_provider.dart';
 import '../../models/other_income_record.dart';
 import '../../providers/other_income_creation_service_provider.dart';
+import '../../providers/other_income_mutation_save_service_provider.dart';
 import '../../providers/other_income_providers.dart';
 
 class OtherIncomeDialog extends ConsumerStatefulWidget {
@@ -55,7 +58,7 @@ class _OtherIncomeDialogState extends ConsumerState<OtherIncomeDialog> {
     super.dispose();
   }
 
-  void _resetCreateAttempt() {
+  void _resetSaveAttempt() {
     _idempotencyKey = null;
     _pendingFingerprint = null;
   }
@@ -102,10 +105,26 @@ class _OtherIncomeDialogState extends ConsumerState<OtherIncomeDialog> {
       return;
     }
 
+    if (_saving) return;
+
+    final authState = ref.read(authProvider).valueOrNull;
+    final userId = authState?.user?.id ?? 0;
+    if (userId <= 0) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              '\u064a\u062c\u0628 \u062a\u0633\u062c\u064a\u0644 \u0627\u0644\u062f\u062e\u0648\u0644 \u0644\u062d\u0641\u0638 \u0627\u0644\u0625\u064a\u0631\u0627\u062f',
+            ),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+      return;
+    }
+
     setState(() => _saving = true);
     try {
-      final authState = ref.read(authProvider).valueOrNull;
-      final userId = authState?.user?.id ?? 0;
       final isEdit = widget.existing != null;
       final activeSession = ref.read(posSessionProvider).valueOrNull;
       // Case D: editing with no active session → preserve the original sessionId.
@@ -114,15 +133,37 @@ class _OtherIncomeDialogState extends ConsumerState<OtherIncomeDialog> {
           ? widget.existing!.sessionId
           : (_linkSession ? activeSession?.id : null);
       if (isEdit) {
-        final repo = ref.read(otherIncomeRepositoryProvider);
-        await repo.updateIncome(widget.existing!.copyWith(
+        final otherIncomeRecordId = widget.existing!.id!;
+        final fingerprint = OtherIncomeMutationFingerprint.computeUpdate(
+          otherIncomeRecordId: otherIncomeRecordId,
           categoryId: _selectedCategoryId!,
           amount: amount,
           incomeDate: _incomeDate,
           receivedAt: _receivedAt,
           notes: _notesCtrl.text.trim(),
           sessionId: sessionId,
-        ));
+          updatedBy: userId,
+        );
+        if (_pendingFingerprint != null &&
+            _pendingFingerprint != fingerprint) {
+          _resetSaveAttempt();
+        }
+        _pendingFingerprint = fingerprint;
+        _idempotencyKey ??= _otherIncomeCreateUuid.v4();
+
+        await ref.read(otherIncomeMutationSaveServiceProvider).processUpdate(
+              idempotencyKey: _idempotencyKey!,
+              fingerprintHash: fingerprint,
+              otherIncomeRecordId: otherIncomeRecordId,
+              categoryId: _selectedCategoryId!,
+              amount: amount,
+              incomeDate: _incomeDate,
+              receivedAt: _receivedAt,
+              notes: _notesCtrl.text.trim(),
+              updatedBy: userId,
+              sessionId: sessionId,
+            );
+        _resetSaveAttempt();
       } else {
         final fingerprint = OtherIncomeCreationFingerprint.compute(
           categoryId: _selectedCategoryId!,
@@ -135,7 +176,7 @@ class _OtherIncomeDialogState extends ConsumerState<OtherIncomeDialog> {
         );
         if (_pendingFingerprint != null &&
             _pendingFingerprint != fingerprint) {
-          _resetCreateAttempt();
+          _resetSaveAttempt();
         }
         _pendingFingerprint = fingerprint;
         _idempotencyKey ??= _otherIncomeCreateUuid.v4();
@@ -151,13 +192,23 @@ class _OtherIncomeDialogState extends ConsumerState<OtherIncomeDialog> {
               createdBy: userId,
               sessionId: sessionId,
             );
-        _resetCreateAttempt();
+        _resetSaveAttempt();
       }
       ref.invalidate(otherIncomeProvider);
       ref.invalidate(otherIncomeSummaryProvider);
       if (mounted) Navigator.of(context).pop(true);
+    } on OtherIncomeMutationSaveIdempotencyConflictException catch (e) {
+      _resetSaveAttempt();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('تعذر تعديل الإيراد: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
     } on OtherIncomeCreationIdempotencyConflictException catch (e) {
-      _resetCreateAttempt();
+      _resetSaveAttempt();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

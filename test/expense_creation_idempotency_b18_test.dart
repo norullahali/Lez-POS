@@ -1,4 +1,4 @@
-﻿import 'dart:io';
+import 'dart:io';
 
 import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:drift/native.dart';
@@ -597,7 +597,7 @@ void main() {
       final migrated = AppDatabase.test(NativeDatabase.opened(opened.rawDb));
       addTearDown(() async => migrated.close());
 
-      expect(migrated.schemaVersion, 49);
+      expect(migrated.schemaVersion, 50);
       expect(await idempotencyTableExists(migrated), isTrue);
     });
 

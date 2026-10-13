@@ -7207,6 +7207,348 @@ class OtherIncomeIdempotencyCompanion
   }
 }
 
+class $OtherIncomeMutationIdempotencyTable
+    extends OtherIncomeMutationIdempotency
+    with
+        TableInfo<$OtherIncomeMutationIdempotencyTable,
+            OtherIncomeMutationIdempotencyData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $OtherIncomeMutationIdempotencyTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idempotencyKeyMeta =
+      const VerificationMeta('idempotencyKey');
+  @override
+  late final GeneratedColumn<String> idempotencyKey = GeneratedColumn<String>(
+      'idempotency_key', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _operationTypeMeta =
+      const VerificationMeta('operationType');
+  @override
+  late final GeneratedColumn<String> operationType = GeneratedColumn<String>(
+      'operation_type', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _fingerprintHashMeta =
+      const VerificationMeta('fingerprintHash');
+  @override
+  late final GeneratedColumn<String> fingerprintHash = GeneratedColumn<String>(
+      'fingerprint_hash', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _otherIncomeRecordIdMeta =
+      const VerificationMeta('otherIncomeRecordId');
+  @override
+  late final GeneratedColumn<int> otherIncomeRecordId = GeneratedColumn<int>(
+      'other_income_record_id', aliasedName, false,
+      type: DriftSqlType.int, requiredDuringInsert: true);
+  static const VerificationMeta _createdAtMeta =
+      const VerificationMeta('createdAt');
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+      'created_at', aliasedName, false,
+      type: DriftSqlType.dateTime,
+      requiredDuringInsert: false,
+      defaultValue: currentDateAndTime);
+  @override
+  List<GeneratedColumn> get $columns => [
+        idempotencyKey,
+        operationType,
+        fingerprintHash,
+        otherIncomeRecordId,
+        createdAt
+      ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'other_income_mutation_idempotency';
+  @override
+  VerificationContext validateIntegrity(
+      Insertable<OtherIncomeMutationIdempotencyData> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('idempotency_key')) {
+      context.handle(
+          _idempotencyKeyMeta,
+          idempotencyKey.isAcceptableOrUnknown(
+              data['idempotency_key']!, _idempotencyKeyMeta));
+    } else if (isInserting) {
+      context.missing(_idempotencyKeyMeta);
+    }
+    if (data.containsKey('operation_type')) {
+      context.handle(
+          _operationTypeMeta,
+          operationType.isAcceptableOrUnknown(
+              data['operation_type']!, _operationTypeMeta));
+    } else if (isInserting) {
+      context.missing(_operationTypeMeta);
+    }
+    if (data.containsKey('fingerprint_hash')) {
+      context.handle(
+          _fingerprintHashMeta,
+          fingerprintHash.isAcceptableOrUnknown(
+              data['fingerprint_hash']!, _fingerprintHashMeta));
+    } else if (isInserting) {
+      context.missing(_fingerprintHashMeta);
+    }
+    if (data.containsKey('other_income_record_id')) {
+      context.handle(
+          _otherIncomeRecordIdMeta,
+          otherIncomeRecordId.isAcceptableOrUnknown(
+              data['other_income_record_id']!, _otherIncomeRecordIdMeta));
+    } else if (isInserting) {
+      context.missing(_otherIncomeRecordIdMeta);
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(_createdAtMeta,
+          createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {idempotencyKey};
+  @override
+  OtherIncomeMutationIdempotencyData map(Map<String, dynamic> data,
+      {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return OtherIncomeMutationIdempotencyData(
+      idempotencyKey: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}idempotency_key'])!,
+      operationType: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}operation_type'])!,
+      fingerprintHash: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}fingerprint_hash'])!,
+      otherIncomeRecordId: attachedDatabase.typeMapping.read(
+          DriftSqlType.int, data['${effectivePrefix}other_income_record_id'])!,
+      createdAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
+    );
+  }
+
+  @override
+  $OtherIncomeMutationIdempotencyTable createAlias(String alias) {
+    return $OtherIncomeMutationIdempotencyTable(attachedDatabase, alias);
+  }
+}
+
+class OtherIncomeMutationIdempotencyData extends DataClass
+    implements Insertable<OtherIncomeMutationIdempotencyData> {
+  final String idempotencyKey;
+  final String operationType;
+  final String fingerprintHash;
+  final int otherIncomeRecordId;
+  final DateTime createdAt;
+  const OtherIncomeMutationIdempotencyData(
+      {required this.idempotencyKey,
+      required this.operationType,
+      required this.fingerprintHash,
+      required this.otherIncomeRecordId,
+      required this.createdAt});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['idempotency_key'] = Variable<String>(idempotencyKey);
+    map['operation_type'] = Variable<String>(operationType);
+    map['fingerprint_hash'] = Variable<String>(fingerprintHash);
+    map['other_income_record_id'] = Variable<int>(otherIncomeRecordId);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    return map;
+  }
+
+  OtherIncomeMutationIdempotencyCompanion toCompanion(bool nullToAbsent) {
+    return OtherIncomeMutationIdempotencyCompanion(
+      idempotencyKey: Value(idempotencyKey),
+      operationType: Value(operationType),
+      fingerprintHash: Value(fingerprintHash),
+      otherIncomeRecordId: Value(otherIncomeRecordId),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory OtherIncomeMutationIdempotencyData.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return OtherIncomeMutationIdempotencyData(
+      idempotencyKey: serializer.fromJson<String>(json['idempotencyKey']),
+      operationType: serializer.fromJson<String>(json['operationType']),
+      fingerprintHash: serializer.fromJson<String>(json['fingerprintHash']),
+      otherIncomeRecordId:
+          serializer.fromJson<int>(json['otherIncomeRecordId']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'idempotencyKey': serializer.toJson<String>(idempotencyKey),
+      'operationType': serializer.toJson<String>(operationType),
+      'fingerprintHash': serializer.toJson<String>(fingerprintHash),
+      'otherIncomeRecordId': serializer.toJson<int>(otherIncomeRecordId),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+    };
+  }
+
+  OtherIncomeMutationIdempotencyData copyWith(
+          {String? idempotencyKey,
+          String? operationType,
+          String? fingerprintHash,
+          int? otherIncomeRecordId,
+          DateTime? createdAt}) =>
+      OtherIncomeMutationIdempotencyData(
+        idempotencyKey: idempotencyKey ?? this.idempotencyKey,
+        operationType: operationType ?? this.operationType,
+        fingerprintHash: fingerprintHash ?? this.fingerprintHash,
+        otherIncomeRecordId: otherIncomeRecordId ?? this.otherIncomeRecordId,
+        createdAt: createdAt ?? this.createdAt,
+      );
+  OtherIncomeMutationIdempotencyData copyWithCompanion(
+      OtherIncomeMutationIdempotencyCompanion data) {
+    return OtherIncomeMutationIdempotencyData(
+      idempotencyKey: data.idempotencyKey.present
+          ? data.idempotencyKey.value
+          : this.idempotencyKey,
+      operationType: data.operationType.present
+          ? data.operationType.value
+          : this.operationType,
+      fingerprintHash: data.fingerprintHash.present
+          ? data.fingerprintHash.value
+          : this.fingerprintHash,
+      otherIncomeRecordId: data.otherIncomeRecordId.present
+          ? data.otherIncomeRecordId.value
+          : this.otherIncomeRecordId,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('OtherIncomeMutationIdempotencyData(')
+          ..write('idempotencyKey: $idempotencyKey, ')
+          ..write('operationType: $operationType, ')
+          ..write('fingerprintHash: $fingerprintHash, ')
+          ..write('otherIncomeRecordId: $otherIncomeRecordId, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(idempotencyKey, operationType,
+      fingerprintHash, otherIncomeRecordId, createdAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is OtherIncomeMutationIdempotencyData &&
+          other.idempotencyKey == this.idempotencyKey &&
+          other.operationType == this.operationType &&
+          other.fingerprintHash == this.fingerprintHash &&
+          other.otherIncomeRecordId == this.otherIncomeRecordId &&
+          other.createdAt == this.createdAt);
+}
+
+class OtherIncomeMutationIdempotencyCompanion
+    extends UpdateCompanion<OtherIncomeMutationIdempotencyData> {
+  final Value<String> idempotencyKey;
+  final Value<String> operationType;
+  final Value<String> fingerprintHash;
+  final Value<int> otherIncomeRecordId;
+  final Value<DateTime> createdAt;
+  final Value<int> rowid;
+  const OtherIncomeMutationIdempotencyCompanion({
+    this.idempotencyKey = const Value.absent(),
+    this.operationType = const Value.absent(),
+    this.fingerprintHash = const Value.absent(),
+    this.otherIncomeRecordId = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  OtherIncomeMutationIdempotencyCompanion.insert({
+    required String idempotencyKey,
+    required String operationType,
+    required String fingerprintHash,
+    required int otherIncomeRecordId,
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  })  : idempotencyKey = Value(idempotencyKey),
+        operationType = Value(operationType),
+        fingerprintHash = Value(fingerprintHash),
+        otherIncomeRecordId = Value(otherIncomeRecordId);
+  static Insertable<OtherIncomeMutationIdempotencyData> custom({
+    Expression<String>? idempotencyKey,
+    Expression<String>? operationType,
+    Expression<String>? fingerprintHash,
+    Expression<int>? otherIncomeRecordId,
+    Expression<DateTime>? createdAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (idempotencyKey != null) 'idempotency_key': idempotencyKey,
+      if (operationType != null) 'operation_type': operationType,
+      if (fingerprintHash != null) 'fingerprint_hash': fingerprintHash,
+      if (otherIncomeRecordId != null)
+        'other_income_record_id': otherIncomeRecordId,
+      if (createdAt != null) 'created_at': createdAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  OtherIncomeMutationIdempotencyCompanion copyWith(
+      {Value<String>? idempotencyKey,
+      Value<String>? operationType,
+      Value<String>? fingerprintHash,
+      Value<int>? otherIncomeRecordId,
+      Value<DateTime>? createdAt,
+      Value<int>? rowid}) {
+    return OtherIncomeMutationIdempotencyCompanion(
+      idempotencyKey: idempotencyKey ?? this.idempotencyKey,
+      operationType: operationType ?? this.operationType,
+      fingerprintHash: fingerprintHash ?? this.fingerprintHash,
+      otherIncomeRecordId: otherIncomeRecordId ?? this.otherIncomeRecordId,
+      createdAt: createdAt ?? this.createdAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (idempotencyKey.present) {
+      map['idempotency_key'] = Variable<String>(idempotencyKey.value);
+    }
+    if (operationType.present) {
+      map['operation_type'] = Variable<String>(operationType.value);
+    }
+    if (fingerprintHash.present) {
+      map['fingerprint_hash'] = Variable<String>(fingerprintHash.value);
+    }
+    if (otherIncomeRecordId.present) {
+      map['other_income_record_id'] = Variable<int>(otherIncomeRecordId.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('OtherIncomeMutationIdempotencyCompanion(')
+          ..write('idempotencyKey: $idempotencyKey, ')
+          ..write('operationType: $operationType, ')
+          ..write('fingerprintHash: $fingerprintHash, ')
+          ..write('otherIncomeRecordId: $otherIncomeRecordId, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $OpeningStockIdempotencyTable extends OpeningStockIdempotency
     with TableInfo<$OpeningStockIdempotencyTable, OpeningStockIdempotencyData> {
   @override
@@ -24352,6 +24694,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       $ExpenseMutationIdempotencyTable(this);
   late final $OtherIncomeIdempotencyTable otherIncomeIdempotency =
       $OtherIncomeIdempotencyTable(this);
+  late final $OtherIncomeMutationIdempotencyTable
+      otherIncomeMutationIdempotency =
+      $OtherIncomeMutationIdempotencyTable(this);
   late final $OpeningStockIdempotencyTable openingStockIdempotency =
       $OpeningStockIdempotencyTable(this);
   late final $ProductOpeningStockSealsTable productOpeningStockSeals =
@@ -24445,6 +24790,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       ExpenseMutationIdempotencyDao(this as AppDatabase);
   late final OtherIncomeIdempotencyDao otherIncomeIdempotencyDao =
       OtherIncomeIdempotencyDao(this as AppDatabase);
+  late final OtherIncomeMutationIdempotencyDao
+      otherIncomeMutationIdempotencyDao =
+      OtherIncomeMutationIdempotencyDao(this as AppDatabase);
   late final OpeningStockIdempotencyDao openingStockIdempotencyDao =
       OpeningStockIdempotencyDao(this as AppDatabase);
   late final ProductOpeningStockSealsDao productOpeningStockSealsDao =
@@ -24495,6 +24843,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         expenseIdempotency,
         expenseMutationIdempotency,
         otherIncomeIdempotency,
+        otherIncomeMutationIdempotency,
         openingStockIdempotency,
         productOpeningStockSeals,
         stockAdjustmentIdempotency,
@@ -29344,6 +29693,194 @@ typedef $$OtherIncomeIdempotencyTableProcessedTableManager
               OtherIncomeIdempotencyData>
         ),
         OtherIncomeIdempotencyData,
+        PrefetchHooks Function()>;
+typedef $$OtherIncomeMutationIdempotencyTableCreateCompanionBuilder
+    = OtherIncomeMutationIdempotencyCompanion Function({
+  required String idempotencyKey,
+  required String operationType,
+  required String fingerprintHash,
+  required int otherIncomeRecordId,
+  Value<DateTime> createdAt,
+  Value<int> rowid,
+});
+typedef $$OtherIncomeMutationIdempotencyTableUpdateCompanionBuilder
+    = OtherIncomeMutationIdempotencyCompanion Function({
+  Value<String> idempotencyKey,
+  Value<String> operationType,
+  Value<String> fingerprintHash,
+  Value<int> otherIncomeRecordId,
+  Value<DateTime> createdAt,
+  Value<int> rowid,
+});
+
+class $$OtherIncomeMutationIdempotencyTableFilterComposer
+    extends Composer<_$AppDatabase, $OtherIncomeMutationIdempotencyTable> {
+  $$OtherIncomeMutationIdempotencyTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get idempotencyKey => $composableBuilder(
+      column: $table.idempotencyKey,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get operationType => $composableBuilder(
+      column: $table.operationType, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get fingerprintHash => $composableBuilder(
+      column: $table.fingerprintHash,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get otherIncomeRecordId => $composableBuilder(
+      column: $table.otherIncomeRecordId,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnFilters(column));
+}
+
+class $$OtherIncomeMutationIdempotencyTableOrderingComposer
+    extends Composer<_$AppDatabase, $OtherIncomeMutationIdempotencyTable> {
+  $$OtherIncomeMutationIdempotencyTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get idempotencyKey => $composableBuilder(
+      column: $table.idempotencyKey,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get operationType => $composableBuilder(
+      column: $table.operationType,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get fingerprintHash => $composableBuilder(
+      column: $table.fingerprintHash,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get otherIncomeRecordId => $composableBuilder(
+      column: $table.otherIncomeRecordId,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnOrderings(column));
+}
+
+class $$OtherIncomeMutationIdempotencyTableAnnotationComposer
+    extends Composer<_$AppDatabase, $OtherIncomeMutationIdempotencyTable> {
+  $$OtherIncomeMutationIdempotencyTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get idempotencyKey => $composableBuilder(
+      column: $table.idempotencyKey, builder: (column) => column);
+
+  GeneratedColumn<String> get operationType => $composableBuilder(
+      column: $table.operationType, builder: (column) => column);
+
+  GeneratedColumn<String> get fingerprintHash => $composableBuilder(
+      column: $table.fingerprintHash, builder: (column) => column);
+
+  GeneratedColumn<int> get otherIncomeRecordId => $composableBuilder(
+      column: $table.otherIncomeRecordId, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+}
+
+class $$OtherIncomeMutationIdempotencyTableTableManager
+    extends RootTableManager<
+        _$AppDatabase,
+        $OtherIncomeMutationIdempotencyTable,
+        OtherIncomeMutationIdempotencyData,
+        $$OtherIncomeMutationIdempotencyTableFilterComposer,
+        $$OtherIncomeMutationIdempotencyTableOrderingComposer,
+        $$OtherIncomeMutationIdempotencyTableAnnotationComposer,
+        $$OtherIncomeMutationIdempotencyTableCreateCompanionBuilder,
+        $$OtherIncomeMutationIdempotencyTableUpdateCompanionBuilder,
+        (
+          OtherIncomeMutationIdempotencyData,
+          BaseReferences<_$AppDatabase, $OtherIncomeMutationIdempotencyTable,
+              OtherIncomeMutationIdempotencyData>
+        ),
+        OtherIncomeMutationIdempotencyData,
+        PrefetchHooks Function()> {
+  $$OtherIncomeMutationIdempotencyTableTableManager(
+      _$AppDatabase db, $OtherIncomeMutationIdempotencyTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$OtherIncomeMutationIdempotencyTableFilterComposer(
+                  $db: db, $table: table),
+          createOrderingComposer: () =>
+              $$OtherIncomeMutationIdempotencyTableOrderingComposer(
+                  $db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$OtherIncomeMutationIdempotencyTableAnnotationComposer(
+                  $db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<String> idempotencyKey = const Value.absent(),
+            Value<String> operationType = const Value.absent(),
+            Value<String> fingerprintHash = const Value.absent(),
+            Value<int> otherIncomeRecordId = const Value.absent(),
+            Value<DateTime> createdAt = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              OtherIncomeMutationIdempotencyCompanion(
+            idempotencyKey: idempotencyKey,
+            operationType: operationType,
+            fingerprintHash: fingerprintHash,
+            otherIncomeRecordId: otherIncomeRecordId,
+            createdAt: createdAt,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            required String idempotencyKey,
+            required String operationType,
+            required String fingerprintHash,
+            required int otherIncomeRecordId,
+            Value<DateTime> createdAt = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              OtherIncomeMutationIdempotencyCompanion.insert(
+            idempotencyKey: idempotencyKey,
+            operationType: operationType,
+            fingerprintHash: fingerprintHash,
+            otherIncomeRecordId: otherIncomeRecordId,
+            createdAt: createdAt,
+            rowid: rowid,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$OtherIncomeMutationIdempotencyTableProcessedTableManager
+    = ProcessedTableManager<
+        _$AppDatabase,
+        $OtherIncomeMutationIdempotencyTable,
+        OtherIncomeMutationIdempotencyData,
+        $$OtherIncomeMutationIdempotencyTableFilterComposer,
+        $$OtherIncomeMutationIdempotencyTableOrderingComposer,
+        $$OtherIncomeMutationIdempotencyTableAnnotationComposer,
+        $$OtherIncomeMutationIdempotencyTableCreateCompanionBuilder,
+        $$OtherIncomeMutationIdempotencyTableUpdateCompanionBuilder,
+        (
+          OtherIncomeMutationIdempotencyData,
+          BaseReferences<_$AppDatabase, $OtherIncomeMutationIdempotencyTable,
+              OtherIncomeMutationIdempotencyData>
+        ),
+        OtherIncomeMutationIdempotencyData,
         PrefetchHooks Function()>;
 typedef $$OpeningStockIdempotencyTableCreateCompanionBuilder
     = OpeningStockIdempotencyCompanion Function({
@@ -43083,6 +43620,10 @@ class $AppDatabaseManager {
   $$OtherIncomeIdempotencyTableTableManager get otherIncomeIdempotency =>
       $$OtherIncomeIdempotencyTableTableManager(
           _db, _db.otherIncomeIdempotency);
+  $$OtherIncomeMutationIdempotencyTableTableManager
+      get otherIncomeMutationIdempotency =>
+          $$OtherIncomeMutationIdempotencyTableTableManager(
+              _db, _db.otherIncomeMutationIdempotency);
   $$OpeningStockIdempotencyTableTableManager get openingStockIdempotency =>
       $$OpeningStockIdempotencyTableTableManager(
           _db, _db.openingStockIdempotency);

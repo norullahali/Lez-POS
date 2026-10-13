@@ -1,9 +1,12 @@
 ﻿import 'package:drift/drift.dart';
+import 'package:flutter/foundation.dart';
 
 import '../../../core/activity/activity_categories.dart';
 import '../../../core/activity/activity_types.dart';
 import '../../../core/database/app_database.dart' as db;
 import '../../../core/services/activity_logger_service.dart';
+import '../../../core/services/other_income_mutation_fingerprint.dart';
+import '../../../core/services/other_income_mutation_save_service.dart';
 import '../models/other_income_category.dart';
 import '../models/other_income_page.dart';
 import '../models/other_income_record.dart';
@@ -71,74 +74,58 @@ class OtherIncomeRepository {
 
   // ── Records ───────────────────────────────────────────────────────────────
 
-  /// Updates a non-voided income record inside a Drift transaction (TOCTOU-safe).
-  ///
-  /// Rules:
-  ///   - Throws [StateError] if the record does not exist.
-  ///   - Throws [StateError] if the record is already voided.
-  ///   - Always forces isVoided = false on the companion — caller value ignored.
-  Future<void> updateIncome(OtherIncomeRecord record) async {
+  /// Test-only update path. Production must use
+  /// [OtherIncomeMutationSaveService.processUpdate].
+  @visibleForTesting
+  Future<void> updateIncomeForTest({
+    required String idempotencyKey,
+    required OtherIncomeRecord record,
+    required int updatedBy,
+  }) async {
     if (record.id == null) {
       throw ArgumentError('OtherIncomeRecord.id is required for update');
     }
-    db.OtherIncomeRecord? before;
-    await _db.transaction(() async {
-      final fetched = await _db.otherIncomeDao.getIncomeById(record.id!);
-      if (fetched == null) throw StateError('Other income record not found');
-      if (fetched.isVoided) throw StateError('Cannot update voided income');
-      before = fetched;
-      await _db.otherIncomeDao.updateIncome(
-        db.OtherIncomeRecordsCompanion(
-          id: Value(record.id!),
-          categoryId: Value(record.categoryId),
-          amount: Value(record.amount),
-          incomeDate: Value(record.incomeDate),
-          receivedAt: Value(record.receivedAt),
-          notes: Value(record.notes),
-          sessionId: Value(record.sessionId),
-          createdBy: Value(record.createdBy),
-          updatedAt: Value(DateTime.now()),
-          // Hardcoded: updateIncome must never perform a void.
-          isVoided: const Value(false),
-        ),
-      );
-    });
-    if (before == null) return;
-    await _activityLogger.logEntityUpdate(
-      activityType: ActivityTypes.incomeUpdated,
-      category: ActivityCategories.financial,
-      entityType: 'other_income_record',
-      entityId: record.id!,
-      title: '\u062a\u0639\u062f\u064a\u0644 \u0625\u064a\u0631\u0627\u062f',
-      description: '${before!.amount} -> ${record.amount}',
+    final fp = OtherIncomeMutationFingerprint.computeUpdate(
+      otherIncomeRecordId: record.id!,
+      categoryId: record.categoryId,
+      amount: record.amount,
+      incomeDate: record.incomeDate,
+      receivedAt: record.receivedAt,
+      notes: record.notes,
+      updatedBy: updatedBy,
+      sessionId: record.sessionId,
+    );
+    await OtherIncomeMutationSaveService(_db).processUpdate(
+      idempotencyKey: idempotencyKey,
+      fingerprintHash: fp,
+      otherIncomeRecordId: record.id!,
+      categoryId: record.categoryId,
+      amount: record.amount,
+      incomeDate: record.incomeDate,
+      receivedAt: record.receivedAt,
+      notes: record.notes,
+      updatedBy: updatedBy,
+      sessionId: record.sessionId,
     );
   }
 
-  /// Voids an income record inside a Drift transaction (TOCTOU-safe).
-  ///
-  /// Uses logWarning (not logInfo) — voiding is a destructive, irreversible operation.
-  /// Early-returns silently if the record is already voided (idempotent guard).
-  Future<void> voidIncome(int id) async {
-    db.OtherIncomeRecord? before;
-    await _db.transaction(() async {
-      final fetched = await _db.otherIncomeDao.getIncomeById(id);
-      if (fetched == null) throw StateError('Other income record not found');
-      if (fetched.isVoided) return;
-      before = fetched;
-      final voided = await _db.otherIncomeDao.voidIncome(id);
-      if (!voided) throw StateError('Failed to void income record');
-    });
-    if (before == null) return;
-    await _activityLogger.logWarning(
-      activityType: ActivityTypes.incomeVoided,
-      category: ActivityCategories.financial,
-      action: 'void',
-      title: '\u0625\u0644\u063a\u0627\u0621 \u0625\u064a\u0631\u0627\u062f',
-      description: before!.notes.isNotEmpty
-          ? before!.notes
-          : before!.amount.toStringAsFixed(2),
-      entityType: 'other_income_record',
-      entityId: id,
+  /// Test-only void path. Production must use
+  /// [OtherIncomeMutationSaveService.processVoid].
+  @visibleForTesting
+  Future<void> voidIncomeForTest({
+    required String idempotencyKey,
+    required int otherIncomeRecordId,
+    required int voidedBy,
+  }) async {
+    final fp = OtherIncomeMutationFingerprint.computeVoid(
+      otherIncomeRecordId: otherIncomeRecordId,
+      voidedBy: voidedBy,
+    );
+    await OtherIncomeMutationSaveService(_db).processVoid(
+      idempotencyKey: idempotencyKey,
+      fingerprintHash: fp,
+      otherIncomeRecordId: otherIncomeRecordId,
+      voidedBy: voidedBy,
     );
   }
 

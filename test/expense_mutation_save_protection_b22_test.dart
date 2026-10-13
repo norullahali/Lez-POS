@@ -664,15 +664,15 @@ void main() {
       addTearDown(opened.rawDb.dispose);
       final migrated = AppDatabase.test(NativeDatabase.opened(opened.rawDb));
       addTearDown(() async => migrated.close());
-      expect(migrated.schemaVersion, 49);
+      expect(migrated.schemaVersion, 50);
       final tables = await migrated.customSelect(
         "SELECT name FROM sqlite_master WHERE type='table' AND name='expense_mutation_idempotency'",
       ).get();
       expect(tables.length, 1);
     });
 
-    test('19) fresh schema 49', () async {
-      expect(db.schemaVersion, 49);
+    test('19) fresh schema 50', () async {
+      expect(db.schemaVersion, 50);
     });
 
     test('21) dual-connection update vs void concurrency', () async {

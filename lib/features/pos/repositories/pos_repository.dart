@@ -3,6 +3,8 @@ import 'package:drift/drift.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/services/customer_account_service.dart';
 import '../../../core/services/customer_payment_result.dart';
+import '../../../core/services/pos_session_close_result.dart';
+import '../../../core/services/pos_session_close_service.dart';
 import '../../../core/services/pos_session_open_result.dart';
 import '../../../core/services/pos_session_open_service.dart';
 import '../models/cart_item.dart';
@@ -11,9 +13,11 @@ class PosRepository {
   final AppDatabase _db;
   final CustomerAccountService _customerAccountService;
   late final PosSessionOpenService _sessionOpenService;
+  late final PosSessionCloseService _sessionCloseService;
 
   PosRepository(this._db, this._customerAccountService) {
     _sessionOpenService = PosSessionOpenService(_db);
+    _sessionCloseService = PosSessionCloseService(_db);
   }
 
   Future<PosSession?> getOpenSession() => _db.salesDao.getOpenSession();
@@ -31,21 +35,19 @@ class PosRepository {
         createdByUserId: userId,
       );
 
-  Future<void> closeSession({
+  Future<PosSessionCloseResult> closeSession({
+    required String idempotencyKey,
     required int sessionId,
     required double closingCash,
-    double? expectedCashAmount,
-    double? cashDifference,
     int? closedByUserId,
     String? notes,
   }) =>
-      _db.salesDao.closeSession(
+      _sessionCloseService.processClose(
+        idempotencyKey: idempotencyKey,
         sessionId: sessionId,
         closingCash: closingCash,
-        expectedCashAmount: expectedCashAmount,
-        cashDifference: cashDifference,
-        closedByUserId: closedByUserId,
         notes: notes,
+        closedByUserId: closedByUserId,
       );
 
   Future<Map<String, dynamic>> getSessionSummary(int sessionId) =>

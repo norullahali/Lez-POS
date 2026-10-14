@@ -26,18 +26,26 @@ class SalesDao extends DatabaseAccessor<AppDatabase> with _$SalesDaoMixin {
   Future<int> insertOpenSessionRow(PosSessionsCompanion session) =>
       into(posSessions).insert(session);
 
-  Future<int> closeSession({
+  Future<PosSession?> getSessionById(int sessionId) =>
+      (select(posSessions)..where((s) => s.id.equals(sessionId)))
+          .getSingleOrNull();
+
+  /// Conditional close for B26 [PosSessionCloseService] only.
+  Future<int> closeOpenSessionIfStillOpen({
     required int sessionId,
     required double closingCash,
-    double? expectedCashAmount,
-    double? cashDifference,
+    required double expectedCashAmount,
+    required double cashDifference,
+    required DateTime closedAt,
     int? closedByUserId,
     String? notes,
   }) =>
-      (update(posSessions)..where((s) => s.id.equals(sessionId))).write(
+      (update(posSessions)
+            ..where((s) => s.id.equals(sessionId) & s.isClosed.equals(false)))
+          .write(
         PosSessionsCompanion(
           isClosed: const Value(true),
-          closedAt: Value(DateTime.now()),
+          closedAt: Value(closedAt),
           closingCash: Value(closingCash),
           closedByUserId: Value(closedByUserId),
           expectedCashAmount: Value(expectedCashAmount),

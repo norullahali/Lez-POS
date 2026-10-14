@@ -12,9 +12,6 @@ import '../../pricing/providers/pricing_provider.dart';
 import '../../../core/services/pos_sale_service.dart';
 import '../../../core/services/process_sale_result.dart';
 import '../../../core/services/pos_sale_fingerprint.dart';
-import '../../../core/services/activity_logger_service.dart';
-import '../../../core/activity/activity_categories.dart';
-import '../../../core/activity/activity_types.dart';
 import '../../customers/providers/customer_accounts_provider.dart';
 
 import 'package:drift/drift.dart' show Value;
@@ -57,46 +54,28 @@ class PosSessionNotifier extends AsyncNotifier<PosSession?> {
   /// [notes]        — optional close note.
   /// Returns the session summary map for the caller to display.
   Future<Map<String, dynamic>> closeSession({
+    required String idempotencyKey,
     required double closingCash,
     String? notes,
   }) async {
     final session = state.valueOrNull;
     if (session == null) return {};
     final userId = ref.read(authProvider).valueOrNull?.user?.id;
-    final summary =
-        await ref.read(posRepositoryProvider).getSessionSummary(session.id);
-
-    final cashSales = (summary['cash'] as num?)?.toDouble() ?? 0.0;
-    final expectedCash = session.openingCash + cashSales;
-    final difference = closingCash - expectedCash;
-
-    await ref.read(posRepositoryProvider).closeSession(
+    final result = await ref.read(posRepositoryProvider).closeSession(
+          idempotencyKey: idempotencyKey,
           sessionId: session.id,
           closingCash: closingCash,
-          expectedCashAmount: expectedCash,
-          cashDifference: difference,
           closedByUserId: userId,
           notes: notes,
         );
     ref.invalidateSelf();
-    await ActivityLoggerService(AppDatabase.instance).logInfo(
-      activityType: ActivityTypes.sessionClosed,
-      category: ActivityCategories.sessions,
-      action: 'close',
-      title: 'إغلاق جلسة نقطة البيع',
-      entityType: 'pos_session',
-      entityId: session.id,
-      metadata: {
-        'closingCash': closingCash,
-        'expectedCash': expectedCash,
-        'difference': difference,
-      },
-    );
+    final summary =
+        await ref.read(posRepositoryProvider).getSessionSummary(session.id);
     return {
       ...summary,
-      'expectedCash': expectedCash,
-      'closingCash': closingCash,
-      'difference': difference,
+      'expectedCash': result.expectedCashAmount,
+      'closingCash': result.closingCash,
+      'difference': result.cashDifference,
       'openingCash': session.openingCash,
     };
   }

@@ -8,6 +8,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../auth/providers/auth_provider.dart';
 import '../../providers/pos_provider.dart';
 import '../../../../core/services/pos_session_already_open_exception.dart';
+import '../../../../core/services/pos_session_close_idempotency_conflict_exception.dart';
 import '../../../../core/services/pos_session_open_idempotency_conflict_exception.dart';
 import 'package:uuid/uuid.dart';
 
@@ -235,10 +236,14 @@ class SessionCloseDialog extends ConsumerStatefulWidget {
 
 class _SessionCloseDialogState extends ConsumerState<SessionCloseDialog> {
   static final _nf = NumberFormat('#,##0.##');
+  static const _closeUuid = Uuid();
 
   final _actualCashCtrl = TextEditingController();
   final _noteCtrl = TextEditingController();
   bool _isLoading = false;
+  late String _idempotencyKey;
+  double? _boundClosingCash;
+  String? _boundNotes;
 
   double? _actualCash;
   double? _expectedCash;
@@ -248,11 +253,32 @@ class _SessionCloseDialogState extends ConsumerState<SessionCloseDialog> {
   @override
   void initState() {
     super.initState();
+    _idempotencyKey = _closeUuid.v4();
     _loadSummary();
-    _actualCashCtrl.addListener(() {
-      setState(
-          () => _actualCash = double.tryParse(_actualCashCtrl.text.trim()));
-    });
+    _actualCashCtrl.addListener(_onCloseInputsChanged);
+    _noteCtrl.addListener(_onCloseInputsChanged);
+  }
+
+  void _onCloseInputsChanged() {
+    setState(
+        () => _actualCash = double.tryParse(_actualCashCtrl.text.trim()));
+    _syncCloseIdempotencyKey();
+  }
+
+  void _syncCloseIdempotencyKey() {
+    final cash = double.tryParse(_actualCashCtrl.text.trim()) ?? 0.0;
+    final rawNotes = _noteCtrl.text.trim();
+    final notes = rawNotes.isEmpty ? null : rawNotes;
+    if (_boundClosingCash == null) {
+      _boundClosingCash = cash;
+      _boundNotes = notes;
+      return;
+    }
+    if (_boundClosingCash != cash || _boundNotes != notes) {
+      _idempotencyKey = _closeUuid.v4();
+      _boundClosingCash = cash;
+      _boundNotes = notes;
+    }
   }
 
   @override
@@ -497,13 +523,25 @@ class _SessionCloseDialogState extends ConsumerState<SessionCloseDialog> {
 
   Future<void> _close() async {
     final actualCash = double.tryParse(_actualCashCtrl.text.trim()) ?? 0.0;
+    _syncCloseIdempotencyKey();
     setState(() => _isLoading = true);
     try {
       await ref.read(posSessionProvider.notifier).closeSession(
+            idempotencyKey: _idempotencyKey,
             closingCash: actualCash,
             notes: _noteCtrl.text.trim().isEmpty ? null : _noteCtrl.text.trim(),
           );
       if (mounted) Navigator.pop(context, true);
+    } on PosSessionCloseIdempotencyConflictException {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+                'تغيّرت بيانات الإغلاق أو أن الجلسة مغلقة ببيانات مختلفة. ألغِ الحوار وأعد المحاولة.'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

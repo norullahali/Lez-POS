@@ -22,7 +22,8 @@ class SalesDao extends DatabaseAccessor<AppDatabase> with _$SalesDaoMixin {
         ..limit(1))
           .getSingleOrNull();
 
-  Future<int> openSession(PosSessionsCompanion session) =>
+  /// Internal insert for B25 [PosSessionOpenService] only.
+  Future<int> insertOpenSessionRow(PosSessionsCompanion session) =>
       into(posSessions).insert(session);
 
   Future<int> closeSession({

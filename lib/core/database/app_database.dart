@@ -29,6 +29,7 @@ import 'tables/other_income_mutation_idempotency_table.dart';
 import 'tables/opening_stock_idempotency_table.dart';
 import 'tables/product_opening_stock_seals_table.dart';
 import 'tables/stock_adjustment_idempotency_table.dart';
+import 'tables/pos_session_open_idempotency_table.dart';
 import 'tables/products_table.dart';
 import 'tables/product_batches_table.dart';
 import 'tables/stock_ledger_table.dart';
@@ -87,6 +88,7 @@ import 'daos/other_income_mutation_idempotency_dao.dart';
 import 'daos/opening_stock_idempotency_dao.dart';
 import 'daos/product_opening_stock_seals_dao.dart';
 import 'daos/stock_adjustment_idempotency_dao.dart';
+import 'daos/pos_session_open_idempotency_dao.dart';
 import 'daos/supplier_accounts_dao.dart';
 import 'daos/products_dao.dart';
 import 'daos/stock_dao.dart';
@@ -122,6 +124,7 @@ part 'app_database.g.dart';
     OpeningStockIdempotency,
     ProductOpeningStockSeals,
     StockAdjustmentIdempotency,
+    PosSessionOpenIdempotency,
     SupplierAccounts,
     SupplierTransactions,
     Products,
@@ -180,6 +183,7 @@ part 'app_database.g.dart';
     OpeningStockIdempotencyDao,
     ProductOpeningStockSealsDao,
     StockAdjustmentIdempotencyDao,
+    PosSessionOpenIdempotencyDao,
     SupplierAccountsDao,
     ProductsDao,
     StockDao,
@@ -214,7 +218,7 @@ class AppDatabase extends _$AppDatabase {
   late final pricingDao = PricingDao(this);
 
   @override
-  int get schemaVersion => 50;
+  int get schemaVersion => 51;
 
   @override
   MigrationStrategy get migration {
@@ -282,6 +286,11 @@ class AppDatabase extends _$AppDatabase {
           'CREATE INDEX IF NOT EXISTS oimi_other_income_record_idx '
           'ON other_income_mutation_idempotency (other_income_record_id)',
         );
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS psoi_pos_session_idx '
+          'ON pos_session_open_idempotency (pos_session_id)',
+        );
+        await _createPosSessionOneOpenUniqueIndex();
         // Enable foreign keys
         await customStatement('PRAGMA foreign_keys = ON');
         // Set WAL mode for better concurrent performance
@@ -1243,12 +1252,85 @@ class AppDatabase extends _$AppDatabase {
           }
           debugPrint('[Migration v50] other_income_mutation_idempotency ready');
         }
+        if (from < 51) {
+          debugPrint('[Migration v51] POS session open protection...');
+          await _repairMultipleOpenPosSessionsForB25();
+          await m.createTable(posSessionOpenIdempotency);
+          try {
+            await customStatement(
+              'CREATE INDEX IF NOT EXISTS psoi_pos_session_idx '
+              'ON pos_session_open_idempotency (pos_session_id)',
+            );
+          } catch (e) {
+            debugPrint('[Migration v51] idempotency index skip/error: $e');
+            rethrow;
+          }
+          await _createPosSessionOneOpenUniqueIndex();
+          debugPrint('[Migration v51] POS session open protection ready');
+        }
       },
       beforeOpen: (details) async {
         await customStatement('PRAGMA foreign_keys = ON');
         await customStatement('PRAGMA journal_mode = WAL');
         await customStatement('PRAGMA busy_timeout = 10000');
       },
+    );
+  }
+
+  /// B25: at most one open POS session (expression UNIQUE index).
+  Future<void> _createPosSessionOneOpenUniqueIndex() async {
+    await customStatement(
+      'CREATE UNIQUE INDEX IF NOT EXISTS uq_pos_sessions_one_open '
+      'ON pos_sessions ((CASE WHEN is_closed = 0 THEN 1 ELSE NULL END))',
+    );
+  }
+
+  /// B25: close superseded open rows before enforcing single-open index.
+  Future<void> _repairMultipleOpenPosSessionsForB25() async {
+    final openRows = await customSelect(
+      'SELECT id FROM pos_sessions WHERE is_closed = 0 '
+      'ORDER BY opened_at DESC, id DESC',
+      readsFrom: {posSessions},
+    ).get();
+
+    if (openRows.length <= 1) {
+      return;
+    }
+
+    final authoritativeId = openRows.first.data['id'] as int;
+    final migrationNote =
+        ' [v51: auto-closed superseded open; authoritative=$authoritativeId]';
+    final closedAt = DateTime.now();
+
+    for (var i = 1; i < openRows.length; i++) {
+      final supersededId = openRows[i].data['id'] as int;
+      await customUpdate(
+        'UPDATE pos_sessions SET is_closed = 1, closed_at = ?, '
+        'notes = COALESCE(notes, \'\') || ? '
+        'WHERE id = ? AND is_closed = 0',
+        variables: [
+          Variable.withDateTime(closedAt),
+          Variable.withString(migrationNote),
+          Variable.withInt(supersededId),
+        ],
+        updates: {posSessions},
+      );
+    }
+
+    final remaining = await customSelect(
+      'SELECT COUNT(*) AS cnt FROM pos_sessions WHERE is_closed = 0',
+      readsFrom: {posSessions},
+    ).getSingle();
+    final cnt = remaining.data['cnt'] as int? ?? 0;
+    if (cnt > 1) {
+      throw StateError(
+        'B25 migration blocked: expected at most one open pos_sessions row '
+        'after repair, found $cnt',
+      );
+    }
+    debugPrint(
+      '[Migration v51] repaired ${openRows.length - 1} superseded open session(s); '
+      'authoritative id=$authoritativeId',
     );
   }
 

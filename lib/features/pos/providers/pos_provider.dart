@@ -12,9 +12,9 @@ import '../../pricing/providers/pricing_provider.dart';
 import '../../../core/services/pos_sale_service.dart';
 import '../../../core/services/process_sale_result.dart';
 import '../../../core/services/pos_sale_fingerprint.dart';
+import '../../../core/services/activity_logger_service.dart';
 import '../../../core/activity/activity_categories.dart';
 import '../../../core/activity/activity_types.dart';
-import '../../../core/services/activity_logger_service.dart';
 import '../../customers/providers/customer_accounts_provider.dart';
 
 import 'package:drift/drift.dart' show Value;
@@ -36,22 +36,19 @@ class PosSessionNotifier extends AsyncNotifier<PosSession?> {
     return ref.watch(posRepositoryProvider).getOpenSession();
   }
 
-  Future<void> openSession(String cashierName, double openingCash) async {
+  Future<void> openSession({
+    required String idempotencyKey,
+    required String cashierName,
+    required double openingCash,
+  }) async {
     final userId = ref.read(authProvider).valueOrNull?.user?.id;
-    await ref
-        .read(posRepositoryProvider)
-        .openSession(cashierName, openingCash, userId);
+    await ref.read(posRepositoryProvider).openSession(
+          idempotencyKey: idempotencyKey,
+          cashierName: cashierName,
+          openingCash: openingCash,
+          userId: userId,
+        );
     ref.invalidateSelf();
-    final session = ref.read(posSessionProvider).valueOrNull;
-    await ActivityLoggerService(AppDatabase.instance).logInfo(
-      activityType: ActivityTypes.sessionOpened,
-      category: ActivityCategories.sessions,
-      action: 'open',
-      title: 'فتح جلسة نقطة البيع',
-      entityType: 'pos_session',
-      entityId: session?.id,
-      metadata: {'cashierName': cashierName, 'openingCash': openingCash},
-    );
   }
 
   /// Closes the active session.

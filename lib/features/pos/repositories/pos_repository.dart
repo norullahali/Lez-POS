@@ -3,26 +3,32 @@ import 'package:drift/drift.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/services/customer_account_service.dart';
 import '../../../core/services/customer_payment_result.dart';
+import '../../../core/services/pos_session_open_result.dart';
+import '../../../core/services/pos_session_open_service.dart';
 import '../models/cart_item.dart';
 
 class PosRepository {
   final AppDatabase _db;
   final CustomerAccountService _customerAccountService;
+  late final PosSessionOpenService _sessionOpenService;
 
-  PosRepository(this._db, this._customerAccountService);
+  PosRepository(this._db, this._customerAccountService) {
+    _sessionOpenService = PosSessionOpenService(_db);
+  }
 
   Future<PosSession?> getOpenSession() => _db.salesDao.getOpenSession();
 
-  Future<int> openSession(String cashierName, double openingCash, int? userId) =>
-      _db.salesDao.openSession(
-        PosSessionsCompanion(
-          cashierName: Value(cashierName),
-          openingCash: Value(openingCash),
-          createdByUserId: Value(userId),
-          // Explicit Dart DateTime.now() — avoids SQLite's CURRENT_TIMESTAMP
-          // text default which Drift mis-reads when using integer datetime mode.
-          openedAt: Value(DateTime.now()),
-        ),
+  Future<PosSessionOpenResult> openSession({
+    required String idempotencyKey,
+    required String cashierName,
+    required double openingCash,
+    int? userId,
+  }) =>
+      _sessionOpenService.processOpen(
+        idempotencyKey: idempotencyKey,
+        cashierName: cashierName,
+        openingCash: openingCash,
+        createdByUserId: userId,
       );
 
   Future<void> closeSession({

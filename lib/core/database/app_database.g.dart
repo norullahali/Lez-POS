@@ -8434,6 +8434,1023 @@ class StockAdjustmentIdempotencyCompanion
   }
 }
 
+class $PosSessionsTable extends PosSessions
+    with TableInfo<$PosSessionsTable, PosSession> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $PosSessionsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+      'id', aliasedName, false,
+      hasAutoIncrement: true,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('PRIMARY KEY AUTOINCREMENT'));
+  static const VerificationMeta _cashierNameMeta =
+      const VerificationMeta('cashierName');
+  @override
+  late final GeneratedColumn<String> cashierName = GeneratedColumn<String>(
+      'cashier_name', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant('كاشير'));
+  static const VerificationMeta _createdByUserIdMeta =
+      const VerificationMeta('createdByUserId');
+  @override
+  late final GeneratedColumn<int> createdByUserId = GeneratedColumn<int>(
+      'created_by_user_id', aliasedName, true,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      $customConstraints: 'NULL REFERENCES users(id)');
+  static const VerificationMeta _openedAtMeta =
+      const VerificationMeta('openedAt');
+  @override
+  late final GeneratedColumn<DateTime> openedAt = GeneratedColumn<DateTime>(
+      'opened_at', aliasedName, false,
+      type: DriftSqlType.dateTime,
+      requiredDuringInsert: false,
+      defaultValue: currentDateAndTime);
+  static const VerificationMeta _openingCashMeta =
+      const VerificationMeta('openingCash');
+  @override
+  late final GeneratedColumn<double> openingCash = GeneratedColumn<double>(
+      'opening_cash', aliasedName, false,
+      type: DriftSqlType.double,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0.0));
+  static const VerificationMeta _closedByUserIdMeta =
+      const VerificationMeta('closedByUserId');
+  @override
+  late final GeneratedColumn<int> closedByUserId = GeneratedColumn<int>(
+      'closed_by_user_id', aliasedName, true,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      $customConstraints: 'NULL REFERENCES users(id)');
+  static const VerificationMeta _closedAtMeta =
+      const VerificationMeta('closedAt');
+  @override
+  late final GeneratedColumn<DateTime> closedAt = GeneratedColumn<DateTime>(
+      'closed_at', aliasedName, true,
+      type: DriftSqlType.dateTime, requiredDuringInsert: false);
+  static const VerificationMeta _closingCashMeta =
+      const VerificationMeta('closingCash');
+  @override
+  late final GeneratedColumn<double> closingCash = GeneratedColumn<double>(
+      'closing_cash', aliasedName, true,
+      type: DriftSqlType.double, requiredDuringInsert: false);
+  static const VerificationMeta _expectedCashAmountMeta =
+      const VerificationMeta('expectedCashAmount');
+  @override
+  late final GeneratedColumn<double> expectedCashAmount =
+      GeneratedColumn<double>('expected_cash_amount', aliasedName, true,
+          type: DriftSqlType.double, requiredDuringInsert: false);
+  static const VerificationMeta _cashDifferenceMeta =
+      const VerificationMeta('cashDifference');
+  @override
+  late final GeneratedColumn<double> cashDifference = GeneratedColumn<double>(
+      'cash_difference', aliasedName, true,
+      type: DriftSqlType.double, requiredDuringInsert: false);
+  static const VerificationMeta _notesMeta = const VerificationMeta('notes');
+  @override
+  late final GeneratedColumn<String> notes = GeneratedColumn<String>(
+      'notes', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _isClosedMeta =
+      const VerificationMeta('isClosed');
+  @override
+  late final GeneratedColumn<bool> isClosed = GeneratedColumn<bool>(
+      'is_closed', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('CHECK ("is_closed" IN (0, 1))'),
+      defaultValue: const Constant(false));
+  @override
+  List<GeneratedColumn> get $columns => [
+        id,
+        cashierName,
+        createdByUserId,
+        openedAt,
+        openingCash,
+        closedByUserId,
+        closedAt,
+        closingCash,
+        expectedCashAmount,
+        cashDifference,
+        notes,
+        isClosed
+      ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'pos_sessions';
+  @override
+  VerificationContext validateIntegrity(Insertable<PosSession> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('cashier_name')) {
+      context.handle(
+          _cashierNameMeta,
+          cashierName.isAcceptableOrUnknown(
+              data['cashier_name']!, _cashierNameMeta));
+    }
+    if (data.containsKey('created_by_user_id')) {
+      context.handle(
+          _createdByUserIdMeta,
+          createdByUserId.isAcceptableOrUnknown(
+              data['created_by_user_id']!, _createdByUserIdMeta));
+    }
+    if (data.containsKey('opened_at')) {
+      context.handle(_openedAtMeta,
+          openedAt.isAcceptableOrUnknown(data['opened_at']!, _openedAtMeta));
+    }
+    if (data.containsKey('opening_cash')) {
+      context.handle(
+          _openingCashMeta,
+          openingCash.isAcceptableOrUnknown(
+              data['opening_cash']!, _openingCashMeta));
+    }
+    if (data.containsKey('closed_by_user_id')) {
+      context.handle(
+          _closedByUserIdMeta,
+          closedByUserId.isAcceptableOrUnknown(
+              data['closed_by_user_id']!, _closedByUserIdMeta));
+    }
+    if (data.containsKey('closed_at')) {
+      context.handle(_closedAtMeta,
+          closedAt.isAcceptableOrUnknown(data['closed_at']!, _closedAtMeta));
+    }
+    if (data.containsKey('closing_cash')) {
+      context.handle(
+          _closingCashMeta,
+          closingCash.isAcceptableOrUnknown(
+              data['closing_cash']!, _closingCashMeta));
+    }
+    if (data.containsKey('expected_cash_amount')) {
+      context.handle(
+          _expectedCashAmountMeta,
+          expectedCashAmount.isAcceptableOrUnknown(
+              data['expected_cash_amount']!, _expectedCashAmountMeta));
+    }
+    if (data.containsKey('cash_difference')) {
+      context.handle(
+          _cashDifferenceMeta,
+          cashDifference.isAcceptableOrUnknown(
+              data['cash_difference']!, _cashDifferenceMeta));
+    }
+    if (data.containsKey('notes')) {
+      context.handle(
+          _notesMeta, notes.isAcceptableOrUnknown(data['notes']!, _notesMeta));
+    }
+    if (data.containsKey('is_closed')) {
+      context.handle(_isClosedMeta,
+          isClosed.isAcceptableOrUnknown(data['is_closed']!, _isClosedMeta));
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  PosSession map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return PosSession(
+      id: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}id'])!,
+      cashierName: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}cashier_name'])!,
+      createdByUserId: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}created_by_user_id']),
+      openedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}opened_at'])!,
+      openingCash: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}opening_cash'])!,
+      closedByUserId: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}closed_by_user_id']),
+      closedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}closed_at']),
+      closingCash: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}closing_cash']),
+      expectedCashAmount: attachedDatabase.typeMapping.read(
+          DriftSqlType.double, data['${effectivePrefix}expected_cash_amount']),
+      cashDifference: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}cash_difference']),
+      notes: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}notes']),
+      isClosed: attachedDatabase.typeMapping
+          .read(DriftSqlType.bool, data['${effectivePrefix}is_closed'])!,
+    );
+  }
+
+  @override
+  $PosSessionsTable createAlias(String alias) {
+    return $PosSessionsTable(attachedDatabase, alias);
+  }
+}
+
+class PosSession extends DataClass implements Insertable<PosSession> {
+  final int id;
+
+  /// Denormalized display name (pre-filled from user.fullName at open time).
+  final String cashierName;
+
+  /// User who opened this session.
+  final int? createdByUserId;
+  final DateTime openedAt;
+  final double openingCash;
+  final int? closedByUserId;
+  final DateTime? closedAt;
+  final double? closingCash;
+
+  /// Cash expected at close: openingCash + sum(cash_paid) for this session.
+  final double? expectedCashAmount;
+
+  /// closingCash - expectedCashAmount (negative = shortage, positive = overage).
+  final double? cashDifference;
+  final String? notes;
+  final bool isClosed;
+  const PosSession(
+      {required this.id,
+      required this.cashierName,
+      this.createdByUserId,
+      required this.openedAt,
+      required this.openingCash,
+      this.closedByUserId,
+      this.closedAt,
+      this.closingCash,
+      this.expectedCashAmount,
+      this.cashDifference,
+      this.notes,
+      required this.isClosed});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['cashier_name'] = Variable<String>(cashierName);
+    if (!nullToAbsent || createdByUserId != null) {
+      map['created_by_user_id'] = Variable<int>(createdByUserId);
+    }
+    map['opened_at'] = Variable<DateTime>(openedAt);
+    map['opening_cash'] = Variable<double>(openingCash);
+    if (!nullToAbsent || closedByUserId != null) {
+      map['closed_by_user_id'] = Variable<int>(closedByUserId);
+    }
+    if (!nullToAbsent || closedAt != null) {
+      map['closed_at'] = Variable<DateTime>(closedAt);
+    }
+    if (!nullToAbsent || closingCash != null) {
+      map['closing_cash'] = Variable<double>(closingCash);
+    }
+    if (!nullToAbsent || expectedCashAmount != null) {
+      map['expected_cash_amount'] = Variable<double>(expectedCashAmount);
+    }
+    if (!nullToAbsent || cashDifference != null) {
+      map['cash_difference'] = Variable<double>(cashDifference);
+    }
+    if (!nullToAbsent || notes != null) {
+      map['notes'] = Variable<String>(notes);
+    }
+    map['is_closed'] = Variable<bool>(isClosed);
+    return map;
+  }
+
+  PosSessionsCompanion toCompanion(bool nullToAbsent) {
+    return PosSessionsCompanion(
+      id: Value(id),
+      cashierName: Value(cashierName),
+      createdByUserId: createdByUserId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(createdByUserId),
+      openedAt: Value(openedAt),
+      openingCash: Value(openingCash),
+      closedByUserId: closedByUserId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(closedByUserId),
+      closedAt: closedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(closedAt),
+      closingCash: closingCash == null && nullToAbsent
+          ? const Value.absent()
+          : Value(closingCash),
+      expectedCashAmount: expectedCashAmount == null && nullToAbsent
+          ? const Value.absent()
+          : Value(expectedCashAmount),
+      cashDifference: cashDifference == null && nullToAbsent
+          ? const Value.absent()
+          : Value(cashDifference),
+      notes:
+          notes == null && nullToAbsent ? const Value.absent() : Value(notes),
+      isClosed: Value(isClosed),
+    );
+  }
+
+  factory PosSession.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return PosSession(
+      id: serializer.fromJson<int>(json['id']),
+      cashierName: serializer.fromJson<String>(json['cashierName']),
+      createdByUserId: serializer.fromJson<int?>(json['createdByUserId']),
+      openedAt: serializer.fromJson<DateTime>(json['openedAt']),
+      openingCash: serializer.fromJson<double>(json['openingCash']),
+      closedByUserId: serializer.fromJson<int?>(json['closedByUserId']),
+      closedAt: serializer.fromJson<DateTime?>(json['closedAt']),
+      closingCash: serializer.fromJson<double?>(json['closingCash']),
+      expectedCashAmount:
+          serializer.fromJson<double?>(json['expectedCashAmount']),
+      cashDifference: serializer.fromJson<double?>(json['cashDifference']),
+      notes: serializer.fromJson<String?>(json['notes']),
+      isClosed: serializer.fromJson<bool>(json['isClosed']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'cashierName': serializer.toJson<String>(cashierName),
+      'createdByUserId': serializer.toJson<int?>(createdByUserId),
+      'openedAt': serializer.toJson<DateTime>(openedAt),
+      'openingCash': serializer.toJson<double>(openingCash),
+      'closedByUserId': serializer.toJson<int?>(closedByUserId),
+      'closedAt': serializer.toJson<DateTime?>(closedAt),
+      'closingCash': serializer.toJson<double?>(closingCash),
+      'expectedCashAmount': serializer.toJson<double?>(expectedCashAmount),
+      'cashDifference': serializer.toJson<double?>(cashDifference),
+      'notes': serializer.toJson<String?>(notes),
+      'isClosed': serializer.toJson<bool>(isClosed),
+    };
+  }
+
+  PosSession copyWith(
+          {int? id,
+          String? cashierName,
+          Value<int?> createdByUserId = const Value.absent(),
+          DateTime? openedAt,
+          double? openingCash,
+          Value<int?> closedByUserId = const Value.absent(),
+          Value<DateTime?> closedAt = const Value.absent(),
+          Value<double?> closingCash = const Value.absent(),
+          Value<double?> expectedCashAmount = const Value.absent(),
+          Value<double?> cashDifference = const Value.absent(),
+          Value<String?> notes = const Value.absent(),
+          bool? isClosed}) =>
+      PosSession(
+        id: id ?? this.id,
+        cashierName: cashierName ?? this.cashierName,
+        createdByUserId: createdByUserId.present
+            ? createdByUserId.value
+            : this.createdByUserId,
+        openedAt: openedAt ?? this.openedAt,
+        openingCash: openingCash ?? this.openingCash,
+        closedByUserId:
+            closedByUserId.present ? closedByUserId.value : this.closedByUserId,
+        closedAt: closedAt.present ? closedAt.value : this.closedAt,
+        closingCash: closingCash.present ? closingCash.value : this.closingCash,
+        expectedCashAmount: expectedCashAmount.present
+            ? expectedCashAmount.value
+            : this.expectedCashAmount,
+        cashDifference:
+            cashDifference.present ? cashDifference.value : this.cashDifference,
+        notes: notes.present ? notes.value : this.notes,
+        isClosed: isClosed ?? this.isClosed,
+      );
+  PosSession copyWithCompanion(PosSessionsCompanion data) {
+    return PosSession(
+      id: data.id.present ? data.id.value : this.id,
+      cashierName:
+          data.cashierName.present ? data.cashierName.value : this.cashierName,
+      createdByUserId: data.createdByUserId.present
+          ? data.createdByUserId.value
+          : this.createdByUserId,
+      openedAt: data.openedAt.present ? data.openedAt.value : this.openedAt,
+      openingCash:
+          data.openingCash.present ? data.openingCash.value : this.openingCash,
+      closedByUserId: data.closedByUserId.present
+          ? data.closedByUserId.value
+          : this.closedByUserId,
+      closedAt: data.closedAt.present ? data.closedAt.value : this.closedAt,
+      closingCash:
+          data.closingCash.present ? data.closingCash.value : this.closingCash,
+      expectedCashAmount: data.expectedCashAmount.present
+          ? data.expectedCashAmount.value
+          : this.expectedCashAmount,
+      cashDifference: data.cashDifference.present
+          ? data.cashDifference.value
+          : this.cashDifference,
+      notes: data.notes.present ? data.notes.value : this.notes,
+      isClosed: data.isClosed.present ? data.isClosed.value : this.isClosed,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PosSession(')
+          ..write('id: $id, ')
+          ..write('cashierName: $cashierName, ')
+          ..write('createdByUserId: $createdByUserId, ')
+          ..write('openedAt: $openedAt, ')
+          ..write('openingCash: $openingCash, ')
+          ..write('closedByUserId: $closedByUserId, ')
+          ..write('closedAt: $closedAt, ')
+          ..write('closingCash: $closingCash, ')
+          ..write('expectedCashAmount: $expectedCashAmount, ')
+          ..write('cashDifference: $cashDifference, ')
+          ..write('notes: $notes, ')
+          ..write('isClosed: $isClosed')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+      id,
+      cashierName,
+      createdByUserId,
+      openedAt,
+      openingCash,
+      closedByUserId,
+      closedAt,
+      closingCash,
+      expectedCashAmount,
+      cashDifference,
+      notes,
+      isClosed);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is PosSession &&
+          other.id == this.id &&
+          other.cashierName == this.cashierName &&
+          other.createdByUserId == this.createdByUserId &&
+          other.openedAt == this.openedAt &&
+          other.openingCash == this.openingCash &&
+          other.closedByUserId == this.closedByUserId &&
+          other.closedAt == this.closedAt &&
+          other.closingCash == this.closingCash &&
+          other.expectedCashAmount == this.expectedCashAmount &&
+          other.cashDifference == this.cashDifference &&
+          other.notes == this.notes &&
+          other.isClosed == this.isClosed);
+}
+
+class PosSessionsCompanion extends UpdateCompanion<PosSession> {
+  final Value<int> id;
+  final Value<String> cashierName;
+  final Value<int?> createdByUserId;
+  final Value<DateTime> openedAt;
+  final Value<double> openingCash;
+  final Value<int?> closedByUserId;
+  final Value<DateTime?> closedAt;
+  final Value<double?> closingCash;
+  final Value<double?> expectedCashAmount;
+  final Value<double?> cashDifference;
+  final Value<String?> notes;
+  final Value<bool> isClosed;
+  const PosSessionsCompanion({
+    this.id = const Value.absent(),
+    this.cashierName = const Value.absent(),
+    this.createdByUserId = const Value.absent(),
+    this.openedAt = const Value.absent(),
+    this.openingCash = const Value.absent(),
+    this.closedByUserId = const Value.absent(),
+    this.closedAt = const Value.absent(),
+    this.closingCash = const Value.absent(),
+    this.expectedCashAmount = const Value.absent(),
+    this.cashDifference = const Value.absent(),
+    this.notes = const Value.absent(),
+    this.isClosed = const Value.absent(),
+  });
+  PosSessionsCompanion.insert({
+    this.id = const Value.absent(),
+    this.cashierName = const Value.absent(),
+    this.createdByUserId = const Value.absent(),
+    this.openedAt = const Value.absent(),
+    this.openingCash = const Value.absent(),
+    this.closedByUserId = const Value.absent(),
+    this.closedAt = const Value.absent(),
+    this.closingCash = const Value.absent(),
+    this.expectedCashAmount = const Value.absent(),
+    this.cashDifference = const Value.absent(),
+    this.notes = const Value.absent(),
+    this.isClosed = const Value.absent(),
+  });
+  static Insertable<PosSession> custom({
+    Expression<int>? id,
+    Expression<String>? cashierName,
+    Expression<int>? createdByUserId,
+    Expression<DateTime>? openedAt,
+    Expression<double>? openingCash,
+    Expression<int>? closedByUserId,
+    Expression<DateTime>? closedAt,
+    Expression<double>? closingCash,
+    Expression<double>? expectedCashAmount,
+    Expression<double>? cashDifference,
+    Expression<String>? notes,
+    Expression<bool>? isClosed,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (cashierName != null) 'cashier_name': cashierName,
+      if (createdByUserId != null) 'created_by_user_id': createdByUserId,
+      if (openedAt != null) 'opened_at': openedAt,
+      if (openingCash != null) 'opening_cash': openingCash,
+      if (closedByUserId != null) 'closed_by_user_id': closedByUserId,
+      if (closedAt != null) 'closed_at': closedAt,
+      if (closingCash != null) 'closing_cash': closingCash,
+      if (expectedCashAmount != null)
+        'expected_cash_amount': expectedCashAmount,
+      if (cashDifference != null) 'cash_difference': cashDifference,
+      if (notes != null) 'notes': notes,
+      if (isClosed != null) 'is_closed': isClosed,
+    });
+  }
+
+  PosSessionsCompanion copyWith(
+      {Value<int>? id,
+      Value<String>? cashierName,
+      Value<int?>? createdByUserId,
+      Value<DateTime>? openedAt,
+      Value<double>? openingCash,
+      Value<int?>? closedByUserId,
+      Value<DateTime?>? closedAt,
+      Value<double?>? closingCash,
+      Value<double?>? expectedCashAmount,
+      Value<double?>? cashDifference,
+      Value<String?>? notes,
+      Value<bool>? isClosed}) {
+    return PosSessionsCompanion(
+      id: id ?? this.id,
+      cashierName: cashierName ?? this.cashierName,
+      createdByUserId: createdByUserId ?? this.createdByUserId,
+      openedAt: openedAt ?? this.openedAt,
+      openingCash: openingCash ?? this.openingCash,
+      closedByUserId: closedByUserId ?? this.closedByUserId,
+      closedAt: closedAt ?? this.closedAt,
+      closingCash: closingCash ?? this.closingCash,
+      expectedCashAmount: expectedCashAmount ?? this.expectedCashAmount,
+      cashDifference: cashDifference ?? this.cashDifference,
+      notes: notes ?? this.notes,
+      isClosed: isClosed ?? this.isClosed,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (cashierName.present) {
+      map['cashier_name'] = Variable<String>(cashierName.value);
+    }
+    if (createdByUserId.present) {
+      map['created_by_user_id'] = Variable<int>(createdByUserId.value);
+    }
+    if (openedAt.present) {
+      map['opened_at'] = Variable<DateTime>(openedAt.value);
+    }
+    if (openingCash.present) {
+      map['opening_cash'] = Variable<double>(openingCash.value);
+    }
+    if (closedByUserId.present) {
+      map['closed_by_user_id'] = Variable<int>(closedByUserId.value);
+    }
+    if (closedAt.present) {
+      map['closed_at'] = Variable<DateTime>(closedAt.value);
+    }
+    if (closingCash.present) {
+      map['closing_cash'] = Variable<double>(closingCash.value);
+    }
+    if (expectedCashAmount.present) {
+      map['expected_cash_amount'] = Variable<double>(expectedCashAmount.value);
+    }
+    if (cashDifference.present) {
+      map['cash_difference'] = Variable<double>(cashDifference.value);
+    }
+    if (notes.present) {
+      map['notes'] = Variable<String>(notes.value);
+    }
+    if (isClosed.present) {
+      map['is_closed'] = Variable<bool>(isClosed.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PosSessionsCompanion(')
+          ..write('id: $id, ')
+          ..write('cashierName: $cashierName, ')
+          ..write('createdByUserId: $createdByUserId, ')
+          ..write('openedAt: $openedAt, ')
+          ..write('openingCash: $openingCash, ')
+          ..write('closedByUserId: $closedByUserId, ')
+          ..write('closedAt: $closedAt, ')
+          ..write('closingCash: $closingCash, ')
+          ..write('expectedCashAmount: $expectedCashAmount, ')
+          ..write('cashDifference: $cashDifference, ')
+          ..write('notes: $notes, ')
+          ..write('isClosed: $isClosed')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $PosSessionOpenIdempotencyTable extends PosSessionOpenIdempotency
+    with
+        TableInfo<$PosSessionOpenIdempotencyTable,
+            PosSessionOpenIdempotencyData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $PosSessionOpenIdempotencyTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idempotencyKeyMeta =
+      const VerificationMeta('idempotencyKey');
+  @override
+  late final GeneratedColumn<String> idempotencyKey = GeneratedColumn<String>(
+      'idempotency_key', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _fingerprintHashMeta =
+      const VerificationMeta('fingerprintHash');
+  @override
+  late final GeneratedColumn<String> fingerprintHash = GeneratedColumn<String>(
+      'fingerprint_hash', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _posSessionIdMeta =
+      const VerificationMeta('posSessionId');
+  @override
+  late final GeneratedColumn<int> posSessionId = GeneratedColumn<int>(
+      'pos_session_id', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: true,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('REFERENCES pos_sessions (id)'));
+  static const VerificationMeta _createdByUserIdMeta =
+      const VerificationMeta('createdByUserId');
+  @override
+  late final GeneratedColumn<int> createdByUserId = GeneratedColumn<int>(
+      'created_by_user_id', aliasedName, true,
+      type: DriftSqlType.int, requiredDuringInsert: false);
+  static const VerificationMeta _openingCashMeta =
+      const VerificationMeta('openingCash');
+  @override
+  late final GeneratedColumn<double> openingCash = GeneratedColumn<double>(
+      'opening_cash', aliasedName, false,
+      type: DriftSqlType.double, requiredDuringInsert: true);
+  static const VerificationMeta _createdAtMeta =
+      const VerificationMeta('createdAt');
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+      'created_at', aliasedName, false,
+      type: DriftSqlType.dateTime,
+      requiredDuringInsert: false,
+      defaultValue: currentDateAndTime);
+  @override
+  List<GeneratedColumn> get $columns => [
+        idempotencyKey,
+        fingerprintHash,
+        posSessionId,
+        createdByUserId,
+        openingCash,
+        createdAt
+      ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'pos_session_open_idempotency';
+  @override
+  VerificationContext validateIntegrity(
+      Insertable<PosSessionOpenIdempotencyData> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('idempotency_key')) {
+      context.handle(
+          _idempotencyKeyMeta,
+          idempotencyKey.isAcceptableOrUnknown(
+              data['idempotency_key']!, _idempotencyKeyMeta));
+    } else if (isInserting) {
+      context.missing(_idempotencyKeyMeta);
+    }
+    if (data.containsKey('fingerprint_hash')) {
+      context.handle(
+          _fingerprintHashMeta,
+          fingerprintHash.isAcceptableOrUnknown(
+              data['fingerprint_hash']!, _fingerprintHashMeta));
+    } else if (isInserting) {
+      context.missing(_fingerprintHashMeta);
+    }
+    if (data.containsKey('pos_session_id')) {
+      context.handle(
+          _posSessionIdMeta,
+          posSessionId.isAcceptableOrUnknown(
+              data['pos_session_id']!, _posSessionIdMeta));
+    } else if (isInserting) {
+      context.missing(_posSessionIdMeta);
+    }
+    if (data.containsKey('created_by_user_id')) {
+      context.handle(
+          _createdByUserIdMeta,
+          createdByUserId.isAcceptableOrUnknown(
+              data['created_by_user_id']!, _createdByUserIdMeta));
+    }
+    if (data.containsKey('opening_cash')) {
+      context.handle(
+          _openingCashMeta,
+          openingCash.isAcceptableOrUnknown(
+              data['opening_cash']!, _openingCashMeta));
+    } else if (isInserting) {
+      context.missing(_openingCashMeta);
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(_createdAtMeta,
+          createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {idempotencyKey};
+  @override
+  PosSessionOpenIdempotencyData map(Map<String, dynamic> data,
+      {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return PosSessionOpenIdempotencyData(
+      idempotencyKey: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}idempotency_key'])!,
+      fingerprintHash: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}fingerprint_hash'])!,
+      posSessionId: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}pos_session_id'])!,
+      createdByUserId: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}created_by_user_id']),
+      openingCash: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}opening_cash'])!,
+      createdAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
+    );
+  }
+
+  @override
+  $PosSessionOpenIdempotencyTable createAlias(String alias) {
+    return $PosSessionOpenIdempotencyTable(attachedDatabase, alias);
+  }
+}
+
+class PosSessionOpenIdempotencyData extends DataClass
+    implements Insertable<PosSessionOpenIdempotencyData> {
+  final String idempotencyKey;
+  final String fingerprintHash;
+  final int posSessionId;
+  final int? createdByUserId;
+  final double openingCash;
+  final DateTime createdAt;
+  const PosSessionOpenIdempotencyData(
+      {required this.idempotencyKey,
+      required this.fingerprintHash,
+      required this.posSessionId,
+      this.createdByUserId,
+      required this.openingCash,
+      required this.createdAt});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['idempotency_key'] = Variable<String>(idempotencyKey);
+    map['fingerprint_hash'] = Variable<String>(fingerprintHash);
+    map['pos_session_id'] = Variable<int>(posSessionId);
+    if (!nullToAbsent || createdByUserId != null) {
+      map['created_by_user_id'] = Variable<int>(createdByUserId);
+    }
+    map['opening_cash'] = Variable<double>(openingCash);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    return map;
+  }
+
+  PosSessionOpenIdempotencyCompanion toCompanion(bool nullToAbsent) {
+    return PosSessionOpenIdempotencyCompanion(
+      idempotencyKey: Value(idempotencyKey),
+      fingerprintHash: Value(fingerprintHash),
+      posSessionId: Value(posSessionId),
+      createdByUserId: createdByUserId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(createdByUserId),
+      openingCash: Value(openingCash),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory PosSessionOpenIdempotencyData.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return PosSessionOpenIdempotencyData(
+      idempotencyKey: serializer.fromJson<String>(json['idempotencyKey']),
+      fingerprintHash: serializer.fromJson<String>(json['fingerprintHash']),
+      posSessionId: serializer.fromJson<int>(json['posSessionId']),
+      createdByUserId: serializer.fromJson<int?>(json['createdByUserId']),
+      openingCash: serializer.fromJson<double>(json['openingCash']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'idempotencyKey': serializer.toJson<String>(idempotencyKey),
+      'fingerprintHash': serializer.toJson<String>(fingerprintHash),
+      'posSessionId': serializer.toJson<int>(posSessionId),
+      'createdByUserId': serializer.toJson<int?>(createdByUserId),
+      'openingCash': serializer.toJson<double>(openingCash),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+    };
+  }
+
+  PosSessionOpenIdempotencyData copyWith(
+          {String? idempotencyKey,
+          String? fingerprintHash,
+          int? posSessionId,
+          Value<int?> createdByUserId = const Value.absent(),
+          double? openingCash,
+          DateTime? createdAt}) =>
+      PosSessionOpenIdempotencyData(
+        idempotencyKey: idempotencyKey ?? this.idempotencyKey,
+        fingerprintHash: fingerprintHash ?? this.fingerprintHash,
+        posSessionId: posSessionId ?? this.posSessionId,
+        createdByUserId: createdByUserId.present
+            ? createdByUserId.value
+            : this.createdByUserId,
+        openingCash: openingCash ?? this.openingCash,
+        createdAt: createdAt ?? this.createdAt,
+      );
+  PosSessionOpenIdempotencyData copyWithCompanion(
+      PosSessionOpenIdempotencyCompanion data) {
+    return PosSessionOpenIdempotencyData(
+      idempotencyKey: data.idempotencyKey.present
+          ? data.idempotencyKey.value
+          : this.idempotencyKey,
+      fingerprintHash: data.fingerprintHash.present
+          ? data.fingerprintHash.value
+          : this.fingerprintHash,
+      posSessionId: data.posSessionId.present
+          ? data.posSessionId.value
+          : this.posSessionId,
+      createdByUserId: data.createdByUserId.present
+          ? data.createdByUserId.value
+          : this.createdByUserId,
+      openingCash:
+          data.openingCash.present ? data.openingCash.value : this.openingCash,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PosSessionOpenIdempotencyData(')
+          ..write('idempotencyKey: $idempotencyKey, ')
+          ..write('fingerprintHash: $fingerprintHash, ')
+          ..write('posSessionId: $posSessionId, ')
+          ..write('createdByUserId: $createdByUserId, ')
+          ..write('openingCash: $openingCash, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(idempotencyKey, fingerprintHash, posSessionId,
+      createdByUserId, openingCash, createdAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is PosSessionOpenIdempotencyData &&
+          other.idempotencyKey == this.idempotencyKey &&
+          other.fingerprintHash == this.fingerprintHash &&
+          other.posSessionId == this.posSessionId &&
+          other.createdByUserId == this.createdByUserId &&
+          other.openingCash == this.openingCash &&
+          other.createdAt == this.createdAt);
+}
+
+class PosSessionOpenIdempotencyCompanion
+    extends UpdateCompanion<PosSessionOpenIdempotencyData> {
+  final Value<String> idempotencyKey;
+  final Value<String> fingerprintHash;
+  final Value<int> posSessionId;
+  final Value<int?> createdByUserId;
+  final Value<double> openingCash;
+  final Value<DateTime> createdAt;
+  final Value<int> rowid;
+  const PosSessionOpenIdempotencyCompanion({
+    this.idempotencyKey = const Value.absent(),
+    this.fingerprintHash = const Value.absent(),
+    this.posSessionId = const Value.absent(),
+    this.createdByUserId = const Value.absent(),
+    this.openingCash = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  PosSessionOpenIdempotencyCompanion.insert({
+    required String idempotencyKey,
+    required String fingerprintHash,
+    required int posSessionId,
+    this.createdByUserId = const Value.absent(),
+    required double openingCash,
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  })  : idempotencyKey = Value(idempotencyKey),
+        fingerprintHash = Value(fingerprintHash),
+        posSessionId = Value(posSessionId),
+        openingCash = Value(openingCash);
+  static Insertable<PosSessionOpenIdempotencyData> custom({
+    Expression<String>? idempotencyKey,
+    Expression<String>? fingerprintHash,
+    Expression<int>? posSessionId,
+    Expression<int>? createdByUserId,
+    Expression<double>? openingCash,
+    Expression<DateTime>? createdAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (idempotencyKey != null) 'idempotency_key': idempotencyKey,
+      if (fingerprintHash != null) 'fingerprint_hash': fingerprintHash,
+      if (posSessionId != null) 'pos_session_id': posSessionId,
+      if (createdByUserId != null) 'created_by_user_id': createdByUserId,
+      if (openingCash != null) 'opening_cash': openingCash,
+      if (createdAt != null) 'created_at': createdAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  PosSessionOpenIdempotencyCompanion copyWith(
+      {Value<String>? idempotencyKey,
+      Value<String>? fingerprintHash,
+      Value<int>? posSessionId,
+      Value<int?>? createdByUserId,
+      Value<double>? openingCash,
+      Value<DateTime>? createdAt,
+      Value<int>? rowid}) {
+    return PosSessionOpenIdempotencyCompanion(
+      idempotencyKey: idempotencyKey ?? this.idempotencyKey,
+      fingerprintHash: fingerprintHash ?? this.fingerprintHash,
+      posSessionId: posSessionId ?? this.posSessionId,
+      createdByUserId: createdByUserId ?? this.createdByUserId,
+      openingCash: openingCash ?? this.openingCash,
+      createdAt: createdAt ?? this.createdAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (idempotencyKey.present) {
+      map['idempotency_key'] = Variable<String>(idempotencyKey.value);
+    }
+    if (fingerprintHash.present) {
+      map['fingerprint_hash'] = Variable<String>(fingerprintHash.value);
+    }
+    if (posSessionId.present) {
+      map['pos_session_id'] = Variable<int>(posSessionId.value);
+    }
+    if (createdByUserId.present) {
+      map['created_by_user_id'] = Variable<int>(createdByUserId.value);
+    }
+    if (openingCash.present) {
+      map['opening_cash'] = Variable<double>(openingCash.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PosSessionOpenIdempotencyCompanion(')
+          ..write('idempotencyKey: $idempotencyKey, ')
+          ..write('fingerprintHash: $fingerprintHash, ')
+          ..write('posSessionId: $posSessionId, ')
+          ..write('createdByUserId: $createdByUserId, ')
+          ..write('openingCash: $openingCash, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $SupplierAccountsTable extends SupplierAccounts
     with TableInfo<$SupplierAccountsTable, SupplierAccount> {
   @override
@@ -12137,637 +13154,6 @@ class PurchaseItemsCompanion extends UpdateCompanion<PurchaseItem> {
           ..write('discountAmount: $discountAmount, ')
           ..write('total: $total, ')
           ..write('expiryDate: $expiryDate')
-          ..write(')'))
-        .toString();
-  }
-}
-
-class $PosSessionsTable extends PosSessions
-    with TableInfo<$PosSessionsTable, PosSession> {
-  @override
-  final GeneratedDatabase attachedDatabase;
-  final String? _alias;
-  $PosSessionsTable(this.attachedDatabase, [this._alias]);
-  static const VerificationMeta _idMeta = const VerificationMeta('id');
-  @override
-  late final GeneratedColumn<int> id = GeneratedColumn<int>(
-      'id', aliasedName, false,
-      hasAutoIncrement: true,
-      type: DriftSqlType.int,
-      requiredDuringInsert: false,
-      defaultConstraints:
-          GeneratedColumn.constraintIsAlways('PRIMARY KEY AUTOINCREMENT'));
-  static const VerificationMeta _cashierNameMeta =
-      const VerificationMeta('cashierName');
-  @override
-  late final GeneratedColumn<String> cashierName = GeneratedColumn<String>(
-      'cashier_name', aliasedName, false,
-      type: DriftSqlType.string,
-      requiredDuringInsert: false,
-      defaultValue: const Constant('كاشير'));
-  static const VerificationMeta _createdByUserIdMeta =
-      const VerificationMeta('createdByUserId');
-  @override
-  late final GeneratedColumn<int> createdByUserId = GeneratedColumn<int>(
-      'created_by_user_id', aliasedName, true,
-      type: DriftSqlType.int,
-      requiredDuringInsert: false,
-      $customConstraints: 'NULL REFERENCES users(id)');
-  static const VerificationMeta _openedAtMeta =
-      const VerificationMeta('openedAt');
-  @override
-  late final GeneratedColumn<DateTime> openedAt = GeneratedColumn<DateTime>(
-      'opened_at', aliasedName, false,
-      type: DriftSqlType.dateTime,
-      requiredDuringInsert: false,
-      defaultValue: currentDateAndTime);
-  static const VerificationMeta _openingCashMeta =
-      const VerificationMeta('openingCash');
-  @override
-  late final GeneratedColumn<double> openingCash = GeneratedColumn<double>(
-      'opening_cash', aliasedName, false,
-      type: DriftSqlType.double,
-      requiredDuringInsert: false,
-      defaultValue: const Constant(0.0));
-  static const VerificationMeta _closedByUserIdMeta =
-      const VerificationMeta('closedByUserId');
-  @override
-  late final GeneratedColumn<int> closedByUserId = GeneratedColumn<int>(
-      'closed_by_user_id', aliasedName, true,
-      type: DriftSqlType.int,
-      requiredDuringInsert: false,
-      $customConstraints: 'NULL REFERENCES users(id)');
-  static const VerificationMeta _closedAtMeta =
-      const VerificationMeta('closedAt');
-  @override
-  late final GeneratedColumn<DateTime> closedAt = GeneratedColumn<DateTime>(
-      'closed_at', aliasedName, true,
-      type: DriftSqlType.dateTime, requiredDuringInsert: false);
-  static const VerificationMeta _closingCashMeta =
-      const VerificationMeta('closingCash');
-  @override
-  late final GeneratedColumn<double> closingCash = GeneratedColumn<double>(
-      'closing_cash', aliasedName, true,
-      type: DriftSqlType.double, requiredDuringInsert: false);
-  static const VerificationMeta _expectedCashAmountMeta =
-      const VerificationMeta('expectedCashAmount');
-  @override
-  late final GeneratedColumn<double> expectedCashAmount =
-      GeneratedColumn<double>('expected_cash_amount', aliasedName, true,
-          type: DriftSqlType.double, requiredDuringInsert: false);
-  static const VerificationMeta _cashDifferenceMeta =
-      const VerificationMeta('cashDifference');
-  @override
-  late final GeneratedColumn<double> cashDifference = GeneratedColumn<double>(
-      'cash_difference', aliasedName, true,
-      type: DriftSqlType.double, requiredDuringInsert: false);
-  static const VerificationMeta _notesMeta = const VerificationMeta('notes');
-  @override
-  late final GeneratedColumn<String> notes = GeneratedColumn<String>(
-      'notes', aliasedName, true,
-      type: DriftSqlType.string, requiredDuringInsert: false);
-  static const VerificationMeta _isClosedMeta =
-      const VerificationMeta('isClosed');
-  @override
-  late final GeneratedColumn<bool> isClosed = GeneratedColumn<bool>(
-      'is_closed', aliasedName, false,
-      type: DriftSqlType.bool,
-      requiredDuringInsert: false,
-      defaultConstraints:
-          GeneratedColumn.constraintIsAlways('CHECK ("is_closed" IN (0, 1))'),
-      defaultValue: const Constant(false));
-  @override
-  List<GeneratedColumn> get $columns => [
-        id,
-        cashierName,
-        createdByUserId,
-        openedAt,
-        openingCash,
-        closedByUserId,
-        closedAt,
-        closingCash,
-        expectedCashAmount,
-        cashDifference,
-        notes,
-        isClosed
-      ];
-  @override
-  String get aliasedName => _alias ?? actualTableName;
-  @override
-  String get actualTableName => $name;
-  static const String $name = 'pos_sessions';
-  @override
-  VerificationContext validateIntegrity(Insertable<PosSession> instance,
-      {bool isInserting = false}) {
-    final context = VerificationContext();
-    final data = instance.toColumns(true);
-    if (data.containsKey('id')) {
-      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
-    }
-    if (data.containsKey('cashier_name')) {
-      context.handle(
-          _cashierNameMeta,
-          cashierName.isAcceptableOrUnknown(
-              data['cashier_name']!, _cashierNameMeta));
-    }
-    if (data.containsKey('created_by_user_id')) {
-      context.handle(
-          _createdByUserIdMeta,
-          createdByUserId.isAcceptableOrUnknown(
-              data['created_by_user_id']!, _createdByUserIdMeta));
-    }
-    if (data.containsKey('opened_at')) {
-      context.handle(_openedAtMeta,
-          openedAt.isAcceptableOrUnknown(data['opened_at']!, _openedAtMeta));
-    }
-    if (data.containsKey('opening_cash')) {
-      context.handle(
-          _openingCashMeta,
-          openingCash.isAcceptableOrUnknown(
-              data['opening_cash']!, _openingCashMeta));
-    }
-    if (data.containsKey('closed_by_user_id')) {
-      context.handle(
-          _closedByUserIdMeta,
-          closedByUserId.isAcceptableOrUnknown(
-              data['closed_by_user_id']!, _closedByUserIdMeta));
-    }
-    if (data.containsKey('closed_at')) {
-      context.handle(_closedAtMeta,
-          closedAt.isAcceptableOrUnknown(data['closed_at']!, _closedAtMeta));
-    }
-    if (data.containsKey('closing_cash')) {
-      context.handle(
-          _closingCashMeta,
-          closingCash.isAcceptableOrUnknown(
-              data['closing_cash']!, _closingCashMeta));
-    }
-    if (data.containsKey('expected_cash_amount')) {
-      context.handle(
-          _expectedCashAmountMeta,
-          expectedCashAmount.isAcceptableOrUnknown(
-              data['expected_cash_amount']!, _expectedCashAmountMeta));
-    }
-    if (data.containsKey('cash_difference')) {
-      context.handle(
-          _cashDifferenceMeta,
-          cashDifference.isAcceptableOrUnknown(
-              data['cash_difference']!, _cashDifferenceMeta));
-    }
-    if (data.containsKey('notes')) {
-      context.handle(
-          _notesMeta, notes.isAcceptableOrUnknown(data['notes']!, _notesMeta));
-    }
-    if (data.containsKey('is_closed')) {
-      context.handle(_isClosedMeta,
-          isClosed.isAcceptableOrUnknown(data['is_closed']!, _isClosedMeta));
-    }
-    return context;
-  }
-
-  @override
-  Set<GeneratedColumn> get $primaryKey => {id};
-  @override
-  PosSession map(Map<String, dynamic> data, {String? tablePrefix}) {
-    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
-    return PosSession(
-      id: attachedDatabase.typeMapping
-          .read(DriftSqlType.int, data['${effectivePrefix}id'])!,
-      cashierName: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}cashier_name'])!,
-      createdByUserId: attachedDatabase.typeMapping
-          .read(DriftSqlType.int, data['${effectivePrefix}created_by_user_id']),
-      openedAt: attachedDatabase.typeMapping
-          .read(DriftSqlType.dateTime, data['${effectivePrefix}opened_at'])!,
-      openingCash: attachedDatabase.typeMapping
-          .read(DriftSqlType.double, data['${effectivePrefix}opening_cash'])!,
-      closedByUserId: attachedDatabase.typeMapping
-          .read(DriftSqlType.int, data['${effectivePrefix}closed_by_user_id']),
-      closedAt: attachedDatabase.typeMapping
-          .read(DriftSqlType.dateTime, data['${effectivePrefix}closed_at']),
-      closingCash: attachedDatabase.typeMapping
-          .read(DriftSqlType.double, data['${effectivePrefix}closing_cash']),
-      expectedCashAmount: attachedDatabase.typeMapping.read(
-          DriftSqlType.double, data['${effectivePrefix}expected_cash_amount']),
-      cashDifference: attachedDatabase.typeMapping
-          .read(DriftSqlType.double, data['${effectivePrefix}cash_difference']),
-      notes: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}notes']),
-      isClosed: attachedDatabase.typeMapping
-          .read(DriftSqlType.bool, data['${effectivePrefix}is_closed'])!,
-    );
-  }
-
-  @override
-  $PosSessionsTable createAlias(String alias) {
-    return $PosSessionsTable(attachedDatabase, alias);
-  }
-}
-
-class PosSession extends DataClass implements Insertable<PosSession> {
-  final int id;
-
-  /// Denormalized display name (pre-filled from user.fullName at open time).
-  final String cashierName;
-
-  /// User who opened this session.
-  final int? createdByUserId;
-  final DateTime openedAt;
-  final double openingCash;
-  final int? closedByUserId;
-  final DateTime? closedAt;
-  final double? closingCash;
-
-  /// Cash expected at close: openingCash + sum(cash_paid) for this session.
-  final double? expectedCashAmount;
-
-  /// closingCash - expectedCashAmount (negative = shortage, positive = overage).
-  final double? cashDifference;
-  final String? notes;
-  final bool isClosed;
-  const PosSession(
-      {required this.id,
-      required this.cashierName,
-      this.createdByUserId,
-      required this.openedAt,
-      required this.openingCash,
-      this.closedByUserId,
-      this.closedAt,
-      this.closingCash,
-      this.expectedCashAmount,
-      this.cashDifference,
-      this.notes,
-      required this.isClosed});
-  @override
-  Map<String, Expression> toColumns(bool nullToAbsent) {
-    final map = <String, Expression>{};
-    map['id'] = Variable<int>(id);
-    map['cashier_name'] = Variable<String>(cashierName);
-    if (!nullToAbsent || createdByUserId != null) {
-      map['created_by_user_id'] = Variable<int>(createdByUserId);
-    }
-    map['opened_at'] = Variable<DateTime>(openedAt);
-    map['opening_cash'] = Variable<double>(openingCash);
-    if (!nullToAbsent || closedByUserId != null) {
-      map['closed_by_user_id'] = Variable<int>(closedByUserId);
-    }
-    if (!nullToAbsent || closedAt != null) {
-      map['closed_at'] = Variable<DateTime>(closedAt);
-    }
-    if (!nullToAbsent || closingCash != null) {
-      map['closing_cash'] = Variable<double>(closingCash);
-    }
-    if (!nullToAbsent || expectedCashAmount != null) {
-      map['expected_cash_amount'] = Variable<double>(expectedCashAmount);
-    }
-    if (!nullToAbsent || cashDifference != null) {
-      map['cash_difference'] = Variable<double>(cashDifference);
-    }
-    if (!nullToAbsent || notes != null) {
-      map['notes'] = Variable<String>(notes);
-    }
-    map['is_closed'] = Variable<bool>(isClosed);
-    return map;
-  }
-
-  PosSessionsCompanion toCompanion(bool nullToAbsent) {
-    return PosSessionsCompanion(
-      id: Value(id),
-      cashierName: Value(cashierName),
-      createdByUserId: createdByUserId == null && nullToAbsent
-          ? const Value.absent()
-          : Value(createdByUserId),
-      openedAt: Value(openedAt),
-      openingCash: Value(openingCash),
-      closedByUserId: closedByUserId == null && nullToAbsent
-          ? const Value.absent()
-          : Value(closedByUserId),
-      closedAt: closedAt == null && nullToAbsent
-          ? const Value.absent()
-          : Value(closedAt),
-      closingCash: closingCash == null && nullToAbsent
-          ? const Value.absent()
-          : Value(closingCash),
-      expectedCashAmount: expectedCashAmount == null && nullToAbsent
-          ? const Value.absent()
-          : Value(expectedCashAmount),
-      cashDifference: cashDifference == null && nullToAbsent
-          ? const Value.absent()
-          : Value(cashDifference),
-      notes:
-          notes == null && nullToAbsent ? const Value.absent() : Value(notes),
-      isClosed: Value(isClosed),
-    );
-  }
-
-  factory PosSession.fromJson(Map<String, dynamic> json,
-      {ValueSerializer? serializer}) {
-    serializer ??= driftRuntimeOptions.defaultSerializer;
-    return PosSession(
-      id: serializer.fromJson<int>(json['id']),
-      cashierName: serializer.fromJson<String>(json['cashierName']),
-      createdByUserId: serializer.fromJson<int?>(json['createdByUserId']),
-      openedAt: serializer.fromJson<DateTime>(json['openedAt']),
-      openingCash: serializer.fromJson<double>(json['openingCash']),
-      closedByUserId: serializer.fromJson<int?>(json['closedByUserId']),
-      closedAt: serializer.fromJson<DateTime?>(json['closedAt']),
-      closingCash: serializer.fromJson<double?>(json['closingCash']),
-      expectedCashAmount:
-          serializer.fromJson<double?>(json['expectedCashAmount']),
-      cashDifference: serializer.fromJson<double?>(json['cashDifference']),
-      notes: serializer.fromJson<String?>(json['notes']),
-      isClosed: serializer.fromJson<bool>(json['isClosed']),
-    );
-  }
-  @override
-  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
-    serializer ??= driftRuntimeOptions.defaultSerializer;
-    return <String, dynamic>{
-      'id': serializer.toJson<int>(id),
-      'cashierName': serializer.toJson<String>(cashierName),
-      'createdByUserId': serializer.toJson<int?>(createdByUserId),
-      'openedAt': serializer.toJson<DateTime>(openedAt),
-      'openingCash': serializer.toJson<double>(openingCash),
-      'closedByUserId': serializer.toJson<int?>(closedByUserId),
-      'closedAt': serializer.toJson<DateTime?>(closedAt),
-      'closingCash': serializer.toJson<double?>(closingCash),
-      'expectedCashAmount': serializer.toJson<double?>(expectedCashAmount),
-      'cashDifference': serializer.toJson<double?>(cashDifference),
-      'notes': serializer.toJson<String?>(notes),
-      'isClosed': serializer.toJson<bool>(isClosed),
-    };
-  }
-
-  PosSession copyWith(
-          {int? id,
-          String? cashierName,
-          Value<int?> createdByUserId = const Value.absent(),
-          DateTime? openedAt,
-          double? openingCash,
-          Value<int?> closedByUserId = const Value.absent(),
-          Value<DateTime?> closedAt = const Value.absent(),
-          Value<double?> closingCash = const Value.absent(),
-          Value<double?> expectedCashAmount = const Value.absent(),
-          Value<double?> cashDifference = const Value.absent(),
-          Value<String?> notes = const Value.absent(),
-          bool? isClosed}) =>
-      PosSession(
-        id: id ?? this.id,
-        cashierName: cashierName ?? this.cashierName,
-        createdByUserId: createdByUserId.present
-            ? createdByUserId.value
-            : this.createdByUserId,
-        openedAt: openedAt ?? this.openedAt,
-        openingCash: openingCash ?? this.openingCash,
-        closedByUserId:
-            closedByUserId.present ? closedByUserId.value : this.closedByUserId,
-        closedAt: closedAt.present ? closedAt.value : this.closedAt,
-        closingCash: closingCash.present ? closingCash.value : this.closingCash,
-        expectedCashAmount: expectedCashAmount.present
-            ? expectedCashAmount.value
-            : this.expectedCashAmount,
-        cashDifference:
-            cashDifference.present ? cashDifference.value : this.cashDifference,
-        notes: notes.present ? notes.value : this.notes,
-        isClosed: isClosed ?? this.isClosed,
-      );
-  PosSession copyWithCompanion(PosSessionsCompanion data) {
-    return PosSession(
-      id: data.id.present ? data.id.value : this.id,
-      cashierName:
-          data.cashierName.present ? data.cashierName.value : this.cashierName,
-      createdByUserId: data.createdByUserId.present
-          ? data.createdByUserId.value
-          : this.createdByUserId,
-      openedAt: data.openedAt.present ? data.openedAt.value : this.openedAt,
-      openingCash:
-          data.openingCash.present ? data.openingCash.value : this.openingCash,
-      closedByUserId: data.closedByUserId.present
-          ? data.closedByUserId.value
-          : this.closedByUserId,
-      closedAt: data.closedAt.present ? data.closedAt.value : this.closedAt,
-      closingCash:
-          data.closingCash.present ? data.closingCash.value : this.closingCash,
-      expectedCashAmount: data.expectedCashAmount.present
-          ? data.expectedCashAmount.value
-          : this.expectedCashAmount,
-      cashDifference: data.cashDifference.present
-          ? data.cashDifference.value
-          : this.cashDifference,
-      notes: data.notes.present ? data.notes.value : this.notes,
-      isClosed: data.isClosed.present ? data.isClosed.value : this.isClosed,
-    );
-  }
-
-  @override
-  String toString() {
-    return (StringBuffer('PosSession(')
-          ..write('id: $id, ')
-          ..write('cashierName: $cashierName, ')
-          ..write('createdByUserId: $createdByUserId, ')
-          ..write('openedAt: $openedAt, ')
-          ..write('openingCash: $openingCash, ')
-          ..write('closedByUserId: $closedByUserId, ')
-          ..write('closedAt: $closedAt, ')
-          ..write('closingCash: $closingCash, ')
-          ..write('expectedCashAmount: $expectedCashAmount, ')
-          ..write('cashDifference: $cashDifference, ')
-          ..write('notes: $notes, ')
-          ..write('isClosed: $isClosed')
-          ..write(')'))
-        .toString();
-  }
-
-  @override
-  int get hashCode => Object.hash(
-      id,
-      cashierName,
-      createdByUserId,
-      openedAt,
-      openingCash,
-      closedByUserId,
-      closedAt,
-      closingCash,
-      expectedCashAmount,
-      cashDifference,
-      notes,
-      isClosed);
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      (other is PosSession &&
-          other.id == this.id &&
-          other.cashierName == this.cashierName &&
-          other.createdByUserId == this.createdByUserId &&
-          other.openedAt == this.openedAt &&
-          other.openingCash == this.openingCash &&
-          other.closedByUserId == this.closedByUserId &&
-          other.closedAt == this.closedAt &&
-          other.closingCash == this.closingCash &&
-          other.expectedCashAmount == this.expectedCashAmount &&
-          other.cashDifference == this.cashDifference &&
-          other.notes == this.notes &&
-          other.isClosed == this.isClosed);
-}
-
-class PosSessionsCompanion extends UpdateCompanion<PosSession> {
-  final Value<int> id;
-  final Value<String> cashierName;
-  final Value<int?> createdByUserId;
-  final Value<DateTime> openedAt;
-  final Value<double> openingCash;
-  final Value<int?> closedByUserId;
-  final Value<DateTime?> closedAt;
-  final Value<double?> closingCash;
-  final Value<double?> expectedCashAmount;
-  final Value<double?> cashDifference;
-  final Value<String?> notes;
-  final Value<bool> isClosed;
-  const PosSessionsCompanion({
-    this.id = const Value.absent(),
-    this.cashierName = const Value.absent(),
-    this.createdByUserId = const Value.absent(),
-    this.openedAt = const Value.absent(),
-    this.openingCash = const Value.absent(),
-    this.closedByUserId = const Value.absent(),
-    this.closedAt = const Value.absent(),
-    this.closingCash = const Value.absent(),
-    this.expectedCashAmount = const Value.absent(),
-    this.cashDifference = const Value.absent(),
-    this.notes = const Value.absent(),
-    this.isClosed = const Value.absent(),
-  });
-  PosSessionsCompanion.insert({
-    this.id = const Value.absent(),
-    this.cashierName = const Value.absent(),
-    this.createdByUserId = const Value.absent(),
-    this.openedAt = const Value.absent(),
-    this.openingCash = const Value.absent(),
-    this.closedByUserId = const Value.absent(),
-    this.closedAt = const Value.absent(),
-    this.closingCash = const Value.absent(),
-    this.expectedCashAmount = const Value.absent(),
-    this.cashDifference = const Value.absent(),
-    this.notes = const Value.absent(),
-    this.isClosed = const Value.absent(),
-  });
-  static Insertable<PosSession> custom({
-    Expression<int>? id,
-    Expression<String>? cashierName,
-    Expression<int>? createdByUserId,
-    Expression<DateTime>? openedAt,
-    Expression<double>? openingCash,
-    Expression<int>? closedByUserId,
-    Expression<DateTime>? closedAt,
-    Expression<double>? closingCash,
-    Expression<double>? expectedCashAmount,
-    Expression<double>? cashDifference,
-    Expression<String>? notes,
-    Expression<bool>? isClosed,
-  }) {
-    return RawValuesInsertable({
-      if (id != null) 'id': id,
-      if (cashierName != null) 'cashier_name': cashierName,
-      if (createdByUserId != null) 'created_by_user_id': createdByUserId,
-      if (openedAt != null) 'opened_at': openedAt,
-      if (openingCash != null) 'opening_cash': openingCash,
-      if (closedByUserId != null) 'closed_by_user_id': closedByUserId,
-      if (closedAt != null) 'closed_at': closedAt,
-      if (closingCash != null) 'closing_cash': closingCash,
-      if (expectedCashAmount != null)
-        'expected_cash_amount': expectedCashAmount,
-      if (cashDifference != null) 'cash_difference': cashDifference,
-      if (notes != null) 'notes': notes,
-      if (isClosed != null) 'is_closed': isClosed,
-    });
-  }
-
-  PosSessionsCompanion copyWith(
-      {Value<int>? id,
-      Value<String>? cashierName,
-      Value<int?>? createdByUserId,
-      Value<DateTime>? openedAt,
-      Value<double>? openingCash,
-      Value<int?>? closedByUserId,
-      Value<DateTime?>? closedAt,
-      Value<double?>? closingCash,
-      Value<double?>? expectedCashAmount,
-      Value<double?>? cashDifference,
-      Value<String?>? notes,
-      Value<bool>? isClosed}) {
-    return PosSessionsCompanion(
-      id: id ?? this.id,
-      cashierName: cashierName ?? this.cashierName,
-      createdByUserId: createdByUserId ?? this.createdByUserId,
-      openedAt: openedAt ?? this.openedAt,
-      openingCash: openingCash ?? this.openingCash,
-      closedByUserId: closedByUserId ?? this.closedByUserId,
-      closedAt: closedAt ?? this.closedAt,
-      closingCash: closingCash ?? this.closingCash,
-      expectedCashAmount: expectedCashAmount ?? this.expectedCashAmount,
-      cashDifference: cashDifference ?? this.cashDifference,
-      notes: notes ?? this.notes,
-      isClosed: isClosed ?? this.isClosed,
-    );
-  }
-
-  @override
-  Map<String, Expression> toColumns(bool nullToAbsent) {
-    final map = <String, Expression>{};
-    if (id.present) {
-      map['id'] = Variable<int>(id.value);
-    }
-    if (cashierName.present) {
-      map['cashier_name'] = Variable<String>(cashierName.value);
-    }
-    if (createdByUserId.present) {
-      map['created_by_user_id'] = Variable<int>(createdByUserId.value);
-    }
-    if (openedAt.present) {
-      map['opened_at'] = Variable<DateTime>(openedAt.value);
-    }
-    if (openingCash.present) {
-      map['opening_cash'] = Variable<double>(openingCash.value);
-    }
-    if (closedByUserId.present) {
-      map['closed_by_user_id'] = Variable<int>(closedByUserId.value);
-    }
-    if (closedAt.present) {
-      map['closed_at'] = Variable<DateTime>(closedAt.value);
-    }
-    if (closingCash.present) {
-      map['closing_cash'] = Variable<double>(closingCash.value);
-    }
-    if (expectedCashAmount.present) {
-      map['expected_cash_amount'] = Variable<double>(expectedCashAmount.value);
-    }
-    if (cashDifference.present) {
-      map['cash_difference'] = Variable<double>(cashDifference.value);
-    }
-    if (notes.present) {
-      map['notes'] = Variable<String>(notes.value);
-    }
-    if (isClosed.present) {
-      map['is_closed'] = Variable<bool>(isClosed.value);
-    }
-    return map;
-  }
-
-  @override
-  String toString() {
-    return (StringBuffer('PosSessionsCompanion(')
-          ..write('id: $id, ')
-          ..write('cashierName: $cashierName, ')
-          ..write('createdByUserId: $createdByUserId, ')
-          ..write('openedAt: $openedAt, ')
-          ..write('openingCash: $openingCash, ')
-          ..write('closedByUserId: $closedByUserId, ')
-          ..write('closedAt: $closedAt, ')
-          ..write('closingCash: $closingCash, ')
-          ..write('expectedCashAmount: $expectedCashAmount, ')
-          ..write('cashDifference: $cashDifference, ')
-          ..write('notes: $notes, ')
-          ..write('isClosed: $isClosed')
           ..write(')'))
         .toString();
   }
@@ -24703,6 +25089,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       $ProductOpeningStockSealsTable(this);
   late final $StockAdjustmentIdempotencyTable stockAdjustmentIdempotency =
       $StockAdjustmentIdempotencyTable(this);
+  late final $PosSessionsTable posSessions = $PosSessionsTable(this);
+  late final $PosSessionOpenIdempotencyTable posSessionOpenIdempotency =
+      $PosSessionOpenIdempotencyTable(this);
   late final $SupplierAccountsTable supplierAccounts =
       $SupplierAccountsTable(this);
   late final $SupplierTransactionsTable supplierTransactions =
@@ -24715,7 +25104,6 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $PurchaseInvoicesTable purchaseInvoices =
       $PurchaseInvoicesTable(this);
   late final $PurchaseItemsTable purchaseItems = $PurchaseItemsTable(this);
-  late final $PosSessionsTable posSessions = $PosSessionsTable(this);
   late final $SalesInvoicesTable salesInvoices = $SalesInvoicesTable(this);
   late final $SalesInvoiceDailySequencesTable salesInvoiceDailySequences =
       $SalesInvoiceDailySequencesTable(this);
@@ -24799,6 +25187,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       ProductOpeningStockSealsDao(this as AppDatabase);
   late final StockAdjustmentIdempotencyDao stockAdjustmentIdempotencyDao =
       StockAdjustmentIdempotencyDao(this as AppDatabase);
+  late final PosSessionOpenIdempotencyDao posSessionOpenIdempotencyDao =
+      PosSessionOpenIdempotencyDao(this as AppDatabase);
   late final SupplierAccountsDao supplierAccountsDao =
       SupplierAccountsDao(this as AppDatabase);
   late final ProductsDao productsDao = ProductsDao(this as AppDatabase);
@@ -24847,6 +25237,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         openingStockIdempotency,
         productOpeningStockSeals,
         stockAdjustmentIdempotency,
+        posSessions,
+        posSessionOpenIdempotency,
         supplierAccounts,
         supplierTransactions,
         products,
@@ -24855,7 +25247,6 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         stockAdjustments,
         purchaseInvoices,
         purchaseItems,
-        posSessions,
         salesInvoices,
         salesInvoiceDailySequences,
         saleItems,
@@ -30398,6 +30789,911 @@ typedef $$StockAdjustmentIdempotencyTableProcessedTableManager
         ),
         StockAdjustmentIdempotencyData,
         PrefetchHooks Function()>;
+typedef $$PosSessionsTableCreateCompanionBuilder = PosSessionsCompanion
+    Function({
+  Value<int> id,
+  Value<String> cashierName,
+  Value<int?> createdByUserId,
+  Value<DateTime> openedAt,
+  Value<double> openingCash,
+  Value<int?> closedByUserId,
+  Value<DateTime?> closedAt,
+  Value<double?> closingCash,
+  Value<double?> expectedCashAmount,
+  Value<double?> cashDifference,
+  Value<String?> notes,
+  Value<bool> isClosed,
+});
+typedef $$PosSessionsTableUpdateCompanionBuilder = PosSessionsCompanion
+    Function({
+  Value<int> id,
+  Value<String> cashierName,
+  Value<int?> createdByUserId,
+  Value<DateTime> openedAt,
+  Value<double> openingCash,
+  Value<int?> closedByUserId,
+  Value<DateTime?> closedAt,
+  Value<double?> closingCash,
+  Value<double?> expectedCashAmount,
+  Value<double?> cashDifference,
+  Value<String?> notes,
+  Value<bool> isClosed,
+});
+
+final class $$PosSessionsTableReferences
+    extends BaseReferences<_$AppDatabase, $PosSessionsTable, PosSession> {
+  $$PosSessionsTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static MultiTypedResultKey<$PosSessionOpenIdempotencyTable,
+      List<PosSessionOpenIdempotencyData>> _posSessionOpenIdempotencyRefsTable(
+          _$AppDatabase db) =>
+      MultiTypedResultKey.fromTable(db.posSessionOpenIdempotency,
+          aliasName: $_aliasNameGenerator(
+              db.posSessions.id, db.posSessionOpenIdempotency.posSessionId));
+
+  $$PosSessionOpenIdempotencyTableProcessedTableManager
+      get posSessionOpenIdempotencyRefs {
+    final manager = $$PosSessionOpenIdempotencyTableTableManager(
+            $_db, $_db.posSessionOpenIdempotency)
+        .filter((f) => f.posSessionId.id($_item.id));
+
+    final cache = $_typedResult
+        .readTableOrNull(_posSessionOpenIdempotencyRefsTable($_db));
+    return ProcessedTableManager(
+        manager.$state.copyWith(prefetchedData: cache));
+  }
+
+  static MultiTypedResultKey<$SalesInvoicesTable, List<SalesInvoice>>
+      _salesInvoicesRefsTable(_$AppDatabase db) =>
+          MultiTypedResultKey.fromTable(db.salesInvoices,
+              aliasName: $_aliasNameGenerator(
+                  db.posSessions.id, db.salesInvoices.sessionId));
+
+  $$SalesInvoicesTableProcessedTableManager get salesInvoicesRefs {
+    final manager = $$SalesInvoicesTableTableManager($_db, $_db.salesInvoices)
+        .filter((f) => f.sessionId.id($_item.id));
+
+    final cache = $_typedResult.readTableOrNull(_salesInvoicesRefsTable($_db));
+    return ProcessedTableManager(
+        manager.$state.copyWith(prefetchedData: cache));
+  }
+
+  static MultiTypedResultKey<$ExpenseRecordsTable, List<ExpenseRecord>>
+      _expenseRecordsRefsTable(_$AppDatabase db) =>
+          MultiTypedResultKey.fromTable(db.expenseRecords,
+              aliasName: $_aliasNameGenerator(
+                  db.posSessions.id, db.expenseRecords.sessionId));
+
+  $$ExpenseRecordsTableProcessedTableManager get expenseRecordsRefs {
+    final manager = $$ExpenseRecordsTableTableManager($_db, $_db.expenseRecords)
+        .filter((f) => f.sessionId.id($_item.id));
+
+    final cache = $_typedResult.readTableOrNull(_expenseRecordsRefsTable($_db));
+    return ProcessedTableManager(
+        manager.$state.copyWith(prefetchedData: cache));
+  }
+
+  static MultiTypedResultKey<$OtherIncomeRecordsTable, List<OtherIncomeRecord>>
+      _otherIncomeRecordsRefsTable(_$AppDatabase db) =>
+          MultiTypedResultKey.fromTable(db.otherIncomeRecords,
+              aliasName: $_aliasNameGenerator(
+                  db.posSessions.id, db.otherIncomeRecords.sessionId));
+
+  $$OtherIncomeRecordsTableProcessedTableManager get otherIncomeRecordsRefs {
+    final manager =
+        $$OtherIncomeRecordsTableTableManager($_db, $_db.otherIncomeRecords)
+            .filter((f) => f.sessionId.id($_item.id));
+
+    final cache =
+        $_typedResult.readTableOrNull(_otherIncomeRecordsRefsTable($_db));
+    return ProcessedTableManager(
+        manager.$state.copyWith(prefetchedData: cache));
+  }
+}
+
+class $$PosSessionsTableFilterComposer
+    extends Composer<_$AppDatabase, $PosSessionsTable> {
+  $$PosSessionsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get cashierName => $composableBuilder(
+      column: $table.cashierName, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get createdByUserId => $composableBuilder(
+      column: $table.createdByUserId,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get openedAt => $composableBuilder(
+      column: $table.openedAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get openingCash => $composableBuilder(
+      column: $table.openingCash, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get closedByUserId => $composableBuilder(
+      column: $table.closedByUserId,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get closedAt => $composableBuilder(
+      column: $table.closedAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get closingCash => $composableBuilder(
+      column: $table.closingCash, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get expectedCashAmount => $composableBuilder(
+      column: $table.expectedCashAmount,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get cashDifference => $composableBuilder(
+      column: $table.cashDifference,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get notes => $composableBuilder(
+      column: $table.notes, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get isClosed => $composableBuilder(
+      column: $table.isClosed, builder: (column) => ColumnFilters(column));
+
+  Expression<bool> posSessionOpenIdempotencyRefs(
+      Expression<bool> Function(
+              $$PosSessionOpenIdempotencyTableFilterComposer f)
+          f) {
+    final $$PosSessionOpenIdempotencyTableFilterComposer composer =
+        $composerBuilder(
+            composer: this,
+            getCurrentColumn: (t) => t.id,
+            referencedTable: $db.posSessionOpenIdempotency,
+            getReferencedColumn: (t) => t.posSessionId,
+            builder: (joinBuilder,
+                    {$addJoinBuilderToRootComposer,
+                    $removeJoinBuilderFromRootComposer}) =>
+                $$PosSessionOpenIdempotencyTableFilterComposer(
+                  $db: $db,
+                  $table: $db.posSessionOpenIdempotency,
+                  $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                  joinBuilder: joinBuilder,
+                  $removeJoinBuilderFromRootComposer:
+                      $removeJoinBuilderFromRootComposer,
+                ));
+    return f(composer);
+  }
+
+  Expression<bool> salesInvoicesRefs(
+      Expression<bool> Function($$SalesInvoicesTableFilterComposer f) f) {
+    final $$SalesInvoicesTableFilterComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.id,
+        referencedTable: $db.salesInvoices,
+        getReferencedColumn: (t) => t.sessionId,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$SalesInvoicesTableFilterComposer(
+              $db: $db,
+              $table: $db.salesInvoices,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return f(composer);
+  }
+
+  Expression<bool> expenseRecordsRefs(
+      Expression<bool> Function($$ExpenseRecordsTableFilterComposer f) f) {
+    final $$ExpenseRecordsTableFilterComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.id,
+        referencedTable: $db.expenseRecords,
+        getReferencedColumn: (t) => t.sessionId,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$ExpenseRecordsTableFilterComposer(
+              $db: $db,
+              $table: $db.expenseRecords,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return f(composer);
+  }
+
+  Expression<bool> otherIncomeRecordsRefs(
+      Expression<bool> Function($$OtherIncomeRecordsTableFilterComposer f) f) {
+    final $$OtherIncomeRecordsTableFilterComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.id,
+        referencedTable: $db.otherIncomeRecords,
+        getReferencedColumn: (t) => t.sessionId,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$OtherIncomeRecordsTableFilterComposer(
+              $db: $db,
+              $table: $db.otherIncomeRecords,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return f(composer);
+  }
+}
+
+class $$PosSessionsTableOrderingComposer
+    extends Composer<_$AppDatabase, $PosSessionsTable> {
+  $$PosSessionsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get cashierName => $composableBuilder(
+      column: $table.cashierName, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get createdByUserId => $composableBuilder(
+      column: $table.createdByUserId,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get openedAt => $composableBuilder(
+      column: $table.openedAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get openingCash => $composableBuilder(
+      column: $table.openingCash, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get closedByUserId => $composableBuilder(
+      column: $table.closedByUserId,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get closedAt => $composableBuilder(
+      column: $table.closedAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get closingCash => $composableBuilder(
+      column: $table.closingCash, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get expectedCashAmount => $composableBuilder(
+      column: $table.expectedCashAmount,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get cashDifference => $composableBuilder(
+      column: $table.cashDifference,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get notes => $composableBuilder(
+      column: $table.notes, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get isClosed => $composableBuilder(
+      column: $table.isClosed, builder: (column) => ColumnOrderings(column));
+}
+
+class $$PosSessionsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $PosSessionsTable> {
+  $$PosSessionsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get cashierName => $composableBuilder(
+      column: $table.cashierName, builder: (column) => column);
+
+  GeneratedColumn<int> get createdByUserId => $composableBuilder(
+      column: $table.createdByUserId, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get openedAt =>
+      $composableBuilder(column: $table.openedAt, builder: (column) => column);
+
+  GeneratedColumn<double> get openingCash => $composableBuilder(
+      column: $table.openingCash, builder: (column) => column);
+
+  GeneratedColumn<int> get closedByUserId => $composableBuilder(
+      column: $table.closedByUserId, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get closedAt =>
+      $composableBuilder(column: $table.closedAt, builder: (column) => column);
+
+  GeneratedColumn<double> get closingCash => $composableBuilder(
+      column: $table.closingCash, builder: (column) => column);
+
+  GeneratedColumn<double> get expectedCashAmount => $composableBuilder(
+      column: $table.expectedCashAmount, builder: (column) => column);
+
+  GeneratedColumn<double> get cashDifference => $composableBuilder(
+      column: $table.cashDifference, builder: (column) => column);
+
+  GeneratedColumn<String> get notes =>
+      $composableBuilder(column: $table.notes, builder: (column) => column);
+
+  GeneratedColumn<bool> get isClosed =>
+      $composableBuilder(column: $table.isClosed, builder: (column) => column);
+
+  Expression<T> posSessionOpenIdempotencyRefs<T extends Object>(
+      Expression<T> Function(
+              $$PosSessionOpenIdempotencyTableAnnotationComposer a)
+          f) {
+    final $$PosSessionOpenIdempotencyTableAnnotationComposer composer =
+        $composerBuilder(
+            composer: this,
+            getCurrentColumn: (t) => t.id,
+            referencedTable: $db.posSessionOpenIdempotency,
+            getReferencedColumn: (t) => t.posSessionId,
+            builder: (joinBuilder,
+                    {$addJoinBuilderToRootComposer,
+                    $removeJoinBuilderFromRootComposer}) =>
+                $$PosSessionOpenIdempotencyTableAnnotationComposer(
+                  $db: $db,
+                  $table: $db.posSessionOpenIdempotency,
+                  $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                  joinBuilder: joinBuilder,
+                  $removeJoinBuilderFromRootComposer:
+                      $removeJoinBuilderFromRootComposer,
+                ));
+    return f(composer);
+  }
+
+  Expression<T> salesInvoicesRefs<T extends Object>(
+      Expression<T> Function($$SalesInvoicesTableAnnotationComposer a) f) {
+    final $$SalesInvoicesTableAnnotationComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.id,
+        referencedTable: $db.salesInvoices,
+        getReferencedColumn: (t) => t.sessionId,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$SalesInvoicesTableAnnotationComposer(
+              $db: $db,
+              $table: $db.salesInvoices,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return f(composer);
+  }
+
+  Expression<T> expenseRecordsRefs<T extends Object>(
+      Expression<T> Function($$ExpenseRecordsTableAnnotationComposer a) f) {
+    final $$ExpenseRecordsTableAnnotationComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.id,
+        referencedTable: $db.expenseRecords,
+        getReferencedColumn: (t) => t.sessionId,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$ExpenseRecordsTableAnnotationComposer(
+              $db: $db,
+              $table: $db.expenseRecords,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return f(composer);
+  }
+
+  Expression<T> otherIncomeRecordsRefs<T extends Object>(
+      Expression<T> Function($$OtherIncomeRecordsTableAnnotationComposer a) f) {
+    final $$OtherIncomeRecordsTableAnnotationComposer composer =
+        $composerBuilder(
+            composer: this,
+            getCurrentColumn: (t) => t.id,
+            referencedTable: $db.otherIncomeRecords,
+            getReferencedColumn: (t) => t.sessionId,
+            builder: (joinBuilder,
+                    {$addJoinBuilderToRootComposer,
+                    $removeJoinBuilderFromRootComposer}) =>
+                $$OtherIncomeRecordsTableAnnotationComposer(
+                  $db: $db,
+                  $table: $db.otherIncomeRecords,
+                  $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                  joinBuilder: joinBuilder,
+                  $removeJoinBuilderFromRootComposer:
+                      $removeJoinBuilderFromRootComposer,
+                ));
+    return f(composer);
+  }
+}
+
+class $$PosSessionsTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $PosSessionsTable,
+    PosSession,
+    $$PosSessionsTableFilterComposer,
+    $$PosSessionsTableOrderingComposer,
+    $$PosSessionsTableAnnotationComposer,
+    $$PosSessionsTableCreateCompanionBuilder,
+    $$PosSessionsTableUpdateCompanionBuilder,
+    (PosSession, $$PosSessionsTableReferences),
+    PosSession,
+    PrefetchHooks Function(
+        {bool posSessionOpenIdempotencyRefs,
+        bool salesInvoicesRefs,
+        bool expenseRecordsRefs,
+        bool otherIncomeRecordsRefs})> {
+  $$PosSessionsTableTableManager(_$AppDatabase db, $PosSessionsTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$PosSessionsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$PosSessionsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$PosSessionsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<int> id = const Value.absent(),
+            Value<String> cashierName = const Value.absent(),
+            Value<int?> createdByUserId = const Value.absent(),
+            Value<DateTime> openedAt = const Value.absent(),
+            Value<double> openingCash = const Value.absent(),
+            Value<int?> closedByUserId = const Value.absent(),
+            Value<DateTime?> closedAt = const Value.absent(),
+            Value<double?> closingCash = const Value.absent(),
+            Value<double?> expectedCashAmount = const Value.absent(),
+            Value<double?> cashDifference = const Value.absent(),
+            Value<String?> notes = const Value.absent(),
+            Value<bool> isClosed = const Value.absent(),
+          }) =>
+              PosSessionsCompanion(
+            id: id,
+            cashierName: cashierName,
+            createdByUserId: createdByUserId,
+            openedAt: openedAt,
+            openingCash: openingCash,
+            closedByUserId: closedByUserId,
+            closedAt: closedAt,
+            closingCash: closingCash,
+            expectedCashAmount: expectedCashAmount,
+            cashDifference: cashDifference,
+            notes: notes,
+            isClosed: isClosed,
+          ),
+          createCompanionCallback: ({
+            Value<int> id = const Value.absent(),
+            Value<String> cashierName = const Value.absent(),
+            Value<int?> createdByUserId = const Value.absent(),
+            Value<DateTime> openedAt = const Value.absent(),
+            Value<double> openingCash = const Value.absent(),
+            Value<int?> closedByUserId = const Value.absent(),
+            Value<DateTime?> closedAt = const Value.absent(),
+            Value<double?> closingCash = const Value.absent(),
+            Value<double?> expectedCashAmount = const Value.absent(),
+            Value<double?> cashDifference = const Value.absent(),
+            Value<String?> notes = const Value.absent(),
+            Value<bool> isClosed = const Value.absent(),
+          }) =>
+              PosSessionsCompanion.insert(
+            id: id,
+            cashierName: cashierName,
+            createdByUserId: createdByUserId,
+            openedAt: openedAt,
+            openingCash: openingCash,
+            closedByUserId: closedByUserId,
+            closedAt: closedAt,
+            closingCash: closingCash,
+            expectedCashAmount: expectedCashAmount,
+            cashDifference: cashDifference,
+            notes: notes,
+            isClosed: isClosed,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (
+                    e.readTable(table),
+                    $$PosSessionsTableReferences(db, table, e)
+                  ))
+              .toList(),
+          prefetchHooksCallback: (
+              {posSessionOpenIdempotencyRefs = false,
+              salesInvoicesRefs = false,
+              expenseRecordsRefs = false,
+              otherIncomeRecordsRefs = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [
+                if (posSessionOpenIdempotencyRefs) db.posSessionOpenIdempotency,
+                if (salesInvoicesRefs) db.salesInvoices,
+                if (expenseRecordsRefs) db.expenseRecords,
+                if (otherIncomeRecordsRefs) db.otherIncomeRecords
+              ],
+              addJoins: null,
+              getPrefetchedDataCallback: (items) async {
+                return [
+                  if (posSessionOpenIdempotencyRefs)
+                    await $_getPrefetchedData(
+                        currentTable: table,
+                        referencedTable: $$PosSessionsTableReferences
+                            ._posSessionOpenIdempotencyRefsTable(db),
+                        managerFromTypedResult: (p0) =>
+                            $$PosSessionsTableReferences(db, table, p0)
+                                .posSessionOpenIdempotencyRefs,
+                        referencedItemsForCurrentItem:
+                            (item, referencedItems) => referencedItems
+                                .where((e) => e.posSessionId == item.id),
+                        typedResults: items),
+                  if (salesInvoicesRefs)
+                    await $_getPrefetchedData(
+                        currentTable: table,
+                        referencedTable: $$PosSessionsTableReferences
+                            ._salesInvoicesRefsTable(db),
+                        managerFromTypedResult: (p0) =>
+                            $$PosSessionsTableReferences(db, table, p0)
+                                .salesInvoicesRefs,
+                        referencedItemsForCurrentItem:
+                            (item, referencedItems) => referencedItems
+                                .where((e) => e.sessionId == item.id),
+                        typedResults: items),
+                  if (expenseRecordsRefs)
+                    await $_getPrefetchedData(
+                        currentTable: table,
+                        referencedTable: $$PosSessionsTableReferences
+                            ._expenseRecordsRefsTable(db),
+                        managerFromTypedResult: (p0) =>
+                            $$PosSessionsTableReferences(db, table, p0)
+                                .expenseRecordsRefs,
+                        referencedItemsForCurrentItem:
+                            (item, referencedItems) => referencedItems
+                                .where((e) => e.sessionId == item.id),
+                        typedResults: items),
+                  if (otherIncomeRecordsRefs)
+                    await $_getPrefetchedData(
+                        currentTable: table,
+                        referencedTable: $$PosSessionsTableReferences
+                            ._otherIncomeRecordsRefsTable(db),
+                        managerFromTypedResult: (p0) =>
+                            $$PosSessionsTableReferences(db, table, p0)
+                                .otherIncomeRecordsRefs,
+                        referencedItemsForCurrentItem:
+                            (item, referencedItems) => referencedItems
+                                .where((e) => e.sessionId == item.id),
+                        typedResults: items)
+                ];
+              },
+            );
+          },
+        ));
+}
+
+typedef $$PosSessionsTableProcessedTableManager = ProcessedTableManager<
+    _$AppDatabase,
+    $PosSessionsTable,
+    PosSession,
+    $$PosSessionsTableFilterComposer,
+    $$PosSessionsTableOrderingComposer,
+    $$PosSessionsTableAnnotationComposer,
+    $$PosSessionsTableCreateCompanionBuilder,
+    $$PosSessionsTableUpdateCompanionBuilder,
+    (PosSession, $$PosSessionsTableReferences),
+    PosSession,
+    PrefetchHooks Function(
+        {bool posSessionOpenIdempotencyRefs,
+        bool salesInvoicesRefs,
+        bool expenseRecordsRefs,
+        bool otherIncomeRecordsRefs})>;
+typedef $$PosSessionOpenIdempotencyTableCreateCompanionBuilder
+    = PosSessionOpenIdempotencyCompanion Function({
+  required String idempotencyKey,
+  required String fingerprintHash,
+  required int posSessionId,
+  Value<int?> createdByUserId,
+  required double openingCash,
+  Value<DateTime> createdAt,
+  Value<int> rowid,
+});
+typedef $$PosSessionOpenIdempotencyTableUpdateCompanionBuilder
+    = PosSessionOpenIdempotencyCompanion Function({
+  Value<String> idempotencyKey,
+  Value<String> fingerprintHash,
+  Value<int> posSessionId,
+  Value<int?> createdByUserId,
+  Value<double> openingCash,
+  Value<DateTime> createdAt,
+  Value<int> rowid,
+});
+
+final class $$PosSessionOpenIdempotencyTableReferences extends BaseReferences<
+    _$AppDatabase,
+    $PosSessionOpenIdempotencyTable,
+    PosSessionOpenIdempotencyData> {
+  $$PosSessionOpenIdempotencyTableReferences(
+      super.$_db, super.$_table, super.$_typedResult);
+
+  static $PosSessionsTable _posSessionIdTable(_$AppDatabase db) =>
+      db.posSessions.createAlias($_aliasNameGenerator(
+          db.posSessionOpenIdempotency.posSessionId, db.posSessions.id));
+
+  $$PosSessionsTableProcessedTableManager? get posSessionId {
+    if ($_item.posSessionId == null) return null;
+    final manager = $$PosSessionsTableTableManager($_db, $_db.posSessions)
+        .filter((f) => f.id($_item.posSessionId!));
+    final item = $_typedResult.readTableOrNull(_posSessionIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+        manager.$state.copyWith(prefetchedData: [item]));
+  }
+}
+
+class $$PosSessionOpenIdempotencyTableFilterComposer
+    extends Composer<_$AppDatabase, $PosSessionOpenIdempotencyTable> {
+  $$PosSessionOpenIdempotencyTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get idempotencyKey => $composableBuilder(
+      column: $table.idempotencyKey,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get fingerprintHash => $composableBuilder(
+      column: $table.fingerprintHash,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get createdByUserId => $composableBuilder(
+      column: $table.createdByUserId,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get openingCash => $composableBuilder(
+      column: $table.openingCash, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnFilters(column));
+
+  $$PosSessionsTableFilterComposer get posSessionId {
+    final $$PosSessionsTableFilterComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.posSessionId,
+        referencedTable: $db.posSessions,
+        getReferencedColumn: (t) => t.id,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$PosSessionsTableFilterComposer(
+              $db: $db,
+              $table: $db.posSessions,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
+}
+
+class $$PosSessionOpenIdempotencyTableOrderingComposer
+    extends Composer<_$AppDatabase, $PosSessionOpenIdempotencyTable> {
+  $$PosSessionOpenIdempotencyTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get idempotencyKey => $composableBuilder(
+      column: $table.idempotencyKey,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get fingerprintHash => $composableBuilder(
+      column: $table.fingerprintHash,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get createdByUserId => $composableBuilder(
+      column: $table.createdByUserId,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get openingCash => $composableBuilder(
+      column: $table.openingCash, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnOrderings(column));
+
+  $$PosSessionsTableOrderingComposer get posSessionId {
+    final $$PosSessionsTableOrderingComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.posSessionId,
+        referencedTable: $db.posSessions,
+        getReferencedColumn: (t) => t.id,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$PosSessionsTableOrderingComposer(
+              $db: $db,
+              $table: $db.posSessions,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
+}
+
+class $$PosSessionOpenIdempotencyTableAnnotationComposer
+    extends Composer<_$AppDatabase, $PosSessionOpenIdempotencyTable> {
+  $$PosSessionOpenIdempotencyTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get idempotencyKey => $composableBuilder(
+      column: $table.idempotencyKey, builder: (column) => column);
+
+  GeneratedColumn<String> get fingerprintHash => $composableBuilder(
+      column: $table.fingerprintHash, builder: (column) => column);
+
+  GeneratedColumn<int> get createdByUserId => $composableBuilder(
+      column: $table.createdByUserId, builder: (column) => column);
+
+  GeneratedColumn<double> get openingCash => $composableBuilder(
+      column: $table.openingCash, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  $$PosSessionsTableAnnotationComposer get posSessionId {
+    final $$PosSessionsTableAnnotationComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.posSessionId,
+        referencedTable: $db.posSessions,
+        getReferencedColumn: (t) => t.id,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$PosSessionsTableAnnotationComposer(
+              $db: $db,
+              $table: $db.posSessions,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
+}
+
+class $$PosSessionOpenIdempotencyTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $PosSessionOpenIdempotencyTable,
+    PosSessionOpenIdempotencyData,
+    $$PosSessionOpenIdempotencyTableFilterComposer,
+    $$PosSessionOpenIdempotencyTableOrderingComposer,
+    $$PosSessionOpenIdempotencyTableAnnotationComposer,
+    $$PosSessionOpenIdempotencyTableCreateCompanionBuilder,
+    $$PosSessionOpenIdempotencyTableUpdateCompanionBuilder,
+    (PosSessionOpenIdempotencyData, $$PosSessionOpenIdempotencyTableReferences),
+    PosSessionOpenIdempotencyData,
+    PrefetchHooks Function({bool posSessionId})> {
+  $$PosSessionOpenIdempotencyTableTableManager(
+      _$AppDatabase db, $PosSessionOpenIdempotencyTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$PosSessionOpenIdempotencyTableFilterComposer(
+                  $db: db, $table: table),
+          createOrderingComposer: () =>
+              $$PosSessionOpenIdempotencyTableOrderingComposer(
+                  $db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$PosSessionOpenIdempotencyTableAnnotationComposer(
+                  $db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<String> idempotencyKey = const Value.absent(),
+            Value<String> fingerprintHash = const Value.absent(),
+            Value<int> posSessionId = const Value.absent(),
+            Value<int?> createdByUserId = const Value.absent(),
+            Value<double> openingCash = const Value.absent(),
+            Value<DateTime> createdAt = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              PosSessionOpenIdempotencyCompanion(
+            idempotencyKey: idempotencyKey,
+            fingerprintHash: fingerprintHash,
+            posSessionId: posSessionId,
+            createdByUserId: createdByUserId,
+            openingCash: openingCash,
+            createdAt: createdAt,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            required String idempotencyKey,
+            required String fingerprintHash,
+            required int posSessionId,
+            Value<int?> createdByUserId = const Value.absent(),
+            required double openingCash,
+            Value<DateTime> createdAt = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              PosSessionOpenIdempotencyCompanion.insert(
+            idempotencyKey: idempotencyKey,
+            fingerprintHash: fingerprintHash,
+            posSessionId: posSessionId,
+            createdByUserId: createdByUserId,
+            openingCash: openingCash,
+            createdAt: createdAt,
+            rowid: rowid,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (
+                    e.readTable(table),
+                    $$PosSessionOpenIdempotencyTableReferences(db, table, e)
+                  ))
+              .toList(),
+          prefetchHooksCallback: ({posSessionId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins: <
+                  T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic>>(state) {
+                if (posSessionId) {
+                  state = state.withJoin(
+                    currentTable: table,
+                    currentColumn: table.posSessionId,
+                    referencedTable: $$PosSessionOpenIdempotencyTableReferences
+                        ._posSessionIdTable(db),
+                    referencedColumn: $$PosSessionOpenIdempotencyTableReferences
+                        ._posSessionIdTable(db)
+                        .id,
+                  ) as T;
+                }
+
+                return state;
+              },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ));
+}
+
+typedef $$PosSessionOpenIdempotencyTableProcessedTableManager
+    = ProcessedTableManager<
+        _$AppDatabase,
+        $PosSessionOpenIdempotencyTable,
+        PosSessionOpenIdempotencyData,
+        $$PosSessionOpenIdempotencyTableFilterComposer,
+        $$PosSessionOpenIdempotencyTableOrderingComposer,
+        $$PosSessionOpenIdempotencyTableAnnotationComposer,
+        $$PosSessionOpenIdempotencyTableCreateCompanionBuilder,
+        $$PosSessionOpenIdempotencyTableUpdateCompanionBuilder,
+        (
+          PosSessionOpenIdempotencyData,
+          $$PosSessionOpenIdempotencyTableReferences
+        ),
+        PosSessionOpenIdempotencyData,
+        PrefetchHooks Function({bool posSessionId})>;
 typedef $$SupplierAccountsTableCreateCompanionBuilder
     = SupplierAccountsCompanion Function({
   Value<int> id,
@@ -34015,521 +35311,6 @@ typedef $$PurchaseItemsTableProcessedTableManager = ProcessedTableManager<
     PurchaseItem,
     PrefetchHooks Function(
         {bool invoiceId, bool productId, bool supplierReturnItemsRefs})>;
-typedef $$PosSessionsTableCreateCompanionBuilder = PosSessionsCompanion
-    Function({
-  Value<int> id,
-  Value<String> cashierName,
-  Value<int?> createdByUserId,
-  Value<DateTime> openedAt,
-  Value<double> openingCash,
-  Value<int?> closedByUserId,
-  Value<DateTime?> closedAt,
-  Value<double?> closingCash,
-  Value<double?> expectedCashAmount,
-  Value<double?> cashDifference,
-  Value<String?> notes,
-  Value<bool> isClosed,
-});
-typedef $$PosSessionsTableUpdateCompanionBuilder = PosSessionsCompanion
-    Function({
-  Value<int> id,
-  Value<String> cashierName,
-  Value<int?> createdByUserId,
-  Value<DateTime> openedAt,
-  Value<double> openingCash,
-  Value<int?> closedByUserId,
-  Value<DateTime?> closedAt,
-  Value<double?> closingCash,
-  Value<double?> expectedCashAmount,
-  Value<double?> cashDifference,
-  Value<String?> notes,
-  Value<bool> isClosed,
-});
-
-final class $$PosSessionsTableReferences
-    extends BaseReferences<_$AppDatabase, $PosSessionsTable, PosSession> {
-  $$PosSessionsTableReferences(super.$_db, super.$_table, super.$_typedResult);
-
-  static MultiTypedResultKey<$SalesInvoicesTable, List<SalesInvoice>>
-      _salesInvoicesRefsTable(_$AppDatabase db) =>
-          MultiTypedResultKey.fromTable(db.salesInvoices,
-              aliasName: $_aliasNameGenerator(
-                  db.posSessions.id, db.salesInvoices.sessionId));
-
-  $$SalesInvoicesTableProcessedTableManager get salesInvoicesRefs {
-    final manager = $$SalesInvoicesTableTableManager($_db, $_db.salesInvoices)
-        .filter((f) => f.sessionId.id($_item.id));
-
-    final cache = $_typedResult.readTableOrNull(_salesInvoicesRefsTable($_db));
-    return ProcessedTableManager(
-        manager.$state.copyWith(prefetchedData: cache));
-  }
-
-  static MultiTypedResultKey<$ExpenseRecordsTable, List<ExpenseRecord>>
-      _expenseRecordsRefsTable(_$AppDatabase db) =>
-          MultiTypedResultKey.fromTable(db.expenseRecords,
-              aliasName: $_aliasNameGenerator(
-                  db.posSessions.id, db.expenseRecords.sessionId));
-
-  $$ExpenseRecordsTableProcessedTableManager get expenseRecordsRefs {
-    final manager = $$ExpenseRecordsTableTableManager($_db, $_db.expenseRecords)
-        .filter((f) => f.sessionId.id($_item.id));
-
-    final cache = $_typedResult.readTableOrNull(_expenseRecordsRefsTable($_db));
-    return ProcessedTableManager(
-        manager.$state.copyWith(prefetchedData: cache));
-  }
-
-  static MultiTypedResultKey<$OtherIncomeRecordsTable, List<OtherIncomeRecord>>
-      _otherIncomeRecordsRefsTable(_$AppDatabase db) =>
-          MultiTypedResultKey.fromTable(db.otherIncomeRecords,
-              aliasName: $_aliasNameGenerator(
-                  db.posSessions.id, db.otherIncomeRecords.sessionId));
-
-  $$OtherIncomeRecordsTableProcessedTableManager get otherIncomeRecordsRefs {
-    final manager =
-        $$OtherIncomeRecordsTableTableManager($_db, $_db.otherIncomeRecords)
-            .filter((f) => f.sessionId.id($_item.id));
-
-    final cache =
-        $_typedResult.readTableOrNull(_otherIncomeRecordsRefsTable($_db));
-    return ProcessedTableManager(
-        manager.$state.copyWith(prefetchedData: cache));
-  }
-}
-
-class $$PosSessionsTableFilterComposer
-    extends Composer<_$AppDatabase, $PosSessionsTable> {
-  $$PosSessionsTableFilterComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  ColumnFilters<int> get id => $composableBuilder(
-      column: $table.id, builder: (column) => ColumnFilters(column));
-
-  ColumnFilters<String> get cashierName => $composableBuilder(
-      column: $table.cashierName, builder: (column) => ColumnFilters(column));
-
-  ColumnFilters<int> get createdByUserId => $composableBuilder(
-      column: $table.createdByUserId,
-      builder: (column) => ColumnFilters(column));
-
-  ColumnFilters<DateTime> get openedAt => $composableBuilder(
-      column: $table.openedAt, builder: (column) => ColumnFilters(column));
-
-  ColumnFilters<double> get openingCash => $composableBuilder(
-      column: $table.openingCash, builder: (column) => ColumnFilters(column));
-
-  ColumnFilters<int> get closedByUserId => $composableBuilder(
-      column: $table.closedByUserId,
-      builder: (column) => ColumnFilters(column));
-
-  ColumnFilters<DateTime> get closedAt => $composableBuilder(
-      column: $table.closedAt, builder: (column) => ColumnFilters(column));
-
-  ColumnFilters<double> get closingCash => $composableBuilder(
-      column: $table.closingCash, builder: (column) => ColumnFilters(column));
-
-  ColumnFilters<double> get expectedCashAmount => $composableBuilder(
-      column: $table.expectedCashAmount,
-      builder: (column) => ColumnFilters(column));
-
-  ColumnFilters<double> get cashDifference => $composableBuilder(
-      column: $table.cashDifference,
-      builder: (column) => ColumnFilters(column));
-
-  ColumnFilters<String> get notes => $composableBuilder(
-      column: $table.notes, builder: (column) => ColumnFilters(column));
-
-  ColumnFilters<bool> get isClosed => $composableBuilder(
-      column: $table.isClosed, builder: (column) => ColumnFilters(column));
-
-  Expression<bool> salesInvoicesRefs(
-      Expression<bool> Function($$SalesInvoicesTableFilterComposer f) f) {
-    final $$SalesInvoicesTableFilterComposer composer = $composerBuilder(
-        composer: this,
-        getCurrentColumn: (t) => t.id,
-        referencedTable: $db.salesInvoices,
-        getReferencedColumn: (t) => t.sessionId,
-        builder: (joinBuilder,
-                {$addJoinBuilderToRootComposer,
-                $removeJoinBuilderFromRootComposer}) =>
-            $$SalesInvoicesTableFilterComposer(
-              $db: $db,
-              $table: $db.salesInvoices,
-              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-              joinBuilder: joinBuilder,
-              $removeJoinBuilderFromRootComposer:
-                  $removeJoinBuilderFromRootComposer,
-            ));
-    return f(composer);
-  }
-
-  Expression<bool> expenseRecordsRefs(
-      Expression<bool> Function($$ExpenseRecordsTableFilterComposer f) f) {
-    final $$ExpenseRecordsTableFilterComposer composer = $composerBuilder(
-        composer: this,
-        getCurrentColumn: (t) => t.id,
-        referencedTable: $db.expenseRecords,
-        getReferencedColumn: (t) => t.sessionId,
-        builder: (joinBuilder,
-                {$addJoinBuilderToRootComposer,
-                $removeJoinBuilderFromRootComposer}) =>
-            $$ExpenseRecordsTableFilterComposer(
-              $db: $db,
-              $table: $db.expenseRecords,
-              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-              joinBuilder: joinBuilder,
-              $removeJoinBuilderFromRootComposer:
-                  $removeJoinBuilderFromRootComposer,
-            ));
-    return f(composer);
-  }
-
-  Expression<bool> otherIncomeRecordsRefs(
-      Expression<bool> Function($$OtherIncomeRecordsTableFilterComposer f) f) {
-    final $$OtherIncomeRecordsTableFilterComposer composer = $composerBuilder(
-        composer: this,
-        getCurrentColumn: (t) => t.id,
-        referencedTable: $db.otherIncomeRecords,
-        getReferencedColumn: (t) => t.sessionId,
-        builder: (joinBuilder,
-                {$addJoinBuilderToRootComposer,
-                $removeJoinBuilderFromRootComposer}) =>
-            $$OtherIncomeRecordsTableFilterComposer(
-              $db: $db,
-              $table: $db.otherIncomeRecords,
-              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-              joinBuilder: joinBuilder,
-              $removeJoinBuilderFromRootComposer:
-                  $removeJoinBuilderFromRootComposer,
-            ));
-    return f(composer);
-  }
-}
-
-class $$PosSessionsTableOrderingComposer
-    extends Composer<_$AppDatabase, $PosSessionsTable> {
-  $$PosSessionsTableOrderingComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  ColumnOrderings<int> get id => $composableBuilder(
-      column: $table.id, builder: (column) => ColumnOrderings(column));
-
-  ColumnOrderings<String> get cashierName => $composableBuilder(
-      column: $table.cashierName, builder: (column) => ColumnOrderings(column));
-
-  ColumnOrderings<int> get createdByUserId => $composableBuilder(
-      column: $table.createdByUserId,
-      builder: (column) => ColumnOrderings(column));
-
-  ColumnOrderings<DateTime> get openedAt => $composableBuilder(
-      column: $table.openedAt, builder: (column) => ColumnOrderings(column));
-
-  ColumnOrderings<double> get openingCash => $composableBuilder(
-      column: $table.openingCash, builder: (column) => ColumnOrderings(column));
-
-  ColumnOrderings<int> get closedByUserId => $composableBuilder(
-      column: $table.closedByUserId,
-      builder: (column) => ColumnOrderings(column));
-
-  ColumnOrderings<DateTime> get closedAt => $composableBuilder(
-      column: $table.closedAt, builder: (column) => ColumnOrderings(column));
-
-  ColumnOrderings<double> get closingCash => $composableBuilder(
-      column: $table.closingCash, builder: (column) => ColumnOrderings(column));
-
-  ColumnOrderings<double> get expectedCashAmount => $composableBuilder(
-      column: $table.expectedCashAmount,
-      builder: (column) => ColumnOrderings(column));
-
-  ColumnOrderings<double> get cashDifference => $composableBuilder(
-      column: $table.cashDifference,
-      builder: (column) => ColumnOrderings(column));
-
-  ColumnOrderings<String> get notes => $composableBuilder(
-      column: $table.notes, builder: (column) => ColumnOrderings(column));
-
-  ColumnOrderings<bool> get isClosed => $composableBuilder(
-      column: $table.isClosed, builder: (column) => ColumnOrderings(column));
-}
-
-class $$PosSessionsTableAnnotationComposer
-    extends Composer<_$AppDatabase, $PosSessionsTable> {
-  $$PosSessionsTableAnnotationComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  GeneratedColumn<int> get id =>
-      $composableBuilder(column: $table.id, builder: (column) => column);
-
-  GeneratedColumn<String> get cashierName => $composableBuilder(
-      column: $table.cashierName, builder: (column) => column);
-
-  GeneratedColumn<int> get createdByUserId => $composableBuilder(
-      column: $table.createdByUserId, builder: (column) => column);
-
-  GeneratedColumn<DateTime> get openedAt =>
-      $composableBuilder(column: $table.openedAt, builder: (column) => column);
-
-  GeneratedColumn<double> get openingCash => $composableBuilder(
-      column: $table.openingCash, builder: (column) => column);
-
-  GeneratedColumn<int> get closedByUserId => $composableBuilder(
-      column: $table.closedByUserId, builder: (column) => column);
-
-  GeneratedColumn<DateTime> get closedAt =>
-      $composableBuilder(column: $table.closedAt, builder: (column) => column);
-
-  GeneratedColumn<double> get closingCash => $composableBuilder(
-      column: $table.closingCash, builder: (column) => column);
-
-  GeneratedColumn<double> get expectedCashAmount => $composableBuilder(
-      column: $table.expectedCashAmount, builder: (column) => column);
-
-  GeneratedColumn<double> get cashDifference => $composableBuilder(
-      column: $table.cashDifference, builder: (column) => column);
-
-  GeneratedColumn<String> get notes =>
-      $composableBuilder(column: $table.notes, builder: (column) => column);
-
-  GeneratedColumn<bool> get isClosed =>
-      $composableBuilder(column: $table.isClosed, builder: (column) => column);
-
-  Expression<T> salesInvoicesRefs<T extends Object>(
-      Expression<T> Function($$SalesInvoicesTableAnnotationComposer a) f) {
-    final $$SalesInvoicesTableAnnotationComposer composer = $composerBuilder(
-        composer: this,
-        getCurrentColumn: (t) => t.id,
-        referencedTable: $db.salesInvoices,
-        getReferencedColumn: (t) => t.sessionId,
-        builder: (joinBuilder,
-                {$addJoinBuilderToRootComposer,
-                $removeJoinBuilderFromRootComposer}) =>
-            $$SalesInvoicesTableAnnotationComposer(
-              $db: $db,
-              $table: $db.salesInvoices,
-              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-              joinBuilder: joinBuilder,
-              $removeJoinBuilderFromRootComposer:
-                  $removeJoinBuilderFromRootComposer,
-            ));
-    return f(composer);
-  }
-
-  Expression<T> expenseRecordsRefs<T extends Object>(
-      Expression<T> Function($$ExpenseRecordsTableAnnotationComposer a) f) {
-    final $$ExpenseRecordsTableAnnotationComposer composer = $composerBuilder(
-        composer: this,
-        getCurrentColumn: (t) => t.id,
-        referencedTable: $db.expenseRecords,
-        getReferencedColumn: (t) => t.sessionId,
-        builder: (joinBuilder,
-                {$addJoinBuilderToRootComposer,
-                $removeJoinBuilderFromRootComposer}) =>
-            $$ExpenseRecordsTableAnnotationComposer(
-              $db: $db,
-              $table: $db.expenseRecords,
-              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-              joinBuilder: joinBuilder,
-              $removeJoinBuilderFromRootComposer:
-                  $removeJoinBuilderFromRootComposer,
-            ));
-    return f(composer);
-  }
-
-  Expression<T> otherIncomeRecordsRefs<T extends Object>(
-      Expression<T> Function($$OtherIncomeRecordsTableAnnotationComposer a) f) {
-    final $$OtherIncomeRecordsTableAnnotationComposer composer =
-        $composerBuilder(
-            composer: this,
-            getCurrentColumn: (t) => t.id,
-            referencedTable: $db.otherIncomeRecords,
-            getReferencedColumn: (t) => t.sessionId,
-            builder: (joinBuilder,
-                    {$addJoinBuilderToRootComposer,
-                    $removeJoinBuilderFromRootComposer}) =>
-                $$OtherIncomeRecordsTableAnnotationComposer(
-                  $db: $db,
-                  $table: $db.otherIncomeRecords,
-                  $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-                  joinBuilder: joinBuilder,
-                  $removeJoinBuilderFromRootComposer:
-                      $removeJoinBuilderFromRootComposer,
-                ));
-    return f(composer);
-  }
-}
-
-class $$PosSessionsTableTableManager extends RootTableManager<
-    _$AppDatabase,
-    $PosSessionsTable,
-    PosSession,
-    $$PosSessionsTableFilterComposer,
-    $$PosSessionsTableOrderingComposer,
-    $$PosSessionsTableAnnotationComposer,
-    $$PosSessionsTableCreateCompanionBuilder,
-    $$PosSessionsTableUpdateCompanionBuilder,
-    (PosSession, $$PosSessionsTableReferences),
-    PosSession,
-    PrefetchHooks Function(
-        {bool salesInvoicesRefs,
-        bool expenseRecordsRefs,
-        bool otherIncomeRecordsRefs})> {
-  $$PosSessionsTableTableManager(_$AppDatabase db, $PosSessionsTable table)
-      : super(TableManagerState(
-          db: db,
-          table: table,
-          createFilteringComposer: () =>
-              $$PosSessionsTableFilterComposer($db: db, $table: table),
-          createOrderingComposer: () =>
-              $$PosSessionsTableOrderingComposer($db: db, $table: table),
-          createComputedFieldComposer: () =>
-              $$PosSessionsTableAnnotationComposer($db: db, $table: table),
-          updateCompanionCallback: ({
-            Value<int> id = const Value.absent(),
-            Value<String> cashierName = const Value.absent(),
-            Value<int?> createdByUserId = const Value.absent(),
-            Value<DateTime> openedAt = const Value.absent(),
-            Value<double> openingCash = const Value.absent(),
-            Value<int?> closedByUserId = const Value.absent(),
-            Value<DateTime?> closedAt = const Value.absent(),
-            Value<double?> closingCash = const Value.absent(),
-            Value<double?> expectedCashAmount = const Value.absent(),
-            Value<double?> cashDifference = const Value.absent(),
-            Value<String?> notes = const Value.absent(),
-            Value<bool> isClosed = const Value.absent(),
-          }) =>
-              PosSessionsCompanion(
-            id: id,
-            cashierName: cashierName,
-            createdByUserId: createdByUserId,
-            openedAt: openedAt,
-            openingCash: openingCash,
-            closedByUserId: closedByUserId,
-            closedAt: closedAt,
-            closingCash: closingCash,
-            expectedCashAmount: expectedCashAmount,
-            cashDifference: cashDifference,
-            notes: notes,
-            isClosed: isClosed,
-          ),
-          createCompanionCallback: ({
-            Value<int> id = const Value.absent(),
-            Value<String> cashierName = const Value.absent(),
-            Value<int?> createdByUserId = const Value.absent(),
-            Value<DateTime> openedAt = const Value.absent(),
-            Value<double> openingCash = const Value.absent(),
-            Value<int?> closedByUserId = const Value.absent(),
-            Value<DateTime?> closedAt = const Value.absent(),
-            Value<double?> closingCash = const Value.absent(),
-            Value<double?> expectedCashAmount = const Value.absent(),
-            Value<double?> cashDifference = const Value.absent(),
-            Value<String?> notes = const Value.absent(),
-            Value<bool> isClosed = const Value.absent(),
-          }) =>
-              PosSessionsCompanion.insert(
-            id: id,
-            cashierName: cashierName,
-            createdByUserId: createdByUserId,
-            openedAt: openedAt,
-            openingCash: openingCash,
-            closedByUserId: closedByUserId,
-            closedAt: closedAt,
-            closingCash: closingCash,
-            expectedCashAmount: expectedCashAmount,
-            cashDifference: cashDifference,
-            notes: notes,
-            isClosed: isClosed,
-          ),
-          withReferenceMapper: (p0) => p0
-              .map((e) => (
-                    e.readTable(table),
-                    $$PosSessionsTableReferences(db, table, e)
-                  ))
-              .toList(),
-          prefetchHooksCallback: (
-              {salesInvoicesRefs = false,
-              expenseRecordsRefs = false,
-              otherIncomeRecordsRefs = false}) {
-            return PrefetchHooks(
-              db: db,
-              explicitlyWatchedTables: [
-                if (salesInvoicesRefs) db.salesInvoices,
-                if (expenseRecordsRefs) db.expenseRecords,
-                if (otherIncomeRecordsRefs) db.otherIncomeRecords
-              ],
-              addJoins: null,
-              getPrefetchedDataCallback: (items) async {
-                return [
-                  if (salesInvoicesRefs)
-                    await $_getPrefetchedData(
-                        currentTable: table,
-                        referencedTable: $$PosSessionsTableReferences
-                            ._salesInvoicesRefsTable(db),
-                        managerFromTypedResult: (p0) =>
-                            $$PosSessionsTableReferences(db, table, p0)
-                                .salesInvoicesRefs,
-                        referencedItemsForCurrentItem:
-                            (item, referencedItems) => referencedItems
-                                .where((e) => e.sessionId == item.id),
-                        typedResults: items),
-                  if (expenseRecordsRefs)
-                    await $_getPrefetchedData(
-                        currentTable: table,
-                        referencedTable: $$PosSessionsTableReferences
-                            ._expenseRecordsRefsTable(db),
-                        managerFromTypedResult: (p0) =>
-                            $$PosSessionsTableReferences(db, table, p0)
-                                .expenseRecordsRefs,
-                        referencedItemsForCurrentItem:
-                            (item, referencedItems) => referencedItems
-                                .where((e) => e.sessionId == item.id),
-                        typedResults: items),
-                  if (otherIncomeRecordsRefs)
-                    await $_getPrefetchedData(
-                        currentTable: table,
-                        referencedTable: $$PosSessionsTableReferences
-                            ._otherIncomeRecordsRefsTable(db),
-                        managerFromTypedResult: (p0) =>
-                            $$PosSessionsTableReferences(db, table, p0)
-                                .otherIncomeRecordsRefs,
-                        referencedItemsForCurrentItem:
-                            (item, referencedItems) => referencedItems
-                                .where((e) => e.sessionId == item.id),
-                        typedResults: items)
-                ];
-              },
-            );
-          },
-        ));
-}
-
-typedef $$PosSessionsTableProcessedTableManager = ProcessedTableManager<
-    _$AppDatabase,
-    $PosSessionsTable,
-    PosSession,
-    $$PosSessionsTableFilterComposer,
-    $$PosSessionsTableOrderingComposer,
-    $$PosSessionsTableAnnotationComposer,
-    $$PosSessionsTableCreateCompanionBuilder,
-    $$PosSessionsTableUpdateCompanionBuilder,
-    (PosSession, $$PosSessionsTableReferences),
-    PosSession,
-    PrefetchHooks Function(
-        {bool salesInvoicesRefs,
-        bool expenseRecordsRefs,
-        bool otherIncomeRecordsRefs})>;
 typedef $$SalesInvoicesTableCreateCompanionBuilder = SalesInvoicesCompanion
     Function({
   Value<int> id,
@@ -43634,6 +44415,11 @@ class $AppDatabaseManager {
       get stockAdjustmentIdempotency =>
           $$StockAdjustmentIdempotencyTableTableManager(
               _db, _db.stockAdjustmentIdempotency);
+  $$PosSessionsTableTableManager get posSessions =>
+      $$PosSessionsTableTableManager(_db, _db.posSessions);
+  $$PosSessionOpenIdempotencyTableTableManager get posSessionOpenIdempotency =>
+      $$PosSessionOpenIdempotencyTableTableManager(
+          _db, _db.posSessionOpenIdempotency);
   $$SupplierAccountsTableTableManager get supplierAccounts =>
       $$SupplierAccountsTableTableManager(_db, _db.supplierAccounts);
   $$SupplierTransactionsTableTableManager get supplierTransactions =>
@@ -43650,8 +44436,6 @@ class $AppDatabaseManager {
       $$PurchaseInvoicesTableTableManager(_db, _db.purchaseInvoices);
   $$PurchaseItemsTableTableManager get purchaseItems =>
       $$PurchaseItemsTableTableManager(_db, _db.purchaseItems);
-  $$PosSessionsTableTableManager get posSessions =>
-      $$PosSessionsTableTableManager(_db, _db.posSessions);
   $$SalesInvoicesTableTableManager get salesInvoices =>
       $$SalesInvoicesTableTableManager(_db, _db.salesInvoices);
   $$SalesInvoiceDailySequencesTableTableManager

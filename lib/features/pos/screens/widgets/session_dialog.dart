@@ -7,6 +7,9 @@ import '../../../../core/database/app_database.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../auth/providers/auth_provider.dart';
 import '../../providers/pos_provider.dart';
+import '../../../../core/services/pos_session_already_open_exception.dart';
+import '../../../../core/services/pos_session_open_idempotency_conflict_exception.dart';
+import 'package:uuid/uuid.dart';
 
 // ---------------------------------------------------------------------------
 // Open Session Dialog
@@ -20,9 +23,18 @@ class SessionOpenDialog extends ConsumerStatefulWidget {
 }
 
 class _SessionOpenDialogState extends ConsumerState<SessionOpenDialog> {
+  static const _openUuid = Uuid();
+
   final _cashCtrl = TextEditingController(text: '0');
   final _noteCtrl = TextEditingController();
   bool _isLoading = false;
+  late final String _idempotencyKey;
+
+  @override
+  void initState() {
+    super.initState();
+    _idempotencyKey = _openUuid.v4();
+  }
 
   @override
   void dispose() {
@@ -168,10 +180,32 @@ class _SessionOpenDialogState extends ConsumerState<SessionOpenDialog> {
     setState(() => _isLoading = true);
     try {
       await ref.read(posSessionProvider.notifier).openSession(
-            cashierName,
-            cash,
+            idempotencyKey: _idempotencyKey,
+            cashierName: cashierName,
+            openingCash: cash,
           );
       if (mounted) Navigator.pop(context);
+    } on PosSessionAlreadyOpenException catch (e) {
+      if (mounted) {
+        ref.invalidate(posSessionProvider);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+                'يوجد وردية مفتوحة بالفعل (جلسة #${e.existingSessionId}). أغلقها أو حدّث الشاشة.'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } on PosSessionOpenIdempotencyConflictException {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+                'تغيّرت بيانات الفتح. ألغِ الحوار وأعد المحاولة.'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

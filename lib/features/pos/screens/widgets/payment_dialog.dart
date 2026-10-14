@@ -2,7 +2,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart' hide TextDirection;
-import 'package:uuid/uuid.dart';
 import '../../../../core/constants/loyalty_config.dart';
 import '../../../../core/database/app_database.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -24,8 +23,6 @@ class PaymentDialog extends ConsumerStatefulWidget {
   ConsumerState<PaymentDialog> createState() => _PaymentDialogState();
 }
 
-const _posCheckoutUuid = Uuid();
-
 class _PaymentDialogState extends ConsumerState<PaymentDialog> {
   String _method = 'CASH';
   final _cashCtrl = TextEditingController();
@@ -37,7 +34,6 @@ class _PaymentDialogState extends ConsumerState<PaymentDialog> {
   double _availablePoints = 0;
   double _pointsToUse = 0;
   bool _loyaltyLoaded = false;
-  String? _idempotencyKey;
   bool _confirming = false;
 
   @override
@@ -475,7 +471,6 @@ class _PaymentDialogState extends ConsumerState<PaymentDialog> {
   void _confirm() {
     if (_confirming) return;
     _confirming = true;
-    _idempotencyKey ??= _posCheckoutUuid.v4();
 
     final debtAmt = _method == 'DEBT'
         ? (_debtAmount).clamp(0.0, _effectiveTotal)
@@ -484,7 +479,7 @@ class _PaymentDialogState extends ConsumerState<PaymentDialog> {
       context,
       PaymentInfo(
         method: _method,
-        idempotencyKey: _idempotencyKey!,
+        idempotencyKey: '',
         cashPaid: _cashPaid,
         cardPaid: _cardPaid,
         change: _change > 0 ? _change : 0,

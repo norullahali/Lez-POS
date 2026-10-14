@@ -1,4 +1,5 @@
 // lib/features/pos/providers/pos_provider.dart
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../auth/providers/auth_provider.dart';
@@ -13,8 +14,10 @@ import '../../../core/services/pos_sale_service.dart';
 import '../../../core/services/process_sale_result.dart';
 import '../../../core/services/pos_sale_fingerprint.dart';
 import '../../customers/providers/customer_accounts_provider.dart';
+import '../pos_checkout_idempotency.dart';
 
 import 'package:drift/drift.dart' show Value;
+import 'package:uuid/uuid.dart';
 final posRepositoryProvider = Provider<PosRepository>((ref) {
   return PosRepository(
     AppDatabase.instance,
@@ -127,8 +130,73 @@ class CartState {
 class CartNotifier extends Notifier<CartState> {
   static const _kStorageKey = 'pos_carts';
   static const _kActiveIdKey = 'pos_active_cart';
+  static const _checkoutUuid = Uuid();
+
+  @visibleForTesting
+  final PosCheckoutIdempotencyState checkoutIdempotency =
+      PosCheckoutIdempotencyState();
 
   PricingEngine get _engine => ref.read(pricingEngineProvider);
+
+  void _invalidateCheckoutKeyForActiveSlot() {
+    checkoutIdempotency.clearCheckoutKey(state.activeCartId);
+  }
+
+  String prepareCheckoutKey({
+    required int cartSlotId,
+    required String fingerprintHash,
+  }) {
+    return checkoutIdempotency.prepareCheckoutKey(
+      cartSlotId: cartSlotId,
+      fingerprintHash: fingerprintHash,
+      generateUuid: () => _checkoutUuid.v4(),
+    );
+  }
+
+  void clearCheckoutKey(int cartSlotId) {
+    checkoutIdempotency.clearCheckoutKey(cartSlotId);
+  }
+
+  String computeCheckoutFingerprint({
+    required CartSession cart,
+    required int? sessionId,
+    required PaymentInfo payment,
+    int? approvedByUserId,
+  }) {
+    final loyaltyPointsUsed = payment.pointsUsed > 0
+        ? payment.pointsUsed
+        : cart.loyaltyPointsUsed;
+    final loyaltyDiscount = payment.loyaltyDiscount > 0
+        ? payment.loyaltyDiscount
+        : cart.loyaltyDiscount;
+    return PosSaleFingerprint.compute(
+      sessionId: sessionId,
+      cartSlotId: cart.id,
+      items: cart.items,
+      invoiceDiscount: cart.invoiceDiscount,
+      loyaltyPointsUsed: loyaltyPointsUsed,
+      loyaltyDiscount: loyaltyDiscount,
+      customerId: cart.selectedCustomer?.id,
+      payment: payment,
+      approvedByUserId: approvedByUserId,
+    );
+  }
+
+  PaymentInfo paymentWithCheckoutKey({
+    required PaymentInfo payment,
+    required String idempotencyKey,
+  }) {
+    return PaymentInfo(
+      method: payment.method,
+      idempotencyKey: idempotencyKey,
+      cashPaid: payment.cashPaid,
+      cardPaid: payment.cardPaid,
+      change: payment.change,
+      debtAmount: payment.debtAmount,
+      pointsUsed: payment.pointsUsed,
+      loyaltyDiscount: payment.loyaltyDiscount,
+    );
+  }
 
   @override
   CartState build() {
@@ -241,6 +309,7 @@ class CartNotifier extends Notifier<CartState> {
       newActiveId = 1;
     }
 
+    checkoutIdempotency.removeSlot(cartId);
     state = state.copyWith(carts: newCarts, activeCartId: newActiveId);
     _saveCartsToStorage();
   }
@@ -276,6 +345,7 @@ class CartNotifier extends Notifier<CartState> {
       return _applyPricing(item.product, item.quantity);
     }).toList();
     _syncFreeItems(items);
+    _invalidateCheckoutKeyForActiveSlot();
   }
 
   // -- BUY_X_GET_Y free item sync --------------------------------------------
@@ -318,6 +388,7 @@ class CartNotifier extends Notifier<CartState> {
       items: allItems,
       selectedIndex: state.selectedIndex,
     ));
+    _invalidateCheckoutKeyForActiveSlot();
   }
 
   // -- Public Cart API -------------------------------------------------------
@@ -341,6 +412,7 @@ class CartNotifier extends Notifier<CartState> {
     }
     _syncFreeItems(state.items);
     _saveCartsToStorage();
+    _invalidateCheckoutKeyForActiveSlot();
   }
 
   void setQuantity(int index, double qty) {
@@ -357,6 +429,7 @@ class CartNotifier extends Notifier<CartState> {
     _updateActiveCart(active.copyWith(items: items));
     _syncFreeItems(state.items);
     _saveCartsToStorage();
+    _invalidateCheckoutKeyForActiveSlot();
   }
 
   void incrementQty(int index) {
@@ -369,6 +442,7 @@ class CartNotifier extends Notifier<CartState> {
     }
     _updateActiveCart(active.copyWith(items: items));
     _syncFreeItems(state.items);
+    _invalidateCheckoutKeyForActiveSlot();
   }
 
   void toggleReturnItem(int index) {
@@ -381,6 +455,7 @@ class CartNotifier extends Notifier<CartState> {
     items[index] = item.copyWith(isReturn: !item.isReturn);
     _updateActiveCart(active.copyWith(items: items));
     _saveCartsToStorage();
+    _invalidateCheckoutKeyForActiveSlot();
   }
 
   void decrementQty(int index) {
@@ -395,6 +470,7 @@ class CartNotifier extends Notifier<CartState> {
       _updateActiveCart(active.copyWith(items: items));
       _syncFreeItems(state.items);
     }
+    _invalidateCheckoutKeyForActiveSlot();
   }
 
   void setItemDiscount(int index, double discount) {
@@ -402,6 +478,7 @@ class CartNotifier extends Notifier<CartState> {
     final items = [...active.items];
     items[index] = items[index].copyWith(discount: discount);
     _updateActiveCart(active.copyWith(items: items));
+    _invalidateCheckoutKeyForActiveSlot();
   }
 
   void setItemPrice(int index, double price) {
@@ -409,11 +486,13 @@ class CartNotifier extends Notifier<CartState> {
     final items = [...active.items];
     items[index] = items[index].copyWith(unitPrice: price);
     _updateActiveCart(active.copyWith(items: items));
+    _invalidateCheckoutKeyForActiveSlot();
   }
 
   void setInvoiceDiscount(double discount) {
     final active = state.activeCart;
     _updateActiveCart(active.copyWith(invoiceDiscount: discount));
+    _invalidateCheckoutKeyForActiveSlot();
   }
 
   /// Apply loyalty points redemption to the active cart.
@@ -436,6 +515,7 @@ class CartNotifier extends Notifier<CartState> {
       loyaltyDiscount: 0,
     ));
     _saveCartsToStorage();
+    _invalidateCheckoutKeyForActiveSlot();
   }
 
   void removeItem(int index) {
@@ -444,6 +524,7 @@ class CartNotifier extends Notifier<CartState> {
     _updateActiveCart(active.copyWith(items: items, selectedIndex: null));
     _syncFreeItems(state.items);
     _saveCartsToStorage();
+    _invalidateCheckoutKeyForActiveSlot();
   }
 
   void selectItem(int index) {
@@ -454,10 +535,12 @@ class CartNotifier extends Notifier<CartState> {
   void selectCustomer(Customer? customer) {
     final active = state.activeCart;
     _updateActiveCart(active.copyWith(selectedCustomer: customer));
+    _invalidateCheckoutKeyForActiveSlot();
   }
 
   void clearCart() {
     final active = state.activeCart;
+    checkoutIdempotency.clearCheckoutKey(active.id);
     _updateActiveCart(CartSession(
       id: active.id,
       createdAt: active.createdAt,
@@ -483,14 +566,9 @@ class CartNotifier extends Notifier<CartState> {
         : cart.loyaltyDiscount;
     final checkoutTotal = cart.subtotal - cart.invoiceDiscount - loyaltyDiscount;
 
-    final fingerprintHash = PosSaleFingerprint.compute(
+    final fingerprintHash = computeCheckoutFingerprint(
+      cart: cart,
       sessionId: sessionId,
-      cartSlotId: cart.id,
-      items: cart.items,
-      invoiceDiscount: cart.invoiceDiscount,
-      loyaltyPointsUsed: loyaltyPointsUsed,
-      loyaltyDiscount: loyaltyDiscount,
-      customerId: cart.selectedCustomer?.id,
       payment: payment,
       approvedByUserId: approvedByUserId,
     );

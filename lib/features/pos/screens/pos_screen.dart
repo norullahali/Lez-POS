@@ -844,12 +844,28 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
           )
         : activeCartSnapshot;
 
+    final cartNotifier = ref.read(cartProvider.notifier);
+    final fingerprintHash = cartNotifier.computeCheckoutFingerprint(
+      cart: checkoutCart,
+      sessionId: session.id,
+      payment: payment,
+      approvedByUserId: approvedByUserId,
+    );
+    final checkoutKey = cartNotifier.prepareCheckoutKey(
+      cartSlotId: checkoutCart.id,
+      fingerprintHash: fingerprintHash,
+    );
+    final paymentWithKey = cartNotifier.paymentWithCheckoutKey(
+      payment: payment,
+      idempotencyKey: checkoutKey,
+    );
+
     // Keep live cart UI in sync with the confirmed payment snapshot.
     if (payment.pointsUsed > 0) {
-      ref.read(cartProvider.notifier).setLoyaltyPoints(
-            payment.pointsUsed,
-            payment.loyaltyDiscount,
-          );
+      cartNotifier.setLoyaltyPoints(
+        payment.pointsUsed,
+        payment.loyaltyDiscount,
+      );
     }
 
     _checkoutInFlight = true;
@@ -860,10 +876,10 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
 
       // ✅ تنفيذ عملية البيع (invoice number allocated inside processSale)
       final saleResult =
-          await ref.read(cartProvider.notifier).checkout(
+          await cartNotifier.checkout(
                 cart: checkoutCart,
                 sessionId: session.id,
-                payment: payment,
+                payment: paymentWithKey,
                 userId: userId,
                 approvedByUserId: approvedByUserId,
               );
@@ -920,7 +936,8 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
       );
 
       // clearCart() resets loyaltyPointsUsed/loyaltyDiscount too.
-      ref.read(cartProvider.notifier).clearCart();
+      cartNotifier.clearCheckoutKey(completedCartId);
+      cartNotifier.clearCart();
       _invoiceDiscountCtrl.text = '0';
       ref.invalidate(productsNotifierProvider);
 
@@ -947,7 +964,7 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
       final message = e is CreditLimitExceededException
           ? e.localizedMessage
           : e is PosSaleIdempotencyConflictException
-              ? 'تعارض في عملية الدفع. أعد فتح نافذة الدفع وحاول مرة أخرى.'
+              ? 'تعارض في عملية الدفع: المعاملات لا تطابق محاولة سابقة. غيّر العربة أو الدفع، أو امسح العربة ثم أعد المحاولة.'
               : 'خطأ: $e';
       ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(message), backgroundColor: AppColors.error));

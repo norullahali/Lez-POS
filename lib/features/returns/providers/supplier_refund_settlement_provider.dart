@@ -4,12 +4,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/database/app_database.dart';
+import '../../../core/services/supplier_refund_settlement_intent_fingerprint.dart';
 import '../../../core/services/supplier_refund_settlement_service.dart';
 import '../../suppliers/providers/supplier_accounts_provider.dart';
+import '../../suppliers/supplier_refund_settlement_idempotency.dart';
 import '../utils/supplier_refund_settlement_messages.dart';
 import 'supplier_return_service_provider.dart';
-
-const _refundIdempotencyUuid = Uuid();
 
 /// Refreshes read-only supplier credit/balance displays after successful refund.
 void invalidateSupplierRefundDisplays(Ref ref, int supplierId) {
@@ -17,6 +17,22 @@ void invalidateSupplierRefundDisplays(Ref ref, int supplierId) {
   ref.invalidate(supplierBalanceProvider(supplierId));
   ref.invalidate(supplierHistoryProvider(supplierId));
 }
+
+/// Post-success UI refresh after [SupplierRefundSettlementService.settleCredit].
+typedef SupplierRefundPostSuccessRefresh = void Function(
+  Ref ref,
+  int supplierId,
+);
+
+void defaultSupplierRefundPostSuccessRefresh(Ref ref, int supplierId) {
+  ref.read(supplierReturnsRefreshProvider.notifier).state++;
+  invalidateSupplierRefundDisplays(ref, supplierId);
+}
+
+final supplierRefundPostSuccessRefreshProvider =
+    Provider<SupplierRefundPostSuccessRefresh>(
+  (ref) => defaultSupplierRefundPostSuccessRefresh,
+);
 
 /// Canonical SR.3.3 settlement service — sole financial write boundary for refunds.
 final supplierRefundSettlementServiceProvider =
@@ -44,13 +60,11 @@ class SupplierRefundSettlementUiState {
   final String? returnLabel;
   final SupplierRefundSettlementUiStatus status;
   final String? errorMessage;
-  final String idempotencyKey;
 
   const SupplierRefundSettlementUiState({
     required this.supplierId,
     required this.supplierName,
     required this.availableCredit,
-    required this.idempotencyKey,
     this.amountText = '',
     this.note = '',
     this.returnId,
@@ -89,7 +103,6 @@ class SupplierRefundSettlementUiState {
       supplierId: supplierId,
       supplierName: supplierName,
       availableCredit: availableCredit,
-      idempotencyKey: idempotencyKey,
       amountText: amountText ?? this.amountText,
       note: note ?? this.note,
       returnId: returnId,
@@ -128,7 +141,12 @@ String? validateRefundAmountText(String text, double availableCredit) {
 
 class SupplierRefundSettlementUiNotifier
     extends Notifier<SupplierRefundSettlementUiState?> {
+  static const _settlementUuid = Uuid();
+
   int _submitGeneration = 0;
+
+  final SupplierRefundSettlementIdempotencyState settlementIdempotency =
+      SupplierRefundSettlementIdempotencyState();
 
   @override
   SupplierRefundSettlementUiState? build() => null;
@@ -145,7 +163,6 @@ class SupplierRefundSettlementUiNotifier
       supplierId: supplierId,
       supplierName: supplierName,
       availableCredit: availableCredit,
-      idempotencyKey: _refundIdempotencyUuid.v4(),
       returnId: returnId,
       returnLabel: returnLabel,
     );
@@ -208,18 +225,35 @@ class SupplierRefundSettlementUiNotifier
       return false;
     }
 
+    final noteForService =
+        current.note.trim().isEmpty ? null : current.note.trim();
+    final fingerprintHash =
+        SupplierRefundSettlementIntentFingerprint.compute(
+      supplierId: current.supplierId,
+      amount: amount,
+      returnId: current.returnId,
+      note: noteForService,
+    );
+    final settlementKey = settlementIdempotency.prepareSettlementKey(
+      fingerprintHash: fingerprintHash,
+      generateUuid: () => _settlementUuid.v4(),
+    );
+
     try {
       await ref.read(supplierRefundSettlementServiceProvider).settleCredit(
             supplierId: current.supplierId,
             amount: amount,
-            idempotencyKey: current.idempotencyKey,
+            idempotencyKey: settlementKey,
             returnId: current.returnId,
-            note: current.note.trim().isEmpty ? null : current.note.trim(),
+            note: noteForService,
           );
       if (!_isCurrentSubmit(generation)) return false;
 
-      ref.read(supplierReturnsRefreshProvider.notifier).state++;
-      invalidateSupplierRefundDisplays(ref, current.supplierId);
+      ref.read(supplierRefundPostSuccessRefreshProvider)(
+        ref,
+        current.supplierId,
+      );
+      settlementIdempotency.clearSettlementKey(fingerprintHash);
 
       state = current.copyWith(
         status: SupplierRefundSettlementUiStatus.success,

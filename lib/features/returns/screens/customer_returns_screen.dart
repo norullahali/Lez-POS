@@ -4,12 +4,12 @@ import 'package:uuid/uuid.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/loading_overlay.dart';
 import '../../../core/database/app_database.dart';
-import '../../../core/services/manual_return_idempotency_conflict_exception.dart';
 import '../../../core/services/quick_return_idempotency_conflict_exception.dart';
 import '../../../core/widgets/manager_approval_dialog.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../pos/providers/pos_provider.dart';
 import '../../products/providers/products_provider.dart';
+import '../customer_manual_return_idempotency.dart';
 import '../providers/manual_return_service_provider.dart';
 import '../providers/return_analytics_provider.dart';
 import 'widgets/smart_return_lookup_dialog.dart';
@@ -92,73 +92,77 @@ class _CustomerReturnsScreenState extends ConsumerState<CustomerReturnsScreen> {
   String? _quickReturnIdempotencyKey;
   QuickReturnPayload? _pendingQuickReturnPayload;
   bool _quickReturnSubmitting = false;
-  String? _manualReturnIdempotencyKey;
-  ManualReturnPayload? _pendingManualReturnPayload;
-  bool _manualReturnSubmitting = false;
-
-  void _clearManualReturnAttempt() {
-    _manualReturnIdempotencyKey = null;
-    _pendingManualReturnPayload = null;
-  }
+  final CustomerManualReturnSubmitRunner _manualReturnSubmitRunner =
+      CustomerManualReturnSubmitRunner();
 
   Future<void> _submitManualReturn(ManualReturnPayload payload) async {
-    if (_manualReturnSubmitting) return;
+    final intent = ManualReturnSubmitIntent(
+      productId: payload.productId,
+      quantity: payload.quantity,
+      unitPrice: payload.unitPrice,
+      reason: payload.reason,
+      userId: payload.userId,
+    );
 
-    if (_pendingManualReturnPayload != null &&
-        !_pendingManualReturnPayload!.matches(payload)) {
-      _clearManualReturnAttempt();
-    }
-    _pendingManualReturnPayload = payload;
-    _manualReturnIdempotencyKey ??= _manualReturnUuid.v4();
-
-    _manualReturnSubmitting = true;
     setState(() => _isLoading = true);
-    try {
-      await ref.read(manualReturnServiceProvider).processManualReturn(
-            idempotencyKey: _manualReturnIdempotencyKey!,
+    final outcome = await _manualReturnSubmitRunner.submit(
+      intent: intent,
+      generateUuid: () => _manualReturnUuid.v4(),
+      invokeService: (idempotencyKey) => ref
+          .read(manualReturnServiceProvider)
+          .processManualReturn(
+            idempotencyKey: idempotencyKey,
             productId: payload.productId,
             quantity: payload.quantity,
             unitPrice: payload.unitPrice,
             reason: payload.reason,
             userId: payload.userId,
-          );
+          ),
+      postSuccessRefresh: () async {
+        ref.invalidate(customerReturnsProvider);
+        ref.invalidate(productsNotifierProvider);
+        invalidateReturnAnalytics(ref);
+      },
+    );
+    if (mounted) {
+      setState(() => _isLoading = false);
+    } else {
+      return;
+    }
 
-      _clearManualReturnAttempt();
-      ref.invalidate(customerReturnsProvider);
-      ref.invalidate(productsNotifierProvider);
-      invalidateReturnAnalytics(ref);
-      if (mounted) {
+    switch (outcome) {
+      case ManualReturnSubmitOutcome.skippedInFlight:
+        return;
+      case ManualReturnSubmitOutcome.success:
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('تم حفظ مرتجع العميل بنجاح'),
             backgroundColor: AppColors.success,
           ),
         );
-      }
-    } on ManualReturnIdempotencyConflictException {
-      _clearManualReturnAttempt();
-      if (mounted) {
+      case ManualReturnSubmitOutcome.postSuccessRefreshFailed:
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('تم حفظ المرتجع لكن تعذر تحديث العرض. أعد المحاولة.'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      case ManualReturnSubmitOutcome.idempotencyConflict:
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
-              'تعارض في عملية المرتجع. أعد فتح نافذة المرتجع وحاول مرة أخرى.',
+              'تعارض في عملية المرتجع. غيّر البيانات أو أعد المحاولة بنفس الإدخال.',
             ),
             backgroundColor: AppColors.error,
           ),
         );
-      }
-    } catch (e) {
-      if (mounted) {
+      case ManualReturnSubmitOutcome.serviceFailure:
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('خطأ: $e'),
+          const SnackBar(
+            content: Text('تعذر حفظ مرتجع العميل'),
             backgroundColor: AppColors.error,
           ),
         );
-      }
-    } finally {
-      _manualReturnSubmitting = false;
-      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -328,8 +332,6 @@ class _CustomerReturnsScreenState extends ConsumerState<CustomerReturnsScreen> {
   }
 
   Future<void> _showCustomerReturnDialog() async {
-    _clearManualReturnAttempt();
-
     final invoiceCtrl = TextEditingController();
     final noteCtrl = TextEditingController();
     int? selectedProductId;
@@ -399,7 +401,7 @@ class _CustomerReturnsScreenState extends ConsumerState<CustomerReturnsScreen> {
                       child: const Text('إلغاء')),
                   ElevatedButton(
                     onPressed: (selectedProductId == null ||
-                            _manualReturnSubmitting)
+                            _manualReturnSubmitRunner.inFlight)
                         ? null
                         : () {
                             final qty = double.tryParse(qtyCtrl.text) ?? 1;

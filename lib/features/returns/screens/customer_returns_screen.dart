@@ -4,12 +4,12 @@ import 'package:uuid/uuid.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/loading_overlay.dart';
 import '../../../core/database/app_database.dart';
-import '../../../core/services/quick_return_idempotency_conflict_exception.dart';
 import '../../../core/widgets/manager_approval_dialog.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../pos/providers/pos_provider.dart';
 import '../../products/providers/products_provider.dart';
 import '../customer_manual_return_idempotency.dart';
+import '../customer_quick_return_idempotency.dart';
 import '../providers/manual_return_service_provider.dart';
 import '../providers/return_analytics_provider.dart';
 import 'widgets/smart_return_lookup_dialog.dart';
@@ -57,13 +57,6 @@ class QuickReturnPayload {
   final String reason;
   final int userId;
 
-  bool matches(QuickReturnPayload other) {
-    return productId == other.productId &&
-        quantity == other.quantity &&
-        refundAmount == other.refundAmount &&
-        reason == other.reason &&
-        userId == other.userId;
-  }
 }
 
 final customerReturnsProvider =
@@ -89,11 +82,10 @@ class CustomerReturnsScreen extends ConsumerStatefulWidget {
 
 class _CustomerReturnsScreenState extends ConsumerState<CustomerReturnsScreen> {
   bool _isLoading = false;
-  String? _quickReturnIdempotencyKey;
-  QuickReturnPayload? _pendingQuickReturnPayload;
-  bool _quickReturnSubmitting = false;
   final CustomerManualReturnSubmitRunner _manualReturnSubmitRunner =
       CustomerManualReturnSubmitRunner();
+  final CustomerQuickReturnSubmitRunner _quickReturnSubmitRunner =
+      CustomerQuickReturnSubmitRunner();
 
   Future<void> _submitManualReturn(ManualReturnPayload payload) async {
     final intent = ManualReturnSubmitIntent(
@@ -166,73 +158,82 @@ class _CustomerReturnsScreenState extends ConsumerState<CustomerReturnsScreen> {
     }
   }
 
-  void _clearQuickReturnAttempt() {
-    _quickReturnIdempotencyKey = null;
-    _pendingQuickReturnPayload = null;
-  }
-
   Future<void> _submitQuickReturn(
     QuickReturnPayload payload, {
     int? approvedByUserId,
   }) async {
-    if (_quickReturnSubmitting) return;
+    final intent = QuickReturnSubmitIntent(
+      productId: payload.productId,
+      quantity: payload.quantity,
+      refundAmount: payload.refundAmount,
+      reason: payload.reason,
+      userId: payload.userId,
+      approvedByUserId: approvedByUserId,
+    );
 
-    if (_pendingQuickReturnPayload != null &&
-        !_pendingQuickReturnPayload!.matches(payload)) {
-      _clearQuickReturnAttempt();
-    }
-    _pendingQuickReturnPayload = payload;
-    _quickReturnIdempotencyKey ??= _quickReturnUuid.v4();
-
-    _quickReturnSubmitting = true;
     setState(() => _isLoading = true);
-    try {
-      await ref.read(posSaleServiceProvider).processQuickReturn(
-            idempotencyKey: _quickReturnIdempotencyKey!,
-            productId: payload.productId,
-            quantity: payload.quantity,
-            refundAmount: payload.refundAmount,
-            userId: payload.userId,
-            reason: payload.reason,
-            approvedByUserId: approvedByUserId,
-          );
+    final outcome = await _quickReturnSubmitRunner.submit(
+      intent: intent,
+      generateUuid: () => _quickReturnUuid.v4(),
+      invokeService: (idempotencyKey) => ref
+          .read(posSaleServiceProvider)
+          .processQuickReturn(
+            idempotencyKey: idempotencyKey,
+            productId: intent.productId,
+            quantity: intent.quantity,
+            refundAmount: intent.refundAmount,
+            userId: intent.userId,
+            reason: intent.reason,
+            approvedByUserId: intent.approvedByUserId,
+          )
+          .then((_) {}),
+      postSuccessRefresh: () async {
+        ref.invalidate(customerReturnsProvider);
+        ref.invalidate(productsNotifierProvider);
+        invalidateReturnAnalytics(ref);
+      },
+    );
+    if (mounted) {
+      setState(() => _isLoading = false);
+    } else {
+      return;
+    }
 
-      _clearQuickReturnAttempt();
-      ref.invalidate(customerReturnsProvider);
-      ref.invalidate(productsNotifierProvider);
-      invalidateReturnAnalytics(ref);
-      if (mounted) {
+    switch (outcome) {
+      case QuickReturnSubmitOutcome.skippedInFlight:
+        return;
+      case QuickReturnSubmitOutcome.success:
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('تم الاسترجاع بدون فاتورة بنجاح'),
             backgroundColor: AppColors.success,
           ),
         );
-      }
-    } on QuickReturnIdempotencyConflictException {
-      _clearQuickReturnAttempt();
-      if (mounted) {
+      case QuickReturnSubmitOutcome.postSuccessRefreshFailed:
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
-              'تعارض في عملية الاسترجاع. أعد فتح نافذة الاسترجاع وحاول مرة أخرى.',
+              'تم الاسترجاع لكن تعذر تحديث العرض. أعد المحاولة.',
             ),
             backgroundColor: AppColors.error,
           ),
         );
-      }
-    } catch (e) {
-      if (mounted) {
+      case QuickReturnSubmitOutcome.idempotencyConflict:
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('خطأ: $e'),
+          const SnackBar(
+            content: Text(
+              'تعارض في عملية الاسترجاع. غيّر البيانات أو أعد المحاولة بنفس الإدخال.',
+            ),
             backgroundColor: AppColors.error,
           ),
         );
-      }
-    } finally {
-      _quickReturnSubmitting = false;
-      if (mounted) setState(() => _isLoading = false);
+      case QuickReturnSubmitOutcome.serviceFailure:
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('تعذر إتمام الاسترجاع بدون فاتورة'),
+            backgroundColor: AppColors.error,
+          ),
+        );
     }
   }
 
@@ -436,7 +437,6 @@ class _CustomerReturnsScreenState extends ConsumerState<CustomerReturnsScreen> {
   }
 
   Future<void> _showQuickReturnDialog() async {
-    _clearQuickReturnAttempt();
 
     final products = await ref.read(productsRepositoryProvider).getAll();
     int? selectedProductId;
@@ -531,7 +531,7 @@ class _CustomerReturnsScreenState extends ConsumerState<CustomerReturnsScreen> {
                         foregroundColor: Colors.white),
                     onPressed: (selectedProductId == null ||
                             selectedReason == null ||
-                            _quickReturnSubmitting)
+                            _quickReturnSubmitRunner.inFlight)
                         ? null
                         : () {
                             final qty = double.tryParse(qtyCtrl.text) ?? 0;

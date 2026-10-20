@@ -150,6 +150,9 @@ User _testUser({double refundLimit = 10000}) => User(
     );
 
 void main() {
+  // Keep aligned with AppDatabase.schemaVersion (lib/core/database/app_database.dart).
+  const kExpectedAppSchemaVersion = 51;
+
   const userId = 1;
   const sellPrice = 10.0;
   const initialStock = 100.0;
@@ -600,19 +603,19 @@ void main() {
       final migrated = AppDatabase.test(NativeDatabase.opened(opened.rawDb));
       addTearDown(() async => migrated.close());
 
-      expect(migrated.schemaVersion, 50);
+      expect(migrated.schemaVersion, kExpectedAppSchemaVersion);
       expect(await idempotencyTableExists(migrated), isTrue);
     });
 
     test('23) fresh v41 schema includes table', () async {
-      expect(db.schemaVersion, 50);
+      expect(db.schemaVersion, kExpectedAppSchemaVersion);
       expect(await idempotencyTableExists(db), isTrue);
     });
 
     test('29) B2-B8 regression sentinel on v41', () async {
       final regressionDb = AppDatabase.test();
       addTearDown(() async => regressionDb.close());
-      expect(regressionDb.schemaVersion, 50);
+      expect(regressionDb.schemaVersion, kExpectedAppSchemaVersion);
 
       final b9Table = await regressionDb
           .customSelect(
@@ -1074,7 +1077,8 @@ void main() {
       expect(spyService.keysUsed[0], isNot(spyService.keysUsed[1]));
     });
 
-    testWidgets('27) UI conflict clears key for next attempt', (tester) async {
+    testWidgets('27) UI conflict retains key for same-intent retry',
+        (tester) async {
       await tester.binding.setSurfaceSize(const Size(1920, 1080));
       addTearDown(() => tester.binding.setSurfaceSize(null));
 
@@ -1100,6 +1104,7 @@ void main() {
       await openQuickReturnDialog(tester);
       await fillQuickReturnDialog(tester);
       await submitQuickReturnDialog(tester);
+      expect(spyService.processQuickReturnCalls, 1);
 
       spyService.throwConflict = false;
       await openQuickReturnDialog(tester);
@@ -1107,7 +1112,8 @@ void main() {
       await submitQuickReturnDialog(tester);
 
       expect(spyService.keysUsed.length, 2);
-      expect(spyService.keysUsed[0], isNot(spyService.keysUsed[1]));
+      expect(spyService.keysUsed[0], spyService.keysUsed[1]);
+      expect(spyService.processQuickReturnCalls, 2);
     });
 
     testWidgets('28) opening new dialog clears previous pending key',

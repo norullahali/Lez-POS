@@ -58,9 +58,11 @@ class _CountingSupplierAccountService extends SupplierAccountService {
 
   final Completer<void>? _paymentGate;
   bool throwConflict = false;
+  bool throwOnce = false;
   bool deferToSuper;
   int processPaymentCalls = 0;
   final List<String> keysUsed = [];
+  final List<bool> replayFlags = [];
 
   @override
   Future<SupplierPaymentResult> processPayment({
@@ -71,6 +73,10 @@ class _CountingSupplierAccountService extends SupplierAccountService {
   }) async {
     processPaymentCalls++;
     keysUsed.add(idempotencyKey);
+    if (throwOnce) {
+      throwOnce = false;
+      throw Exception('forced payment failure');
+    }
     if (throwConflict) {
       throw const SupplierPaymentIdempotencyConflictException();
     }
@@ -78,18 +84,28 @@ class _CountingSupplierAccountService extends SupplierAccountService {
       await _paymentGate!.future;
     }
     if (!deferToSuper) {
+      replayFlags.add(false);
       return const SupplierPaymentResult(
         supplierTransactionId: 1,
         idempotentReplay: false,
       );
     }
-    return super.processPayment(
+    final result = await super.processPayment(
       idempotencyKey: idempotencyKey,
       supplierId: supplierId,
       amount: amount,
       note: note,
     );
+    replayFlags.add(result.idempotentReplay);
+    return result;
   }
+}
+
+Future<int> uiPaymentTxnCount(AppDatabase uiDb, int sid) async {
+  return (await (uiDb.select(uiDb.supplierTransactions)
+        ..where((t) => t.supplierId.equals(sid) & t.type.equals('PAYMENT')))
+      .get())
+      .length;
 }
 
 List<Override> _supplierPaymentUiOverrides({
@@ -143,6 +159,97 @@ Widget _supplierPaymentScreenShell({
       body: SupplierPaymentsScreen(supplierId: supplierId),
     ),
   );
+}
+
+class _SupplierPaymentSupplierHarness extends StatefulWidget {
+  const _SupplierPaymentSupplierHarness({
+    super.key,
+    required this.container,
+    required this.initialSupplierId,
+  });
+
+  final ProviderContainer container;
+  final int initialSupplierId;
+
+  @override
+  State<_SupplierPaymentSupplierHarness> createState() =>
+      _SupplierPaymentSupplierHarnessState();
+}
+
+class _SupplierPaymentSupplierHarnessState
+    extends State<_SupplierPaymentSupplierHarness> {
+  late final GoRouter _router;
+  final GlobalKey<_SupplierPaymentSupplierHarnessBodyState> _bodyKey =
+      GlobalKey<_SupplierPaymentSupplierHarnessBodyState>();
+
+  @override
+  void initState() {
+    super.initState();
+    _router = GoRouter(
+      routes: [
+        GoRoute(
+          path: '/',
+          builder: (context, state) => _SupplierPaymentSupplierHarnessBody(
+            key: _bodyKey,
+            initialSupplierId: widget.initialSupplierId,
+          ),
+        ),
+      ],
+    );
+  }
+
+  void setSupplierIdForTesting(int supplierId) {
+    _bodyKey.currentState!.setSupplierIdForTesting(supplierId);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return UncontrolledProviderScope(
+      container: widget.container,
+      child: MaterialApp.router(routerConfig: _router),
+    );
+  }
+}
+
+class _SupplierPaymentSupplierHarnessBody extends StatefulWidget {
+  const _SupplierPaymentSupplierHarnessBody({
+    super.key,
+    required this.initialSupplierId,
+  });
+
+  final int initialSupplierId;
+
+  @override
+  State<_SupplierPaymentSupplierHarnessBody> createState() =>
+      _SupplierPaymentSupplierHarnessBodyState();
+}
+
+class _SupplierPaymentSupplierHarnessBodyState
+    extends State<_SupplierPaymentSupplierHarnessBody> {
+  late int _supplierId;
+
+  @override
+  void initState() {
+    super.initState();
+    _supplierId = widget.initialSupplierId;
+  }
+
+  void setSupplierIdForTesting(int supplierId) {
+    setState(() => _supplierId = supplierId);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Scaffold(
+        body: SupplierPaymentsScreen(
+          key: const ValueKey('b35-supplier-payment'),
+          supplierId: _supplierId,
+        ),
+      ),
+    );
+  }
 }
 
 Widget _supplierPaymentTestApp({
@@ -1142,6 +1249,291 @@ void main() {
 
       expect(spyService.keysUsed.length, 2);
       expect(spyService.keysUsed[0], isNot(spyService.keysUsed[1]));
+    });
+
+    testWidgets('20) stale completion after field edit during flight',
+        (tester) async {
+      await tester.binding.setSurfaceSize(const Size(1920, 1080));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      final uiDb = AppDatabase.test();
+      final uiSupplierId = await _seedUiSupplier(uiDb);
+      final paymentGate = Completer<void>();
+      addTearDown(() {
+        if (!paymentGate.isCompleted) paymentGate.complete();
+      });
+
+      final spyService = _CountingSupplierAccountService(
+        uiDb,
+        paymentGate: paymentGate,
+        deferToSuper: false,
+      );
+
+      final container = ProviderContainer(
+        overrides: _supplierPaymentUiOverrides(
+          spyService: spyService,
+          uiDb: uiDb,
+          uiSupplierId: uiSupplierId,
+        ),
+      );
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        _supplierPaymentTestApp(
+          container: container,
+          supplierId: uiSupplierId,
+        ),
+      );
+      await _pumpUntilPaymentForm(tester);
+      tester.takeException();
+
+      await tester.enterText(find.byType(TextField).first, '100');
+      await tester.tap(find.widgetWithText(ElevatedButton, 'حفظ'));
+      await tester.pump();
+      await tester.enterText(find.byType(TextField).first, '200');
+      await tester.pump();
+
+      paymentGate.complete();
+      for (var i = 0; i < 15; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+        tester.takeException();
+      }
+
+      expect(spyService.processPaymentCalls, 1);
+      expect(find.widgetWithText(ElevatedButton, 'حفظ'), findsOneWidget);
+      expect(
+        find.text('تم تجاهل نتيجة دفعة سابقة بعد تغيير البيانات.'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('21) stale completion after supplier change during flight',
+        (tester) async {
+      await tester.binding.setSurfaceSize(const Size(1920, 1080));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      final uiDb = AppDatabase.test();
+      final supplierA = await _seedUiSupplier(uiDb);
+      final supplierB = await uiDb.into(uiDb.suppliers).insert(
+            const SuppliersCompanion(name: Value('B8 UI Supplier B')),
+          );
+
+      final paymentGate = Completer<void>();
+      addTearDown(() {
+        if (!paymentGate.isCompleted) paymentGate.complete();
+      });
+
+      final spyService = _CountingSupplierAccountService(
+        uiDb,
+        paymentGate: paymentGate,
+        deferToSuper: false,
+      );
+
+      final container = ProviderContainer(
+        overrides: [
+          supplierAccountServiceProvider.overrideWithValue(spyService),
+          suppliersNotifierProvider.overrideWith(
+            () => _TestSuppliersNotifier([
+              SupplierModel(id: supplierA, name: 'B8 UI Supplier'),
+              SupplierModel(id: supplierB, name: 'B8 UI Supplier B'),
+            ]),
+          ),
+          supplierAccountsDaoProvider.overrideWithValue(uiDb.supplierAccountsDao),
+          supplierBalanceProvider.overrideWith(
+            (ref, supplierId) => Stream.value(1000.0),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final harnessKey = GlobalKey<_SupplierPaymentSupplierHarnessState>();
+      await tester.pumpWidget(
+        _SupplierPaymentSupplierHarness(
+          key: harnessKey,
+          container: container,
+          initialSupplierId: supplierA,
+        ),
+      );
+      await _pumpUntilPaymentForm(tester);
+      tester.takeException();
+
+      await tester.enterText(find.byType(TextField).first, '100');
+      await tester.tap(find.widgetWithText(ElevatedButton, 'حفظ'));
+      await tester.pump();
+
+      harnessKey.currentState!.setSupplierIdForTesting(supplierB);
+      await tester.pump();
+      for (var i = 0; i < 10; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+        tester.takeException();
+      }
+
+      paymentGate.complete();
+      for (var i = 0; i < 15; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+        tester.takeException();
+      }
+
+      expect(spyService.processPaymentCalls, 1);
+      expect(
+        find.text('تم تجاهل نتيجة دفعة سابقة بعد تغيير البيانات.'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('22) refresh failure then successful retry', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(1920, 1080));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      final uiDb = AppDatabase.test();
+      final uiSupplierId = await _seedUiSupplier(uiDb);
+
+      final spyService = _CountingSupplierAccountService(
+        uiDb,
+        deferToSuper: true,
+      );
+
+      final container = ProviderContainer(
+        overrides: _supplierPaymentUiOverrides(
+          spyService: spyService,
+          uiDb: uiDb,
+          uiSupplierId: uiSupplierId,
+        ),
+      );
+      addTearDown(container.dispose);
+      addTearDown(() {
+        SupplierPaymentsScreen.failNextPostSuccessRefreshForTesting = false;
+      });
+
+      await tester.pumpWidget(
+        _supplierPaymentTestApp(
+          container: container,
+          supplierId: uiSupplierId,
+        ),
+      );
+      await _pumpUntilPaymentForm(tester);
+      tester.takeException();
+
+      SupplierPaymentsScreen.failNextPostSuccessRefreshForTesting = true;
+      await tester.enterText(find.byType(TextField).first, '100');
+      await tester.tap(find.widgetWithText(ElevatedButton, 'حفظ'));
+      for (var i = 0; i < 15; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+        tester.takeException();
+      }
+
+      expect(await uiPaymentTxnCount(uiDb, uiSupplierId), 1);
+      expect(spyService.keysUsed.length, 1);
+      expect(find.text('تم حفظ الدفعة، لكن تعذر تحديث الرصيد. أعد المحاولة.'),
+          findsOneWidget);
+
+      await tester.tap(find.widgetWithText(ElevatedButton, 'حفظ'));
+      for (var i = 0; i < 15; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+        tester.takeException();
+      }
+
+      expect(spyService.processPaymentCalls, 2);
+      expect(spyService.replayFlags.last, isTrue);
+      expect(await uiPaymentTxnCount(uiDb, uiSupplierId), 1);
+      expect(spyService.keysUsed[0], spyService.keysUsed[1]);
+    });
+
+    testWidgets('23) ordinary failure retry uses same key', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(1920, 1080));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      final uiDb = AppDatabase.test();
+      final uiSupplierId = await _seedUiSupplier(uiDb);
+
+      final spyService = _CountingSupplierAccountService(
+        uiDb,
+        deferToSuper: false,
+      )..throwOnce = true;
+
+      final container = ProviderContainer(
+        overrides: _supplierPaymentUiOverrides(
+          spyService: spyService,
+          uiDb: uiDb,
+          uiSupplierId: uiSupplierId,
+        ),
+      );
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        _supplierPaymentTestApp(
+          container: container,
+          supplierId: uiSupplierId,
+        ),
+      );
+      await _pumpUntilPaymentForm(tester);
+      tester.takeException();
+
+      await tester.enterText(find.byType(TextField).first, '100');
+      await tester.tap(find.widgetWithText(ElevatedButton, 'حفظ'));
+      for (var i = 0; i < 10; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+        tester.takeException();
+      }
+
+      await tester.tap(find.widgetWithText(ElevatedButton, 'حفظ'));
+      for (var i = 0; i < 10; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+        tester.takeException();
+      }
+
+      expect(spyService.processPaymentCalls, 2);
+      expect(spyService.keysUsed.length, 2);
+      expect(spyService.keysUsed[0], spyService.keysUsed[1]);
+    });
+
+    testWidgets('24) overpayment retry uses same key until amount changes',
+        (tester) async {
+      await tester.binding.setSurfaceSize(const Size(1920, 1080));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      final uiDb = AppDatabase.test();
+      final uiSupplierId = await _seedUiSupplier(uiDb);
+
+      final spyService = _CountingSupplierAccountService(
+        uiDb,
+        deferToSuper: true,
+      );
+
+      final container = ProviderContainer(
+        overrides: _supplierPaymentUiOverrides(
+          spyService: spyService,
+          uiDb: uiDb,
+          uiSupplierId: uiSupplierId,
+        ),
+      );
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        _supplierPaymentTestApp(
+          container: container,
+          supplierId: uiSupplierId,
+        ),
+      );
+      await _pumpUntilPaymentForm(tester);
+      tester.takeException();
+
+      await tester.enterText(find.byType(TextField).first, '5000');
+      await tester.tap(find.widgetWithText(ElevatedButton, 'حفظ'));
+      for (var i = 0; i < 10; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+        tester.takeException();
+      }
+
+      await tester.tap(find.widgetWithText(ElevatedButton, 'حفظ'));
+      for (var i = 0; i < 10; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+        tester.takeException();
+      }
+
+      expect(spyService.processPaymentCalls, 2);
+      expect(spyService.keysUsed[0], spyService.keysUsed[1]);
+      expect(await uiPaymentTxnCount(uiDb, uiSupplierId), 0);
     });
   });
 }

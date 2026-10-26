@@ -12,6 +12,8 @@ import 'package:lez_pos/features/reports/core/models/report_filter_model.dart';
 import 'support/customer_invoice_return_test_keys.dart';
 
 void main() {
+  // Keep aligned with AppDatabase.schemaVersion (lib/core/database/app_database.dart).
+
   const returnedByUserId = 1;
   const unitPrice = 10.0;
   const ledgerFilter = CashLedgerFilter(
@@ -116,7 +118,7 @@ void main() {
 
   setUp(() async {
     db = AppDatabase.test();
-    expect(db.schemaVersion, 50);
+    expect(db.schemaVersion, 51);
     partialService = PartialReturnService(db);
     invoiceReturnService = CustomerInvoiceReturnService(db);
     ledger = FinancialLedgerRepository(db);

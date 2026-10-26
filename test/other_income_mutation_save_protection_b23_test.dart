@@ -59,6 +59,9 @@ Future<({
 }
 
 void main() {
+  // Keep aligned with AppDatabase.schemaVersion (lib/core/database/app_database.dart).
+  const kExpectedAppSchemaVersion = 51;
+
   late AppDatabase db;
   late OtherIncomeCreationService createService;
   late OtherIncomeMutationSaveService mutationService;
@@ -688,15 +691,15 @@ void main() {
       addTearDown(opened.rawDb.dispose);
       final migrated = AppDatabase.test(NativeDatabase.opened(opened.rawDb));
       addTearDown(() async => migrated.close());
-      expect(migrated.schemaVersion, 50);
+      expect(migrated.schemaVersion, kExpectedAppSchemaVersion);
       final tables = await migrated.customSelect(
         "SELECT name FROM sqlite_master WHERE type='table' AND name='other_income_mutation_idempotency'",
       ).get();
       expect(tables.length, 1);
     });
 
-    test('19) fresh schema 50', () async {
-      expect(db.schemaVersion, 50);
+    test('19) fresh schema 51', () async {
+      expect(db.schemaVersion, kExpectedAppSchemaVersion);
     });
 
     test('21) dual-connection update vs void concurrency', () async {

@@ -88,6 +88,8 @@ void disposeDualConnectionRaceDatabases(
 }
 
 void main() {
+  // Keep aligned with AppDatabase.schemaVersion (lib/core/database/app_database.dart).
+
   late AppDatabase db;
   late StockAdjustmentSaveService service;
   late int userId;
@@ -984,7 +986,7 @@ void main() {
       final migrated = AppDatabase.test(NativeDatabase.opened(opened.rawDb));
       addTearDown(() async => migrated.close());
 
-      expect(migrated.schemaVersion, 50);
+      expect(migrated.schemaVersion, 51);
       final tables = await migrated.customSelect(
         "SELECT name FROM sqlite_master WHERE type='table' AND name='stock_adjustment_idempotency'",
       ).get();

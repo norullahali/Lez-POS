@@ -60,6 +60,9 @@ Future<List<String>> legacyInvoiceNumbers(Database rawDb) async {
 }
 
 void main() {
+  // Keep aligned with AppDatabase.schemaVersion (lib/core/database/app_database.dart).
+  const kExpectedAppSchemaVersion = 51;
+
   late AppDatabase db;
   late PosSaleService saleService;
   late int productId;
@@ -410,7 +413,7 @@ void main() {
       final migrated = AppDatabase.test(NativeDatabase.opened(rawDb));
       addTearDown(() async => migrated.close());
 
-      expect(migrated.schemaVersion, 50);
+      expect(migrated.schemaVersion, kExpectedAppSchemaVersion);
       expect(await sequencesTableExists(migrated), isTrue);
       expect(await uniqueIndexExists(migrated), isTrue);
 
@@ -557,7 +560,7 @@ void main() {
     });
 
     test('schema v41 includes B4 sequences and idempotency tables', () async {
-      expect(db.schemaVersion, 50);
+      expect(db.schemaVersion, kExpectedAppSchemaVersion);
       expect(await uniqueIndexExists(), isTrue);
 
       final tables = await db.customSelect(

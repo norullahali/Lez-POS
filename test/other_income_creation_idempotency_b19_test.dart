@@ -36,6 +36,8 @@ Future<({sqlite3.Database rawDb, String path})> openSimulatedV45RawDatabase() as
 }
 
 void main() {
+  // Keep aligned with AppDatabase.schemaVersion (lib/core/database/app_database.dart).
+
   late AppDatabase db;
   late OtherIncomeCreationService service;
   late OtherIncomeRepository repository;
@@ -606,7 +608,7 @@ void main() {
       final migrated = AppDatabase.test(NativeDatabase.opened(opened.rawDb));
       addTearDown(() async => migrated.close());
 
-      expect(migrated.schemaVersion, 50);
+      expect(migrated.schemaVersion, 51);
       expect(await idempotencyTableExists(migrated), isTrue);
       expect(await idempotencyIndexExists(migrated), isTrue);
     });

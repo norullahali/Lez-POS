@@ -4,14 +4,23 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 import 'package:uuid/uuid.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../core/services/customer_payment_idempotency_conflict_exception.dart';
 
+import '../../../core/services/customer_payment_idempotency_conflict_exception.dart';
+import '../customer_payment_submit_idempotency.dart';
 import '../providers/customers_provider.dart';
 import '../providers/customer_accounts_provider.dart';
 
 class CustomerPaymentsScreen extends ConsumerStatefulWidget {
   final int? initialCustomerId;
   const CustomerPaymentsScreen({super.key, this.initialCustomerId});
+
+  /// When true, the next post-success refresh throws once (B36 widget tests).
+  @visibleForTesting
+  static bool failNextPostSuccessRefreshForTesting = false;
+
+  /// When true, balance/history panels skip live Drift stream watches (B36 tests).
+  @visibleForTesting
+  static bool suppressLiveCustomerStreamsForTesting = false;
 
   @override
   ConsumerState<CustomerPaymentsScreen> createState() =>
@@ -26,20 +35,48 @@ class _CustomerPaymentsScreenState
   final _amountCtrl = TextEditingController();
   final _noteCtrl = TextEditingController();
   final _nf = NumberFormat('#,##0.##');
+  final CustomerPaymentSubmitRunner _submitRunner =
+      CustomerPaymentSubmitRunner();
   String? _idempotencyKey;
+  int _submitGeneration = 0;
   bool _submitting = false;
+  String? _pendingServiceFailureMessage;
 
   @override
   void initState() {
     super.initState();
     _selectedCustomerId = widget.initialCustomerId;
+    _amountCtrl.addListener(_invalidateSubmitGeneration);
+    _noteCtrl.addListener(_invalidateSubmitGeneration);
+  }
+
+  @override
+  void didUpdateWidget(covariant CustomerPaymentsScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialCustomerId != widget.initialCustomerId &&
+        widget.initialCustomerId != null &&
+        _selectedCustomerId != widget.initialCustomerId) {
+      setState(() {
+        _selectedCustomerId = widget.initialCustomerId;
+        _amountCtrl.clear();
+        _invalidateSubmitGeneration();
+      });
+    }
   }
 
   @override
   void dispose() {
+    _amountCtrl.removeListener(_invalidateSubmitGeneration);
+    _noteCtrl.removeListener(_invalidateSubmitGeneration);
     _amountCtrl.dispose();
     _noteCtrl.dispose();
     super.dispose();
+  }
+
+  void _invalidateSubmitGeneration() {
+    _submitGeneration++;
+    _idempotencyKey = null;
+    if (mounted) setState(() {});
   }
 
   static String _normalizeNumber(String input) {
@@ -62,8 +99,22 @@ class _CustomerPaymentsScreenState
     _idempotencyKey = null;
   }
 
+  /// Sets amount/note for widget tests (triggers the same rebuild as user edits).
+  @visibleForTesting
+  void setPaymentFormForTesting({String? amount, String? note}) {
+    if (amount != null) {
+      _amountCtrl.text = amount;
+    }
+    if (note != null) {
+      _noteCtrl.text = note;
+    }
+    if (mounted) setState(() {});
+  }
+
   Future<void> _savePayment() async {
-    if (_selectedCustomerId == null || _submitting) return;
+    if (_selectedCustomerId == null || _submitting || _submitRunner.inFlight) {
+      return;
+    }
     if (_amount <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
         content: Text('الرجاء إدخال مبلغ صحيح أكبر من صفر'),
@@ -72,38 +123,102 @@ class _CustomerPaymentsScreenState
       return;
     }
 
+    final capturedCustomerId = _selectedCustomerId!;
+    final generation = ++_submitGeneration;
+    final intent = CustomerPaymentSubmitIntent(
+      customerId: capturedCustomerId,
+      amount: _amount,
+      note: _paymentNote(),
+    );
+
     _idempotencyKey ??= _customerPaymentUuid.v4();
+    final paymentKey = _idempotencyKey!;
+
     setState(() => _submitting = true);
     try {
-      await ref.read(customerAccountServiceProvider).processPayment(
-            idempotencyKey: _idempotencyKey!,
-            customerId: _selectedCustomerId!,
-            amount: _amount,
-            note: _paymentNote(),
-          );
+      final outcome = await _submitRunner.submit(
+        intent: intent,
+        idempotencyKey: paymentKey,
+        isSubmitStillCurrent: () =>
+            mounted &&
+            generation == _submitGeneration &&
+            _selectedCustomerId == capturedCustomerId,
+        invokeService: (idempotencyKey) async {
+          try {
+            return await ref
+                .read(customerAccountServiceProvider)
+                .processPayment(
+                  idempotencyKey: idempotencyKey,
+                  customerId: intent.customerId,
+                  amount: intent.amount,
+                  note: intent.note,
+                );
+          } on CustomerPaymentIdempotencyConflictException {
+            rethrow;
+          } catch (e) {
+            _pendingServiceFailureMessage = 'حدث خطأ: $e';
+            rethrow;
+          }
+        },
+        postSuccessRefresh: (_) async {
+          if (CustomerPaymentsScreen.failNextPostSuccessRefreshForTesting) {
+            CustomerPaymentsScreen.failNextPostSuccessRefreshForTesting = false;
+            throw Exception('fail refresh');
+          }
+          if (!CustomerPaymentsScreen.suppressLiveCustomerStreamsForTesting) {
+            ref.invalidate(customerBalanceProvider(capturedCustomerId));
+            ref.invalidate(customerHistoryProvider(capturedCustomerId));
+          }
+        },
+      );
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('تم تسجيل دفعة بقيمة ${_nf.format(_amount)} د.ع بنجاح'),
-          backgroundColor: AppColors.success,
-        ));
-        _amountCtrl.clear();
-        _noteCtrl.clear();
-        _resetPaymentAttempt();
-      }
-    } on CustomerPaymentIdempotencyConflictException catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('تعذر تنفيذ الدفعة: $e'),
-          backgroundColor: AppColors.error,
-        ));
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('حدث خطأ: $e'),
-          backgroundColor: AppColors.error,
-        ));
+      if (!mounted) return;
+
+      switch (outcome) {
+        case CustomerPaymentSubmitOutcome.skippedInFlight:
+          break;
+        case CustomerPaymentSubmitOutcome.success:
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(
+              'تم تسجيل دفعة بقيمة ${_nf.format(intent.amount)} د.ع بنجاح',
+            ),
+            backgroundColor: AppColors.success,
+          ));
+          _amountCtrl.clear();
+          _noteCtrl.clear();
+          _resetPaymentAttempt();
+        case CustomerPaymentSubmitOutcome.postSuccessRefreshFailed:
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'تم حفظ الدفعة، لكن تعذر تحديث العرض. أعد المحاولة.',
+              ),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        case CustomerPaymentSubmitOutcome.idempotencyConflict:
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('تعذر تنفيذ الدفعة: تعارض في عملية الدفع'),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        case CustomerPaymentSubmitOutcome.serviceFailure:
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(_pendingServiceFailureMessage ?? 'حدث خطأ غير متوقع'),
+              backgroundColor: AppColors.error,
+            ),
+          );
+          _pendingServiceFailureMessage = null;
+        case CustomerPaymentSubmitOutcome.staleCompletion:
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'تم تجاهل نتيجة دفعة سابقة بعد تغيير البيانات.',
+              ),
+            ),
+          );
       }
     } finally {
       if (mounted) setState(() => _submitting = false);
@@ -173,7 +288,7 @@ class _CustomerPaymentsScreenState
                         onChanged: (val) => setState(() {
                           _selectedCustomerId = val;
                           _amountCtrl.clear();
-                          _resetPaymentAttempt();
+                          _invalidateSubmitGeneration();
                         }),
                       );
                     },
@@ -188,7 +303,20 @@ class _CustomerPaymentsScreenState
 
                   // Current Balance Display
                   if (_selectedCustomerId != null)
-                    Consumer(
+                    CustomerPaymentsScreen.suppressLiveCustomerStreamsForTesting
+                        ? Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(20),
+                            decoration: BoxDecoration(
+                              color: AppColors.surface,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Text(
+                              'رصيد العميل (اختبار)',
+                              style: TextStyle(color: Colors.white54),
+                            ),
+                          )
+                        : Consumer(
                       builder: (context, ref, _) {
                         final balAsync = ref.watch(
                             customerBalanceProvider(_selectedCustomerId!));
@@ -255,6 +383,7 @@ class _CustomerPaymentsScreenState
                       style: TextStyle(color: Colors.white70, fontSize: 13)),
                   const SizedBox(height: 8),
                   TextField(
+                    key: const Key('customer_payment_amount_field'),
                     controller: _amountCtrl,
                     style: const TextStyle(color: Colors.white, fontSize: 18),
                     keyboardType:
@@ -279,6 +408,7 @@ class _CustomerPaymentsScreenState
                       style: TextStyle(color: Colors.white70, fontSize: 13)),
                   const SizedBox(height: 8),
                   TextField(
+                    key: const Key('customer_payment_note_field'),
                     controller: _noteCtrl,
                     style: const TextStyle(color: Colors.white, fontSize: 14),
                     maxLines: 2,
@@ -311,8 +441,9 @@ class _CustomerPaymentsScreenState
                       label: const Text('حفظ الدفعة',
                           style: TextStyle(
                               fontSize: 16, fontWeight: FontWeight.w700)),
-                      onPressed:
-                          _amount > 0 && !_submitting ? _savePayment : null,
+                      onPressed: _submitting || _submitRunner.inFlight
+                          ? null
+                          : _savePayment,
                     ),
                   ),
                 ],
@@ -339,7 +470,18 @@ class _CustomerPaymentsScreenState
                                 color: Colors.white.withValues(alpha: 0.4))),
                       ],
                     ))
-                  : _TransactionHistoryList(customerId: _selectedCustomerId!),
+                  : CustomerPaymentsScreen.suppressLiveCustomerStreamsForTesting
+                      ? Center(
+                          child: Text(
+                            'سجل الحركات (اختبار)',
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.4),
+                            ),
+                          ),
+                        )
+                      : _TransactionHistoryList(
+                          customerId: _selectedCustomerId!,
+                        ),
             ),
           ),
         ],

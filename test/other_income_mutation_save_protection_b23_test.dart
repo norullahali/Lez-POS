@@ -4,6 +4,8 @@ import 'dart:io';
 import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:drift/native.dart';
 import 'package:drift/native.dart' show SqliteException;
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lez_pos/core/activity/activity_types.dart';
 import 'package:lez_pos/core/database/app_database.dart';
@@ -11,7 +13,17 @@ import 'package:lez_pos/core/services/other_income_creation_fingerprint.dart';
 import 'package:lez_pos/core/services/other_income_creation_service.dart';
 import 'package:lez_pos/core/services/other_income_mutation_fingerprint.dart';
 import 'package:lez_pos/core/services/other_income_mutation_save_idempotency_conflict_exception.dart';
+import 'package:lez_pos/core/services/other_income_mutation_save_result.dart';
 import 'package:lez_pos/core/services/other_income_mutation_save_service.dart';
+import 'package:lez_pos/features/auth/providers/auth_provider.dart';
+import 'package:lez_pos/features/other_income/models/other_income_category.dart'
+    as oi_cat;
+import 'package:lez_pos/features/other_income/models/other_income_record.dart'
+    as oi_models;
+import 'package:lez_pos/features/other_income/providers/other_income_mutation_save_service_provider.dart';
+import 'package:lez_pos/features/other_income/providers/other_income_providers.dart';
+import 'package:lez_pos/features/other_income/screens/widgets/other_income_dialog.dart';
+import 'package:lez_pos/features/pos/providers/pos_provider.dart';
 import 'package:lez_pos/features/financial/models/cash_ledger_event_type.dart';
 import 'package:lez_pos/features/financial/models/cash_ledger_filter.dart';
 import 'package:lez_pos/features/financial/repositories/financial_ledger_repository.dart';
@@ -21,6 +33,133 @@ import 'package:sqlite3/sqlite3.dart' as sqlite3;
 
 import 'support/other_income_creation_test_keys.dart';
 import 'support/other_income_mutation_save_test_keys.dart';
+
+class _CountingOtherIncomeMutationSaveService
+    extends OtherIncomeMutationSaveService {
+  _CountingOtherIncomeMutationSaveService(
+    AppDatabase database, {
+    Completer<void>? saveGate,
+  })  : _saveGate = saveGate,
+        super(database);
+
+  final Completer<void>? _saveGate;
+  bool throwConflict = false;
+  bool throwOnce = false;
+  int updateCalls = 0;
+  final List<String> keysUsed = [];
+  int? lastSessionId;
+
+  @override
+  Future<OtherIncomeMutationSaveResult> processUpdate({
+    required String idempotencyKey,
+    required String fingerprintHash,
+    required int otherIncomeRecordId,
+    required int categoryId,
+    required double amount,
+    required DateTime incomeDate,
+    required DateTime receivedAt,
+    required String notes,
+    required int updatedBy,
+    int? sessionId,
+  }) async {
+    updateCalls++;
+    keysUsed.add(idempotencyKey);
+    lastSessionId = sessionId;
+    if (throwOnce) {
+      throwOnce = false;
+      throw Exception('forced update failure');
+    }
+    if (throwConflict) {
+      throw const OtherIncomeMutationSaveIdempotencyConflictException();
+    }
+    if (_saveGate != null) {
+      await _saveGate!.future;
+    }
+    return OtherIncomeMutationSaveResult(
+      otherIncomeRecordId: otherIncomeRecordId,
+      idempotentReplay: false,
+    );
+  }
+}
+
+class _B40UpdateAuthNotifier extends AuthNotifier {
+  _B40UpdateAuthNotifier(this._user);
+
+  final User _user;
+
+  @override
+  FutureOr<AuthState> build() async => AuthState(user: _user);
+}
+
+class _NullPosSessionNotifier extends PosSessionNotifier {
+  @override
+  Future<PosSession?> build() async => null;
+}
+
+User _b40UpdateUser(int id) => User(
+      id: id,
+      fullName: 'B40 Update User',
+      username: 'b40update',
+      passwordHash: 'hash',
+      roleId: 1,
+      isActive: true,
+      refundLimit: 100000,
+      createdAt: DateTime(2026, 1, 1),
+    );
+
+List<Override> _b40UpdateUiOverrides({
+  required _CountingOtherIncomeMutationSaveService spy,
+  required int categoryId,
+  required int userId,
+  bool nullPosSession = false,
+}) {
+  return [
+    otherIncomeMutationSaveServiceProvider.overrideWithValue(spy),
+    authProvider.overrideWith(() => _B40UpdateAuthNotifier(_b40UpdateUser(userId))),
+    otherIncomeCategoriesProvider.overrideWith(
+      (ref) async => [
+        oi_cat.OtherIncomeCategory(
+          id: categoryId,
+          name: 'B40 Update Category',
+          isActive: true,
+        ),
+      ],
+    ),
+    if (nullPosSession)
+      posSessionProvider.overrideWith(_NullPosSessionNotifier.new),
+  ];
+}
+
+Future<void> _pumpOtherIncomeEditDialog(
+  WidgetTester tester,
+  ProviderContainer container,
+  oi_models.OtherIncomeRecord existing,
+) async {
+  await tester.binding.setSurfaceSize(const Size(800, 900));
+  addTearDown(() => tester.binding.setSurfaceSize(null));
+  await tester.pumpWidget(
+    UncontrolledProviderScope(
+      container: container,
+      child: MaterialApp(
+        home: Scaffold(
+          body: OtherIncomeDialog(existing: existing),
+        ),
+      ),
+    ),
+  );
+  for (var i = 0; i < 60; i++) {
+    await tester.pump(const Duration(milliseconds: 50));
+    final auth = container.read(authProvider);
+    if (auth.hasValue &&
+        auth.requireValue.user != null &&
+        find.byKey(const Key('other_income_dialog_save')).evaluate().isNotEmpty) {
+      return;
+    }
+  }
+}
+
+Finder _b40UpdateAmountField() =>
+    find.byKey(const Key('other_income_dialog_amount'));
 
 Future<({sqlite3.Database rawDb, String path})> openSimulatedV49RawDatabase() async {
   final dbPath =
@@ -935,6 +1074,269 @@ void main() {
                 e.extendedResultCode == 2067,
           ),
         ),
+      );
+    });
+  });
+
+  group('B40 other income dialog UI idempotency — update', () {
+    late AppDatabase uiDb;
+    late int uiCategoryId;
+    late int uiUserId;
+    late int uiOtherIncomeId;
+    late _CountingOtherIncomeMutationSaveService spy;
+
+    setUp(() async {
+      TestWidgetsFlutterBinding.ensureInitialized();
+      OtherIncomeDialog.resetOtherIncomeSubmitTestingHooks();
+      uiDb = AppDatabase.test();
+      uiUserId = await uiDb.into(uiDb.usersTable).insert(
+            UsersTableCompanion.insert(
+              fullName: 'B40 Update UI',
+              username: 'b40up_${DateTime.now().microsecondsSinceEpoch}',
+              passwordHash: 'hash',
+              roleId: 1,
+            ),
+          );
+      uiCategoryId = await uiDb.otherIncomeDao.createCategory(
+        const OtherIncomeCategoriesCompanion(
+          name: Value('B40 Update Category'),
+          isActive: Value(true),
+        ),
+      );
+      final createResult = await OtherIncomeCreationService(uiDb).processCreate(
+        idempotencyKey: b19OtherIncomeCreationIdempotencyKey(),
+        fingerprintHash: OtherIncomeCreationFingerprint.compute(
+          categoryId: uiCategoryId,
+          amount: 100,
+          incomeDate: incomeDate,
+          receivedAt: receivedAt,
+          notes: '',
+          sessionId: null,
+          createdBy: uiUserId,
+        ),
+        categoryId: uiCategoryId,
+        amount: 100,
+        incomeDate: incomeDate,
+        receivedAt: receivedAt,
+        notes: '',
+        createdBy: uiUserId,
+      );
+      uiOtherIncomeId = createResult.otherIncomeRecordId;
+      spy = _CountingOtherIncomeMutationSaveService(uiDb);
+    });
+
+    tearDown(() async {
+      OtherIncomeDialog.resetOtherIncomeSubmitTestingHooks();
+      await uiDb.close();
+    });
+
+    oi_models.OtherIncomeRecord existingRecord({int? sessionId}) =>
+        oi_models.OtherIncomeRecord(
+          id: uiOtherIncomeId,
+          categoryId: uiCategoryId,
+          amount: 100,
+          incomeDate: incomeDate,
+          receivedAt: receivedAt,
+          notes: '',
+          sessionId: sessionId,
+          createdBy: uiUserId,
+        );
+
+    Future<void> openEditDialog(
+      WidgetTester tester, {
+      int? sessionId,
+      bool nullPosSession = false,
+    }) async {
+      final container = ProviderContainer(
+        overrides: _b40UpdateUiOverrides(
+          spy: spy,
+          categoryId: uiCategoryId,
+          userId: uiUserId,
+          nullPosSession: nullPosSession,
+        ),
+      );
+      addTearDown(container.dispose);
+      await _pumpOtherIncomeEditDialog(
+        tester,
+        container,
+        existingRecord(sessionId: sessionId),
+      );
+      await tester.enterText(_b40UpdateAmountField(), '120');
+      await tester.pump();
+    }
+
+    testWidgets('duplicate in-flight update invokes processUpdate once',
+        (tester) async {
+      final gate = Completer<void>();
+      addTearDown(() {
+        if (!gate.isCompleted) gate.complete();
+      });
+      spy = _CountingOtherIncomeMutationSaveService(uiDb, saveGate: gate);
+      await openEditDialog(tester);
+
+      await tester.tap(find.byKey(const Key('other_income_dialog_save')));
+      await tester.pump();
+      await tester.runAsync(() async {
+        for (var i = 0; i < 20; i++) {
+          await Future<void>.delayed(Duration.zero);
+        }
+      });
+      await tester.pump();
+
+      expect(spy.updateCalls, 1);
+      gate.complete();
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('stale update does not close dialog', (tester) async {
+      final gate = Completer<void>();
+      addTearDown(() {
+        if (!gate.isCompleted) gate.complete();
+      });
+      spy = _CountingOtherIncomeMutationSaveService(uiDb, saveGate: gate);
+      await openEditDialog(tester);
+
+      await tester.tap(find.byKey(const Key('other_income_dialog_save')));
+      await tester.pump();
+      OtherIncomeDialog.invalidateSubmitGenerationForTesting();
+      gate.complete();
+      await tester.pumpAndSettle();
+
+      expect(find.byType(OtherIncomeDialog), findsOneWidget);
+      expect(OtherIncomeDialog.postSuccessRefreshCount, 0);
+    });
+
+    testWidgets('update success closes dialog once', (tester) async {
+      await openEditDialog(tester);
+
+      await tester.tap(find.byKey(const Key('other_income_dialog_save')));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(OtherIncomeDialog), findsNothing);
+      expect(spy.updateCalls, 1);
+      expect(OtherIncomeDialog.postSuccessRefreshCount, 1);
+    });
+
+    testWidgets('update conflict clears key for retry', (tester) async {
+      spy.throwConflict = true;
+      await openEditDialog(tester);
+
+      await tester.tap(find.byKey(const Key('other_income_dialog_save')));
+      await tester.pumpAndSettle();
+
+      spy.throwConflict = false;
+      await tester.tap(find.byKey(const Key('other_income_dialog_save')));
+      await tester.pumpAndSettle();
+
+      expect(spy.updateCalls, 2);
+      expect(spy.keysUsed[0], isNot(spy.keysUsed[1]));
+    });
+
+    testWidgets('update service failure retry reuses key', (tester) async {
+      spy.throwOnce = true;
+      await openEditDialog(tester);
+
+      await tester.tap(find.byKey(const Key('other_income_dialog_save')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('other_income_dialog_save')));
+      await tester.pumpAndSettle();
+
+      expect(spy.updateCalls, 2);
+      expect(spy.keysUsed[0], spy.keysUsed[1]);
+    });
+
+    testWidgets('update refresh failure retains key then succeeds',
+        (tester) async {
+      OtherIncomeDialog.failNextPostSuccessRefreshForTesting = true;
+      await openEditDialog(tester);
+
+      await tester.tap(find.byKey(const Key('other_income_dialog_save')));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(OtherIncomeDialog), findsOneWidget);
+      expect(
+        find.text('تم حفظ الإيراد، لكن تعذر تحديث العرض. أعد المحاولة.'),
+        findsOneWidget,
+      );
+      expect(spy.updateCalls, 1);
+      expect(OtherIncomeDialog.postSuccessRefreshCount, 0);
+
+      OtherIncomeDialog.failNextPostSuccessRefreshForTesting = false;
+      await tester.tap(find.byKey(const Key('other_income_dialog_save')));
+      await tester.pumpAndSettle();
+
+      expect(spy.updateCalls, 2);
+      expect(spy.keysUsed[0], spy.keysUsed[1]);
+      expect(find.byType(OtherIncomeDialog), findsNothing);
+      expect(OtherIncomeDialog.postSuccessRefreshCount, 1);
+    });
+
+    testWidgets('Case D preserves sessionId when no active session',
+        (tester) async {
+      await openEditDialog(
+        tester,
+        sessionId: 999,
+        nullPosSession: true,
+      );
+
+      await tester.tap(find.byKey(const Key('other_income_dialog_save')));
+      await tester.pumpAndSettle();
+
+      expect(spy.updateCalls, 1);
+      expect(spy.lastSessionId, 999);
+    });
+
+    test('update refresh failure persists mutation before service replay',
+        () async {
+      final key = b23OtherIncomeMutationIdempotencyKey();
+      final fingerprint = OtherIncomeMutationFingerprint.computeUpdate(
+        otherIncomeRecordId: uiOtherIncomeId,
+        categoryId: uiCategoryId,
+        amount: 120,
+        incomeDate: incomeDate,
+        receivedAt: receivedAt,
+        notes: '',
+        sessionId: null,
+        updatedBy: uiUserId,
+      );
+      final service = OtherIncomeMutationSaveService(uiDb);
+
+      final first = await service.processUpdate(
+        idempotencyKey: key,
+        fingerprintHash: fingerprint,
+        otherIncomeRecordId: uiOtherIncomeId,
+        categoryId: uiCategoryId,
+        amount: 120,
+        incomeDate: incomeDate,
+        receivedAt: receivedAt,
+        notes: '',
+        updatedBy: uiUserId,
+      );
+      expect(first.idempotentReplay, isFalse);
+      expect(
+        (await uiDb.otherIncomeDao.getIncomeById(uiOtherIncomeId))!.amount,
+        120,
+      );
+
+      final replay = await service.processUpdate(
+        idempotencyKey: key,
+        fingerprintHash: fingerprint,
+        otherIncomeRecordId: uiOtherIncomeId,
+        categoryId: uiCategoryId,
+        amount: 120,
+        incomeDate: incomeDate,
+        receivedAt: receivedAt,
+        notes: '',
+        updatedBy: uiUserId,
+      );
+      expect(replay.idempotentReplay, isTrue);
+      expect(
+        (await uiDb.otherIncomeDao.getIncomeById(uiOtherIncomeId))!.amount,
+        120,
+      );
+      expect(
+        (await uiDb.select(uiDb.otherIncomeMutationIdempotency).get()).length,
+        1,
       );
     });
   });

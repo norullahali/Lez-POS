@@ -2,14 +2,13 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart' show DateFormat;
 import 'package:uuid/uuid.dart';
-import '../../../../core/services/other_income_creation_fingerprint.dart';
 import '../../../../core/services/other_income_creation_idempotency_conflict_exception.dart';
-import '../../../../core/services/other_income_mutation_fingerprint.dart';
 import '../../../../core/services/other_income_mutation_save_idempotency_conflict_exception.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../features/auth/providers/auth_provider.dart';
 import '../../../../features/pos/providers/pos_provider.dart';
 import '../../models/other_income_record.dart';
+import '../../other_income_submit_idempotency.dart';
 import '../../providers/other_income_creation_service_provider.dart';
 import '../../providers/other_income_mutation_save_service_provider.dart';
 import '../../providers/other_income_providers.dart';
@@ -18,6 +17,28 @@ class OtherIncomeDialog extends ConsumerStatefulWidget {
   const OtherIncomeDialog({super.key, this.existing});
 
   final OtherIncomeRecord? existing;
+
+  /// When true, the next post-success refresh throws once (B40 widget tests).
+  @visibleForTesting
+  static bool failNextPostSuccessRefreshForTesting = false;
+
+  @visibleForTesting
+  static int postSuccessRefreshCount = 0;
+
+  @visibleForTesting
+  static void Function()? testingInvalidateGenerationHook;
+
+  @visibleForTesting
+  static void invalidateSubmitGenerationForTesting() {
+    testingInvalidateGenerationHook?.call();
+  }
+
+  @visibleForTesting
+  static void resetOtherIncomeSubmitTestingHooks() {
+    failNextPostSuccessRefreshForTesting = false;
+    postSuccessRefreshCount = 0;
+    testingInvalidateGenerationHook = null;
+  }
 
   @override
   ConsumerState<OtherIncomeDialog> createState() => _OtherIncomeDialogState();
@@ -34,6 +55,10 @@ class _OtherIncomeDialogState extends ConsumerState<OtherIncomeDialog> {
   bool _saving = false;
   String? _idempotencyKey;
   String? _pendingFingerprint;
+  int _submitGeneration = 0;
+  final OtherIncomeSubmitRunner _submitRunner = OtherIncomeSubmitRunner();
+  String? _pendingServiceFailureMessage;
+  VoidCallback? _testingGenerationHook;
 
   static final _dateFmt = DateFormat('yyyy/MM/dd');
   static const _otherIncomeCreateUuid = Uuid();
@@ -49,13 +74,32 @@ class _OtherIncomeDialogState extends ConsumerState<OtherIncomeDialog> {
     _incomeDate = ex?.incomeDate ?? DateTime.now();
     _receivedAt = ex?.receivedAt ?? DateTime.now();
     _linkSession = ex?.sessionId != null;
+    _amountCtrl.addListener(_invalidateSubmitGeneration);
+    _notesCtrl.addListener(_invalidateSubmitGeneration);
+    _testingGenerationHook = () {
+      _submitGeneration++;
+    };
+    OtherIncomeDialog.testingInvalidateGenerationHook = _testingGenerationHook;
   }
 
   @override
   void dispose() {
+    _amountCtrl.removeListener(_invalidateSubmitGeneration);
+    _notesCtrl.removeListener(_invalidateSubmitGeneration);
+    if (OtherIncomeDialog.testingInvalidateGenerationHook ==
+        _testingGenerationHook) {
+      OtherIncomeDialog.testingInvalidateGenerationHook = null;
+    }
+    _testingGenerationHook = null;
     _amountCtrl.dispose();
     _notesCtrl.dispose();
     super.dispose();
+  }
+
+  void _invalidateSubmitGeneration() {
+    if (_saving) return;
+    _submitGeneration++;
+    _idempotencyKey = null;
   }
 
   void _resetSaveAttempt() {
@@ -63,7 +107,17 @@ class _OtherIncomeDialogState extends ConsumerState<OtherIncomeDialog> {
     _pendingFingerprint = null;
   }
 
+  /// Case D: editing with no active session preserves the original sessionId.
+  int? _resolveSessionIdForSubmit(bool isEdit) {
+    final activeSession = ref.read(posSessionProvider).valueOrNull;
+    if (isEdit && activeSession == null) {
+      return widget.existing!.sessionId;
+    }
+    return _linkSession ? activeSession?.id : null;
+  }
+
   Future<void> _pickDate(bool isIncomeDate) async {
+    if (_saving) return;
     final initial = isIncomeDate ? _incomeDate : _receivedAt;
     final picked = await showDatePicker(
       context: context,
@@ -78,7 +132,96 @@ class _OtherIncomeDialogState extends ConsumerState<OtherIncomeDialog> {
         } else {
           _receivedAt = picked;
         }
+        _invalidateSubmitGeneration();
       });
+    }
+  }
+
+  OtherIncomeSubmitIntent? _buildSubmitIntent({
+    required int userId,
+    required int? sessionId,
+  }) {
+    final amount = double.tryParse(_amountCtrl.text.trim());
+    if (amount == null || amount <= 0 || _selectedCategoryId == null) {
+      return null;
+    }
+    final notes = _notesCtrl.text.trim();
+    if (widget.existing != null) {
+      return OtherIncomeSubmitIntent.update(
+        otherIncomeRecordId: widget.existing!.id!,
+        categoryId: _selectedCategoryId!,
+        amount: amount,
+        incomeDate: _incomeDate,
+        receivedAt: _receivedAt,
+        notes: notes,
+        sessionId: sessionId,
+        updatedBy: userId,
+      );
+    }
+    return OtherIncomeSubmitIntent.create(
+      categoryId: _selectedCategoryId!,
+      amount: amount,
+      incomeDate: _incomeDate,
+      receivedAt: _receivedAt,
+      notes: notes,
+      sessionId: sessionId,
+      createdBy: userId,
+    );
+  }
+
+  void _handleSubmitOutcome(OtherIncomeSubmitOutcome outcome) {
+    if (!mounted) return;
+    switch (outcome) {
+      case OtherIncomeSubmitOutcome.skippedInFlight:
+        break;
+      case OtherIncomeSubmitOutcome.success:
+        _resetSaveAttempt();
+        if (!context.mounted) return;
+        Navigator.of(context).pop(true);
+      case OtherIncomeSubmitOutcome.postSuccessRefreshFailed:
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'تم حفظ الإيراد، لكن تعذر تحديث العرض. أعد المحاولة.',
+            ),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      case OtherIncomeSubmitOutcome.idempotencyConflict:
+        _resetSaveAttempt();
+        if (!context.mounted) return;
+        final isEdit = widget.existing != null;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              isEdit
+                  ? 'تعذر تعديل الإيراد: تعارض في عملية الحفظ.'
+                  : 'تعذر تسجيل الإيراد: تعارض في عملية الحفظ.',
+            ),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      case OtherIncomeSubmitOutcome.serviceFailure:
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              _pendingServiceFailureMessage ?? 'تعذر حفظ الإيراد',
+            ),
+            backgroundColor: AppColors.error,
+          ),
+        );
+        _pendingServiceFailureMessage = null;
+      case OtherIncomeSubmitOutcome.staleCompletion:
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'تم تجاهل نتيجة حفظ سابقة بعد تغيير البيانات.',
+            ),
+          ),
+        );
     }
   }
 
@@ -105,7 +248,7 @@ class _OtherIncomeDialogState extends ConsumerState<OtherIncomeDialog> {
       return;
     }
 
-    if (_saving) return;
+    if (_saving || _submitRunner.inFlight) return;
 
     final authState = ref.read(authProvider).valueOrNull;
     final userId = authState?.user?.id ?? 0;
@@ -123,106 +266,81 @@ class _OtherIncomeDialogState extends ConsumerState<OtherIncomeDialog> {
       return;
     }
 
+    final isEdit = widget.existing != null;
+    final sessionId = _resolveSessionIdForSubmit(isEdit);
+
+    final intent = _buildSubmitIntent(userId: userId, sessionId: sessionId);
+    if (intent == null) return;
+
+    final fingerprint = intent.fingerprintHash;
+    if (_pendingFingerprint != null && _pendingFingerprint != fingerprint) {
+      _resetSaveAttempt();
+    }
+    _pendingFingerprint = fingerprint;
+
+    final generation = ++_submitGeneration;
+    _idempotencyKey ??= _otherIncomeCreateUuid.v4();
+    final submitKey = _idempotencyKey!;
+
     setState(() => _saving = true);
     try {
-      final isEdit = widget.existing != null;
-      final activeSession = ref.read(posSessionProvider).valueOrNull;
-      // Case D: editing with no active session → preserve the original sessionId.
-      // Case A/B/C: resolve from checkbox state against the current active session.
-      final int? sessionId = (isEdit && activeSession == null)
-          ? widget.existing!.sessionId
-          : (_linkSession ? activeSession?.id : null);
-      if (isEdit) {
-        final otherIncomeRecordId = widget.existing!.id!;
-        final fingerprint = OtherIncomeMutationFingerprint.computeUpdate(
-          otherIncomeRecordId: otherIncomeRecordId,
-          categoryId: _selectedCategoryId!,
-          amount: amount,
-          incomeDate: _incomeDate,
-          receivedAt: _receivedAt,
-          notes: _notesCtrl.text.trim(),
-          sessionId: sessionId,
-          updatedBy: userId,
-        );
-        if (_pendingFingerprint != null &&
-            _pendingFingerprint != fingerprint) {
-          _resetSaveAttempt();
-        }
-        _pendingFingerprint = fingerprint;
-        _idempotencyKey ??= _otherIncomeCreateUuid.v4();
+      final outcome = await _submitRunner.submit(
+        intent: intent,
+        idempotencyKey: submitKey,
+        isSubmitStillCurrent: () =>
+            mounted && generation == _submitGeneration,
+        invokeService: (idempotencyKey) async {
+          try {
+            switch (intent.mode) {
+              case OtherIncomeSubmitMode.create:
+                await ref.read(otherIncomeCreationServiceProvider).processCreate(
+                      idempotencyKey: idempotencyKey,
+                      fingerprintHash: intent.fingerprintHash,
+                      categoryId: intent.categoryId,
+                      amount: intent.amount,
+                      incomeDate: intent.incomeDate,
+                      receivedAt: intent.receivedAt,
+                      notes: intent.notes,
+                      createdBy: intent.createdBy!,
+                      sessionId: intent.sessionId,
+                    );
+              case OtherIncomeSubmitMode.update:
+                await ref
+                    .read(otherIncomeMutationSaveServiceProvider)
+                    .processUpdate(
+                      idempotencyKey: idempotencyKey,
+                      fingerprintHash: intent.fingerprintHash,
+                      otherIncomeRecordId: intent.otherIncomeRecordId!,
+                      categoryId: intent.categoryId,
+                      amount: intent.amount,
+                      incomeDate: intent.incomeDate,
+                      receivedAt: intent.receivedAt,
+                      notes: intent.notes,
+                      updatedBy: intent.updatedBy!,
+                      sessionId: intent.sessionId,
+                    );
+            }
+          } on OtherIncomeCreationIdempotencyConflictException {
+            rethrow;
+          } on OtherIncomeMutationSaveIdempotencyConflictException {
+            rethrow;
+          } catch (e) {
+            _pendingServiceFailureMessage = e.toString();
+            rethrow;
+          }
+        },
+        postSuccessRefresh: () async {
+          if (OtherIncomeDialog.failNextPostSuccessRefreshForTesting) {
+            OtherIncomeDialog.failNextPostSuccessRefreshForTesting = false;
+            throw Exception('fail refresh');
+          }
+          OtherIncomeDialog.postSuccessRefreshCount++;
+          ref.invalidate(otherIncomeProvider);
+          ref.invalidate(otherIncomeSummaryProvider);
+        },
+      );
 
-        await ref.read(otherIncomeMutationSaveServiceProvider).processUpdate(
-              idempotencyKey: _idempotencyKey!,
-              fingerprintHash: fingerprint,
-              otherIncomeRecordId: otherIncomeRecordId,
-              categoryId: _selectedCategoryId!,
-              amount: amount,
-              incomeDate: _incomeDate,
-              receivedAt: _receivedAt,
-              notes: _notesCtrl.text.trim(),
-              updatedBy: userId,
-              sessionId: sessionId,
-            );
-        _resetSaveAttempt();
-      } else {
-        final fingerprint = OtherIncomeCreationFingerprint.compute(
-          categoryId: _selectedCategoryId!,
-          amount: amount,
-          incomeDate: _incomeDate,
-          receivedAt: _receivedAt,
-          notes: _notesCtrl.text.trim(),
-          sessionId: sessionId,
-          createdBy: userId,
-        );
-        if (_pendingFingerprint != null &&
-            _pendingFingerprint != fingerprint) {
-          _resetSaveAttempt();
-        }
-        _pendingFingerprint = fingerprint;
-        _idempotencyKey ??= _otherIncomeCreateUuid.v4();
-
-        await ref.read(otherIncomeCreationServiceProvider).processCreate(
-              idempotencyKey: _idempotencyKey!,
-              fingerprintHash: fingerprint,
-              categoryId: _selectedCategoryId!,
-              amount: amount,
-              incomeDate: _incomeDate,
-              receivedAt: _receivedAt,
-              notes: _notesCtrl.text.trim(),
-              createdBy: userId,
-              sessionId: sessionId,
-            );
-        _resetSaveAttempt();
-      }
-      ref.invalidate(otherIncomeProvider);
-      ref.invalidate(otherIncomeSummaryProvider);
-      if (mounted) Navigator.of(context).pop(true);
-    } on OtherIncomeMutationSaveIdempotencyConflictException catch (e) {
-      _resetSaveAttempt();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('تعذر تعديل الإيراد: $e'),
-            backgroundColor: AppColors.error,
-          ),
-        );
-      }
-    } on OtherIncomeCreationIdempotencyConflictException catch (e) {
-      _resetSaveAttempt();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('تعذر تسجيل الإيراد: $e'),
-            backgroundColor: AppColors.error,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString()), backgroundColor: AppColors.error),
-        );
-      }
+      _handleSubmitOutcome(outcome);
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -233,6 +351,7 @@ class _OtherIncomeDialogState extends ConsumerState<OtherIncomeDialog> {
     final categoriesAsync = ref.watch(otherIncomeCategoriesProvider);
     final isEdit = widget.existing != null;
     final hasSession = ref.watch(posSessionProvider).valueOrNull != null;
+    final canEdit = !_saving;
 
     return AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -262,8 +381,12 @@ class _OtherIncomeDialogState extends ConsumerState<OtherIncomeDialog> {
                           .map((c) => DropdownMenuItem(
                               value: c.id, child: Text(c.name)))
                           .toList(),
-                      onChanged: (v) =>
-                          setState(() => _selectedCategoryId = v),
+                      onChanged: canEdit
+                          ? (v) => setState(() {
+                                _selectedCategoryId = v;
+                                _invalidateSubmitGeneration();
+                              })
+                          : null,
                       validator: (v) => v == null
                           ? '\u0627\u0644\u0641\u0626\u0629 \u0645\u0637\u0644\u0648\u0628\u0629'
                           : null,
@@ -272,7 +395,9 @@ class _OtherIncomeDialogState extends ConsumerState<OtherIncomeDialog> {
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
+                  key: const Key('other_income_dialog_amount'),
                   controller: _amountCtrl,
+                  enabled: canEdit,
                   keyboardType:
                       const TextInputType.numberWithOptions(decimal: true),
                   decoration: const InputDecoration(
@@ -287,7 +412,7 @@ class _OtherIncomeDialogState extends ConsumerState<OtherIncomeDialog> {
                 ),
                 const SizedBox(height: 12),
                 GestureDetector(
-                  onTap: () => _pickDate(true),
+                  onTap: canEdit ? () => _pickDate(true) : null,
                   child: InputDecorator(
                     decoration: const InputDecoration(
                       labelText: '\u062a\u0627\u0631\u064a\u062e \u0627\u0644\u0625\u064a\u0631\u0627\u062f *',
@@ -298,7 +423,7 @@ class _OtherIncomeDialogState extends ConsumerState<OtherIncomeDialog> {
                 ),
                 const SizedBox(height: 12),
                 GestureDetector(
-                  onTap: () => _pickDate(false),
+                  onTap: canEdit ? () => _pickDate(false) : null,
                   child: InputDecorator(
                     decoration: const InputDecoration(
                       labelText: '\u062a\u0627\u0631\u064a\u062e \u0627\u0644\u0627\u0633\u062a\u0644\u0627\u0645',
@@ -310,6 +435,7 @@ class _OtherIncomeDialogState extends ConsumerState<OtherIncomeDialog> {
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _notesCtrl,
+                  enabled: canEdit,
                   decoration: const InputDecoration(
                       labelText: '\u0645\u0644\u0627\u062d\u0638\u0627\u062a'),
                   maxLines: 2,
@@ -318,8 +444,12 @@ class _OtherIncomeDialogState extends ConsumerState<OtherIncomeDialog> {
                   const SizedBox(height: 4),
                   CheckboxListTile(
                     value: _linkSession,
-                    onChanged: (v) =>
-                        setState(() => _linkSession = v ?? false),
+                    onChanged: canEdit
+                        ? (v) => setState(() {
+                              _linkSession = v ?? false;
+                              _invalidateSubmitGeneration();
+                            })
+                        : null,
                     title: const Text(
                       '\u0631\u0628\u0637 \u0628\u0627\u0644\u062c\u0644\u0633\u0629 \u0627\u0644\u062d\u0627\u0644\u064a\u0629',
                       style: TextStyle(fontSize: 13),
@@ -335,10 +465,12 @@ class _OtherIncomeDialogState extends ConsumerState<OtherIncomeDialog> {
       ),
       actions: [
         TextButton(
-          onPressed: _saving ? null : () => Navigator.of(context).pop(false),
+          onPressed:
+              _saving ? null : () => Navigator.of(context).pop(false),
           child: const Text('\u0625\u0644\u063a\u0627\u0621'),
         ),
         ElevatedButton(
+          key: const Key('other_income_dialog_save'),
           onPressed: _saving ? null : _submit,
           child: _saving
               ? const SizedBox(

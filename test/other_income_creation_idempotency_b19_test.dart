@@ -1,15 +1,25 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:drift/native.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lez_pos/core/database/app_database.dart';
 import 'package:lez_pos/core/services/other_income_creation_fingerprint.dart';
 import 'package:lez_pos/core/services/other_income_creation_idempotency_conflict_exception.dart';
 import 'package:lez_pos/core/services/other_income_creation_result.dart';
 import 'package:lez_pos/core/services/other_income_creation_service.dart';
+import 'package:lez_pos/features/auth/providers/auth_provider.dart';
+import 'package:lez_pos/features/other_income/models/other_income_category.dart'
+    as oi_cat;
 import 'package:lez_pos/features/other_income/models/other_income_record.dart' as models;
+import 'package:lez_pos/features/other_income/other_income_submit_idempotency.dart';
+import 'package:lez_pos/features/other_income/providers/other_income_creation_service_provider.dart';
+import 'package:lez_pos/features/other_income/providers/other_income_providers.dart';
 import 'package:lez_pos/features/other_income/repositories/other_income_repository.dart';
+import 'package:lez_pos/features/other_income/screens/widgets/other_income_dialog.dart';
 import 'package:lez_pos/features/financial/models/cash_ledger_event_type.dart';
 import 'package:lez_pos/features/financial/models/cash_ledger_filter.dart';
 import 'package:lez_pos/features/financial/repositories/financial_ledger_repository.dart';
@@ -18,6 +28,139 @@ import 'package:lez_pos/features/reports/core/models/report_filter_model.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite3;
 
 import 'support/other_income_creation_test_keys.dart';
+
+class _CountingOtherIncomeCreationService extends OtherIncomeCreationService {
+  _CountingOtherIncomeCreationService(
+    AppDatabase database, {
+    Completer<void>? saveGate,
+  })  : _saveGate = saveGate,
+        super(database);
+
+  final Completer<void>? _saveGate;
+  bool throwConflict = false;
+  bool throwOnce = false;
+  int createCalls = 0;
+  final List<String> keysUsed = [];
+  int? lastSessionId;
+
+  @override
+  Future<OtherIncomeCreationResult> processCreate({
+    required String idempotencyKey,
+    required String fingerprintHash,
+    required int categoryId,
+    required double amount,
+    required DateTime incomeDate,
+    required DateTime receivedAt,
+    required String notes,
+    required int createdBy,
+    int? sessionId,
+  }) async {
+    createCalls++;
+    keysUsed.add(idempotencyKey);
+    lastSessionId = sessionId;
+    if (throwOnce) {
+      throwOnce = false;
+      throw Exception('forced create failure');
+    }
+    if (throwConflict) {
+      throw const OtherIncomeCreationIdempotencyConflictException();
+    }
+    if (_saveGate != null) {
+      await _saveGate!.future;
+    }
+    return OtherIncomeCreationResult(
+      otherIncomeRecordId: 9001,
+      idempotentReplay: false,
+    );
+  }
+}
+
+class _B40CreateAuthNotifier extends AuthNotifier {
+  _B40CreateAuthNotifier(this._user);
+
+  final User _user;
+
+  @override
+  FutureOr<AuthState> build() async => AuthState(user: _user);
+}
+
+User _b40TestUser(int id) => User(
+      id: id,
+      fullName: 'B40 User',
+      username: 'b40user',
+      passwordHash: 'hash',
+      roleId: 1,
+      isActive: true,
+      refundLimit: 100000,
+      createdAt: DateTime(2026, 1, 1),
+    );
+
+List<Override> _b40CreateUiOverrides({
+  required _CountingOtherIncomeCreationService spy,
+  required int categoryId,
+  required int userId,
+}) {
+  return [
+    otherIncomeCreationServiceProvider.overrideWithValue(spy),
+    authProvider.overrideWith(() => _B40CreateAuthNotifier(_b40TestUser(userId))),
+    otherIncomeCategoriesProvider.overrideWith(
+      (ref) async => [
+        oi_cat.OtherIncomeCategory(
+          id: categoryId,
+          name: 'B40 Category',
+          isActive: true,
+        ),
+      ],
+    ),
+  ];
+}
+
+Future<void> _pumpOtherIncomeCreateDialog(
+  WidgetTester tester,
+  ProviderContainer container,
+) async {
+  await tester.binding.setSurfaceSize(const Size(800, 900));
+  addTearDown(() => tester.binding.setSurfaceSize(null));
+  await tester.pumpWidget(
+    UncontrolledProviderScope(
+      container: container,
+      child: const MaterialApp(
+        home: Scaffold(
+          body: OtherIncomeDialog(),
+        ),
+      ),
+    ),
+  );
+  for (var i = 0; i < 60; i++) {
+    await tester.pump(const Duration(milliseconds: 50));
+    final auth = container.read(authProvider);
+    if (auth.hasValue &&
+        auth.requireValue.user != null &&
+        find.byType(DropdownButtonFormField<int>).evaluate().isNotEmpty) {
+      return;
+    }
+  }
+}
+
+Future<void> _selectB40Category(WidgetTester tester) async {
+  await tester.tap(find.byType(DropdownButtonFormField<int>));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('B40 Category').last);
+  await tester.pumpAndSettle();
+}
+
+Finder _otherIncomeAmountField() =>
+    find.byKey(const Key('other_income_dialog_amount'));
+
+Future<void> _flushOtherIncomeDialogUi(WidgetTester tester) async {
+  await tester.pump();
+  await tester.runAsync(() async {
+    for (var i = 0; i < 30; i++) {
+      await Future<void>.delayed(Duration.zero);
+    }
+  });
+  await tester.pump();
+}
 
 Future<({sqlite3.Database rawDb, String path})> openSimulatedV45RawDatabase() async {
   final dbPath =
@@ -691,6 +834,257 @@ void main() {
         postIncome(idempotencyKey: key, fingerprint: fpB, notes: 'second'),
         throwsA(isA<OtherIncomeCreationIdempotencyConflictException>()),
       );
+    });
+  });
+
+  group('B40 other income submit runner', () {
+    test('skips second submit while in flight', () async {
+      final runner = OtherIncomeSubmitRunner();
+      final gate = Completer<void>();
+      final intent = OtherIncomeSubmitIntent.create(
+        categoryId: 1,
+        amount: 50,
+        incomeDate: DateTime(2026, 3, 15),
+        receivedAt: DateTime(2026, 3, 15),
+        notes: 'n',
+        sessionId: null,
+        createdBy: 1,
+      );
+      var calls = 0;
+
+      final firstFuture = runner.submit(
+        intent: intent,
+        idempotencyKey: 'key-a',
+        isSubmitStillCurrent: () => true,
+        invokeService: (_) async {
+          calls++;
+          await gate.future;
+        },
+        postSuccessRefresh: () async {},
+      );
+
+      final second = await runner.submit(
+        intent: intent,
+        idempotencyKey: 'key-a',
+        isSubmitStillCurrent: () => true,
+        invokeService: (_) async {
+          calls++;
+        },
+        postSuccessRefresh: () async {},
+      );
+
+      expect(second, OtherIncomeSubmitOutcome.skippedInFlight);
+      gate.complete();
+      await firstFuture;
+      expect(calls, 1);
+    });
+
+    test('stale completion skips post-success refresh', () async {
+      final runner = OtherIncomeSubmitRunner();
+      var current = true;
+      var refreshCalls = 0;
+      final intent = OtherIncomeSubmitIntent.create(
+        categoryId: 1,
+        amount: 50,
+        incomeDate: DateTime(2026, 3, 15),
+        receivedAt: DateTime(2026, 3, 15),
+        notes: 'stale',
+        sessionId: null,
+        createdBy: 1,
+      );
+
+      final outcome = await runner.submit(
+        intent: intent,
+        idempotencyKey: 'key-stale',
+        isSubmitStillCurrent: () => current,
+        invokeService: (_) async {
+          current = false;
+        },
+        postSuccessRefresh: () async {
+          refreshCalls++;
+        },
+      );
+
+      expect(outcome, OtherIncomeSubmitOutcome.staleCompletion);
+      expect(refreshCalls, 0);
+    });
+  });
+
+  group('B40 other income dialog UI idempotency — create', () {
+    late AppDatabase uiDb;
+    late int uiCategoryId;
+    late int uiUserId;
+    late _CountingOtherIncomeCreationService spy;
+
+    setUp(() async {
+      TestWidgetsFlutterBinding.ensureInitialized();
+      OtherIncomeDialog.resetOtherIncomeSubmitTestingHooks();
+      uiDb = AppDatabase.test();
+      uiUserId = await uiDb.into(uiDb.usersTable).insert(
+            UsersTableCompanion.insert(
+              fullName: 'B40 UI User',
+              username: 'b40ui_${DateTime.now().microsecondsSinceEpoch}',
+              passwordHash: 'hash',
+              roleId: 1,
+            ),
+          );
+      uiCategoryId = await uiDb.otherIncomeDao.createCategory(
+        const OtherIncomeCategoriesCompanion(
+          name: Value('B40 Category'),
+          isActive: Value(true),
+        ),
+      );
+      spy = _CountingOtherIncomeCreationService(uiDb);
+    });
+
+    tearDown(() async {
+      OtherIncomeDialog.resetOtherIncomeSubmitTestingHooks();
+      await uiDb.close();
+    });
+
+    Future<ProviderContainer> openDialog(WidgetTester tester) async {
+      final container = ProviderContainer(
+        overrides: _b40CreateUiOverrides(
+          spy: spy,
+          categoryId: uiCategoryId,
+          userId: uiUserId,
+        ),
+      );
+      addTearDown(container.dispose);
+      await _pumpOtherIncomeCreateDialog(tester, container);
+      await _selectB40Category(tester);
+      await tester.enterText(_otherIncomeAmountField(), '100');
+      await tester.pump();
+      return container;
+    }
+
+    testWidgets('duplicate in-flight create invokes processCreate once',
+        (tester) async {
+      final gate = Completer<void>();
+      addTearDown(() {
+        if (!gate.isCompleted) gate.complete();
+      });
+      spy = _CountingOtherIncomeCreationService(uiDb, saveGate: gate);
+      await openDialog(tester);
+
+      final save = find.byKey(const Key('other_income_dialog_save'));
+      await tester.tap(save);
+      await _flushOtherIncomeDialogUi(tester);
+      expect(spy.createCalls, 1);
+      expect(tester.widget<ElevatedButton>(save).onPressed, isNull);
+
+      gate.complete();
+      await _flushOtherIncomeDialogUi(tester);
+    });
+
+    testWidgets('stale completion does not close dialog or refresh',
+        (tester) async {
+      final gate = Completer<void>();
+      addTearDown(() {
+        if (!gate.isCompleted) gate.complete();
+      });
+      spy = _CountingOtherIncomeCreationService(uiDb, saveGate: gate);
+
+      await openDialog(tester);
+
+      await tester.tap(find.byKey(const Key('other_income_dialog_save')));
+      await _flushOtherIncomeDialogUi(tester);
+      expect(spy.createCalls, 1);
+      OtherIncomeDialog.invalidateSubmitGenerationForTesting();
+      gate.complete();
+      await tester.pumpAndSettle();
+
+      expect(find.byType(OtherIncomeDialog), findsOneWidget);
+      expect(OtherIncomeDialog.postSuccessRefreshCount, 0);
+      expect(
+        find.text('تم تجاهل نتيجة حفظ سابقة بعد تغيير البيانات.'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('success closes dialog and refreshes once', (tester) async {
+      await openDialog(tester);
+
+      await tester.tap(find.byKey(const Key('other_income_dialog_save')));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(OtherIncomeDialog), findsNothing);
+      expect(spy.createCalls, 1);
+      expect(OtherIncomeDialog.postSuccessRefreshCount, 1);
+    });
+
+    testWidgets('conflict clears key for next attempt', (tester) async {
+      spy.throwConflict = true;
+      await openDialog(tester);
+
+      await tester.tap(find.byKey(const Key('other_income_dialog_save')));
+      await tester.pumpAndSettle();
+
+      spy.throwConflict = false;
+      await tester.tap(find.byKey(const Key('other_income_dialog_save')));
+      await tester.pumpAndSettle();
+
+      expect(spy.createCalls, 2);
+      expect(spy.keysUsed.length, 2);
+      expect(spy.keysUsed[0], isNot(spy.keysUsed[1]));
+    });
+
+    testWidgets('service failure retry reuses same key', (tester) async {
+      spy.throwOnce = true;
+      await openDialog(tester);
+
+      await tester.tap(find.byKey(const Key('other_income_dialog_save')));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('other_income_dialog_save')));
+      await tester.pumpAndSettle();
+
+      expect(spy.createCalls, 2);
+      expect(spy.keysUsed.length, 2);
+      expect(spy.keysUsed[0], spy.keysUsed[1]);
+    });
+
+    testWidgets('refresh failure retains key then succeeds', (tester) async {
+      OtherIncomeDialog.failNextPostSuccessRefreshForTesting = true;
+      await openDialog(tester);
+
+      await tester.tap(find.byKey(const Key('other_income_dialog_save')));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(OtherIncomeDialog), findsOneWidget);
+      expect(
+        find.text('تم حفظ الإيراد، لكن تعذر تحديث العرض. أعد المحاولة.'),
+        findsOneWidget,
+      );
+
+      OtherIncomeDialog.failNextPostSuccessRefreshForTesting = false;
+      await tester.tap(find.byKey(const Key('other_income_dialog_save')));
+      await tester.pumpAndSettle();
+
+      expect(spy.createCalls, 2);
+      expect(spy.keysUsed[0], spy.keysUsed[1]);
+      expect(find.byType(OtherIncomeDialog), findsNothing);
+    });
+
+    testWidgets('intent fields disabled while saving', (tester) async {
+      final gate = Completer<void>();
+      addTearDown(() {
+        if (!gate.isCompleted) gate.complete();
+      });
+      spy = _CountingOtherIncomeCreationService(uiDb, saveGate: gate);
+
+      await openDialog(tester);
+
+      await tester.tap(find.byKey(const Key('other_income_dialog_save')));
+      await _flushOtherIncomeDialogUi(tester);
+      expect(spy.createCalls, 1);
+
+      final amountField =
+          tester.widget<TextFormField>(_otherIncomeAmountField());
+      expect(amountField.enabled, isFalse);
+
+      gate.complete();
+      await _flushOtherIncomeDialogUi(tester);
     });
   });
 }

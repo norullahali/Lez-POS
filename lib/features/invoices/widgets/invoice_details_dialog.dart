@@ -6,7 +6,6 @@ import 'package:uuid/uuid.dart';
 
 import '../../../core/constants/invoice_lifecycle.dart';
 import '../../../core/database/app_database.dart';
-import '../../../core/services/customer_invoice_return_fingerprint.dart';
 import '../../../core/services/customer_invoice_return_idempotency_conflict_exception.dart';
 import '../../../core/services/partial_return_service.dart';
 import '../../../core/activity/activity_categories.dart';
@@ -28,6 +27,7 @@ import '../../returns/providers/customer_invoice_return_service_provider.dart';
 import '../../returns/providers/partial_return_provider.dart';
 import '../../returns/providers/return_analytics_provider.dart';
 import '../../returns/screens/customer_returns_screen.dart';
+import '../customer_invoice_return_submit_idempotency.dart';
 import '../models/invoice_detail.dart';
 import '../models/invoice_history_row.dart' show invoicePaymentLabelAr;
 import '../providers/invoice_history_provider.dart';
@@ -63,6 +63,33 @@ class InvoiceDetailsDialog extends ConsumerStatefulWidget {
   static final _df = DateFormat('yyyy/MM/dd HH:mm');
   static final _money = NumberFormat('#,##0.##');
 
+  /// When set, full/partial return invoice lookups use this DB (B38 widget tests).
+  @visibleForTesting
+  static AppDatabase? invoiceLookupDatabaseOverride;
+
+  /// When true, the next post-success refresh throws once (B38 widget tests).
+  @visibleForTesting
+  static bool failNextPostSuccessRefreshForTesting = false;
+
+  /// Counts successful post-success refresh invocations (B38 widget tests).
+  @visibleForTesting
+  static int fullReturnPostSuccessRefreshCount = 0;
+
+  @visibleForTesting
+  static int partialReturnPostSuccessRefreshCount = 0;
+
+  @visibleForTesting
+  static int invoicePartialReturnOnDoneCount = 0;
+
+  @visibleForTesting
+  static void resetInvoiceReturnTestingHooks() {
+    invoiceLookupDatabaseOverride = null;
+    failNextPostSuccessRefreshForTesting = false;
+    fullReturnPostSuccessRefreshCount = 0;
+    partialReturnPostSuccessRefreshCount = 0;
+    invoicePartialReturnOnDoneCount = 0;
+  }
+
   @override
   ConsumerState<InvoiceDetailsDialog> createState() =>
       _InvoiceDetailsDialogState();
@@ -72,12 +99,72 @@ const _invoiceReturnUuid = Uuid();
 
 class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
   bool _returning = false;
+  bool _fullReturnNoteDialogOpen = false;
   String? _fullReturnIdempotencyKey;
-  String? _pendingFullFingerprint;
+  int _fullSubmitGeneration = 0;
+  final CustomerInvoiceReturnSubmitRunner _fullSubmitRunner =
+      CustomerInvoiceReturnSubmitRunner();
+  String? _pendingFullServiceFailureMessage;
+
+  AppDatabase get _invoiceLookupDatabase =>
+      InvoiceDetailsDialog.invoiceLookupDatabaseOverride ??
+      AppDatabase.instance;
 
   void _clearFullSubmitAttempt() {
     _fullReturnIdempotencyKey = null;
-    _pendingFullFingerprint = null;
+  }
+
+  void _handleFullReturnOutcome(CustomerInvoiceReturnSubmitOutcome outcome) {
+    if (!mounted) return;
+    switch (outcome) {
+      case CustomerInvoiceReturnSubmitOutcome.skippedInFlight:
+        break;
+      case CustomerInvoiceReturnSubmitOutcome.success:
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+          const SnackBar(
+            content: Text('تم إرجاع الفاتورة بنجاح واستعادة المخزون.'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+        _clearFullSubmitAttempt();
+      case CustomerInvoiceReturnSubmitOutcome.postSuccessRefreshFailed:
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+          const SnackBar(
+            content: Text(
+              'تم حفظ الإرجاع، لكن تعذر تحديث العرض. أعد المحاولة.',
+            ),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      case CustomerInvoiceReturnSubmitOutcome.idempotencyConflict:
+        _clearFullSubmitAttempt();
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+          const SnackBar(
+            content: Text(
+              'تعارض في عملية المرتجع. أعد فتح نافذة الفاتورة وحاول مرة أخرى.',
+            ),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      case CustomerInvoiceReturnSubmitOutcome.serviceFailure:
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+          SnackBar(
+            content: Text(
+              _pendingFullServiceFailureMessage ?? 'تعذر إرجاع الفاتورة',
+            ),
+            backgroundColor: AppColors.error,
+          ),
+        );
+        _pendingFullServiceFailureMessage = null;
+      case CustomerInvoiceReturnSubmitOutcome.staleCompletion:
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+          const SnackBar(
+            content: Text(
+              'تم تجاهل نتيجة إرجاع سابقة بعد تغيير البيانات.',
+            ),
+          ),
+        );
+    }
   }
 
   Future<void> _reprint(BuildContext context, InvoiceDetailData data) async {
@@ -150,8 +237,15 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
     )) {
       return;
     }
+    if (_returning ||
+        _fullSubmitRunner.inFlight ||
+        _fullReturnNoteDialogOpen) {
+      return;
+    }
 
+    _fullReturnNoteDialogOpen = true;
     final note = await _showReturnConfirmDialog(context);
+    _fullReturnNoteDialogOpen = false;
     if (note == null) return;
     if (!mounted) return;
 
@@ -168,6 +262,7 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
         entityId: widget.invoiceId,
         metadata: {'note': note},
       );
+      if (!context.mounted) return;
       ScaffoldMessenger.maybeOf(context)?.showSnackBar(
         const SnackBar(
           content:
@@ -178,8 +273,8 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
       return;
     }
 
-    final invoice =
-        await AppDatabase.instance.salesDao.getInvoiceById(widget.invoiceId);
+    final invoice = await _invoiceLookupDatabase.salesDao
+        .getInvoiceById(widget.invoiceId);
     if (invoice == null) {
       if (!context.mounted) return;
       ScaffoldMessenger.maybeOf(context)?.showSnackBar(
@@ -190,72 +285,74 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
       );
       return;
     }
+    final invoiceCustomerId = invoice.customerId;
+    if (invoiceCustomerId == null) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        const SnackBar(
+          content: Text('الفاتورة غير مرتبطة بعميل'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
 
-    final fingerprint = CustomerInvoiceReturnFingerprint.computeFull(
-      customerId: invoice.customerId,
+    final generation = ++_fullSubmitGeneration;
+    final intent = CustomerInvoiceReturnSubmitIntent.full(
       saleInvoiceId: widget.invoiceId,
+      customerId: invoiceCustomerId,
+      returnedByUserId: userId,
       note: note,
     );
-    if (_pendingFullFingerprint != null &&
-        _pendingFullFingerprint != fingerprint) {
-      _clearFullSubmitAttempt();
-    }
-    _pendingFullFingerprint = fingerprint;
+
     _fullReturnIdempotencyKey ??= _invoiceReturnUuid.v4();
+    final paymentKey = _fullReturnIdempotencyKey!;
 
     setState(() => _returning = true);
     try {
-      await ref.read(customerInvoiceReturnServiceProvider).processFullReturn(
-            idempotencyKey: _fullReturnIdempotencyKey!,
-            saleInvoiceId: widget.invoiceId,
-            returnedByUserId: userId,
-            note: note,
-          );
+      final outcome = await _fullSubmitRunner.submit(
+        intent: intent,
+        idempotencyKey: paymentKey,
+        isSubmitStillCurrent: () =>
+            mounted && generation == _fullSubmitGeneration,
+        invokeService: (idempotencyKey) async {
+          try {
+            return await ref
+                .read(customerInvoiceReturnServiceProvider)
+                .processFullReturn(
+                  idempotencyKey: idempotencyKey,
+                  saleInvoiceId: intent.saleInvoiceId,
+                  returnedByUserId: intent.returnedByUserId,
+                  note: intent.note,
+                );
+          } on CustomerInvoiceReturnIdempotencyConflictException {
+            rethrow;
+          } on StateError catch (e) {
+            _pendingFullServiceFailureMessage = e.message;
+            rethrow;
+          } catch (e) {
+            _pendingFullServiceFailureMessage = 'تعذر إرجاع الفاتورة: $e';
+            rethrow;
+          }
+        },
+        postSuccessRefresh: (_) async {
+          if (InvoiceDetailsDialog.failNextPostSuccessRefreshForTesting) {
+            InvoiceDetailsDialog.failNextPostSuccessRefreshForTesting = false;
+            throw Exception('fail refresh');
+          }
+          InvoiceDetailsDialog.fullReturnPostSuccessRefreshCount++;
+          ref.invalidate(invoiceDetailProvider(widget.invoiceId));
+          ref.invalidate(invoicePartialReturnQtysProvider(widget.invoiceId));
+          ref.invalidate(invoiceLinkedCustomerReturnProvider(widget.invoiceId));
+          ref.invalidate(invoiceHistoryPageProvider);
+          ref.invalidate(customerReturnsProvider);
+          ref.invalidate(productsNotifierProvider);
+          ref.invalidate(posProductsProvider);
+          invalidateReturnAnalytics(ref);
+        },
+      );
 
-      _clearFullSubmitAttempt();
-      ref.invalidate(invoiceDetailProvider(widget.invoiceId));
-      ref.invalidate(invoicePartialReturnQtysProvider(widget.invoiceId));
-      ref.invalidate(invoiceLinkedCustomerReturnProvider(widget.invoiceId));
-      ref.invalidate(invoiceHistoryPageProvider);
-      ref.invalidate(customerReturnsProvider);
-      ref.invalidate(productsNotifierProvider);
-      ref.invalidate(posProductsProvider);
-      invalidateReturnAnalytics(ref);
-
-      if (!context.mounted) return;
-      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-        const SnackBar(
-          content: Text('تم إرجاع الفاتورة بنجاح واستعادة المخزون.'),
-          backgroundColor: AppColors.success,
-        ),
-      );
-    } on CustomerInvoiceReturnIdempotencyConflictException {
-      if (!context.mounted) return;
-      _clearFullSubmitAttempt();
-      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-        const SnackBar(
-          content: Text(
-            'تعارض في عملية المرتجع. أعد فتح نافذة الفاتورة وحاول مرة أخرى.',
-          ),
-          backgroundColor: AppColors.error,
-        ),
-      );
-    } on StateError catch (e) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-        SnackBar(
-          content: Text(e.message),
-          backgroundColor: AppColors.error,
-        ),
-      );
-    } catch (e) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-        SnackBar(
-          content: Text('تعذر إرجاع الفاتورة: $e'),
-          backgroundColor: AppColors.error,
-        ),
-      );
+      _handleFullReturnOutcome(outcome);
     } finally {
       if (mounted) setState(() => _returning = false);
     }
@@ -263,6 +360,7 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
 
   /// Called by [_PartialReturnSection] after a successful partial return.
   void _onPartialReturnDone() {
+    InvoiceDetailsDialog.invoicePartialReturnOnDoneCount++;
     ref.invalidate(invoiceDetailProvider(widget.invoiceId));
     ref.invalidate(invoicePartialReturnQtysProvider(widget.invoiceId));
     ref.invalidate(invoiceLinkedCustomerReturnProvider(widget.invoiceId));
@@ -573,6 +671,7 @@ class _InvoiceDetailBody extends ConsumerWidget {
                           ? 'إرجاع جميع الكميات المتبقية واستعادة المخزون'
                           : 'إرجاع كامل مع استعادة المخزون',
                   child: FilledButton.icon(
+                    key: const Key('invoice_full_return_submit'),
                     onPressed: canReturnAll ? onFullReturn : null,
                     style: FilledButton.styleFrom(
                       backgroundColor: AppColors.warning,
@@ -668,12 +767,129 @@ class _PartialReturnSection extends ConsumerStatefulWidget {
 class _PartialReturnSectionState extends ConsumerState<_PartialReturnSection> {
   final Map<int, TextEditingController> _controllers = {};
   bool _submitting = false;
+  bool _partialNoteDialogOpen = false;
   String? _submitIdempotencyKey;
-  String? _pendingPartialFingerprint;
+  int _partialSubmitGeneration = 0;
+  final CustomerInvoiceReturnSubmitRunner _partialSubmitRunner =
+      CustomerInvoiceReturnSubmitRunner();
+  String? _pendingPartialServiceFailureMessage;
+
+  AppDatabase get _invoiceLookupDatabase =>
+      InvoiceDetailsDialog.invoiceLookupDatabaseOverride ??
+      AppDatabase.instance;
+
+  void _invalidatePartialSubmitGeneration() {
+    _partialSubmitGeneration++;
+    _submitIdempotencyKey = null;
+  }
 
   void _clearSubmitAttempt() {
     _submitIdempotencyKey = null;
-    _pendingPartialFingerprint = null;
+  }
+
+  void _handlePartialReturnOutcome(CustomerInvoiceReturnSubmitOutcome outcome) {
+    if (!mounted) return;
+    switch (outcome) {
+      case CustomerInvoiceReturnSubmitOutcome.skippedInFlight:
+        break;
+      case CustomerInvoiceReturnSubmitOutcome.success:
+        for (final c in _controllers.values) {
+          c.clear();
+        }
+        _clearSubmitAttempt();
+        if (!context.mounted) return;
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+          const SnackBar(
+            content: Text('تم تنفيذ الإرجاع الجزئي بنجاح واستعادة المخزون.'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+        widget.onDone();
+      case CustomerInvoiceReturnSubmitOutcome.postSuccessRefreshFailed:
+        if (!context.mounted) return;
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+          const SnackBar(
+            content: Text(
+              'تم حفظ الإرجاع، لكن تعذر تحديث العرض. أعد المحاولة.',
+            ),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      case CustomerInvoiceReturnSubmitOutcome.idempotencyConflict:
+        _clearSubmitAttempt();
+        _showError(
+          context,
+          'تعارض في عملية المرتجع. أعد فتح نافذة الفاتورة وحاول مرة أخرى.',
+        );
+      case CustomerInvoiceReturnSubmitOutcome.serviceFailure:
+        _showError(
+          context,
+          _pendingPartialServiceFailureMessage ??
+              'تعذر تنفيذ الإرجاع الجزئي',
+        );
+        _pendingPartialServiceFailureMessage = null;
+      case CustomerInvoiceReturnSubmitOutcome.staleCompletion:
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+          const SnackBar(
+            content: Text(
+              'تم تجاهل نتيجة إرجاع سابقة بعد تغيير البيانات.',
+            ),
+          ),
+        );
+    }
+  }
+
+  /// Returns null when validation fails (and shows an error when [showErrors]).
+  List<PartialReturnLine>? _collectPartialLinesFromControllers(
+    BuildContext context,
+    Map<int, double> alreadyReturned, {
+    required bool showErrors,
+  }) {
+    final m = NumberFormat('#,##0.##');
+    final lines = <PartialReturnLine>[];
+
+    for (final line in widget.lines) {
+      final text = _controllers[line.id]?.text.trim() ?? '';
+      if (text.isEmpty || text == '0') continue;
+
+      final qty = double.tryParse(text);
+      if (qty == null || qty <= 0) {
+        if (showErrors) {
+          _showError(context, 'كمية غير صحيحة للصنف: ${line.productName}');
+        }
+        return null;
+      }
+
+      final available = (line.quantity - (alreadyReturned[line.id] ?? 0.0))
+          .clamp(0.0, double.infinity);
+
+      if (qty > available + 0.0001) {
+        if (showErrors) {
+          _showError(
+            context,
+            'كمية الإرجاع (${m.format(qty)}) تتجاوز المتاح (${m.format(available)}) للصنف: ${line.productName}',
+          );
+        }
+        return null;
+      }
+
+      lines.add(PartialReturnLine(
+        saleItemId: line.id,
+        productId: line.productId,
+        quantity: qty,
+        unitPrice: line.unitPrice,
+        unitCost: line.unitCost,
+      ));
+    }
+
+    if (lines.isEmpty) {
+      if (showErrors) {
+        _showError(context, 'أدخل كمية إرجاع لصنف واحد على الأقل.');
+      }
+      return null;
+    }
+
+    return lines;
   }
 
   @override
@@ -681,7 +897,7 @@ class _PartialReturnSectionState extends ConsumerState<_PartialReturnSection> {
     super.initState();
     for (final line in widget.lines) {
       final controller = TextEditingController();
-      controller.addListener(_clearSubmitAttempt);
+      controller.addListener(_invalidatePartialSubmitGeneration);
       _controllers[line.id] = controller;
     }
   }
@@ -689,6 +905,7 @@ class _PartialReturnSectionState extends ConsumerState<_PartialReturnSection> {
   @override
   void dispose() {
     for (final c in _controllers.values) {
+      c.removeListener(_invalidatePartialSubmitGeneration);
       c.dispose();
     }
     super.dispose();
@@ -774,6 +991,7 @@ class _PartialReturnSectionState extends ConsumerState<_PartialReturnSection> {
               Align(
                 alignment: AlignmentDirectional.centerStart,
                 child: FilledButton.icon(
+                  key: const Key('invoice_partial_return_submit'),
                   onPressed: _submitting
                       ? null
                       : () => _submit(context, alreadyReturned),
@@ -819,52 +1037,37 @@ class _PartialReturnSectionState extends ConsumerState<_PartialReturnSection> {
     BuildContext context,
     Map<int, double> alreadyReturned,
   ) async {
-    final m = NumberFormat('#,##0.##');
-    final lines = <PartialReturnLine>[];
-
-    for (final line in widget.lines) {
-      final text = _controllers[line.id]?.text.trim() ?? '';
-      if (text.isEmpty || text == '0') continue;
-
-      final qty = double.tryParse(text);
-      if (qty == null || qty <= 0) {
-        _showError(context, 'كمية غير صحيحة للصنف: ${line.productName}');
-        return;
-      }
-
-      final available = (line.quantity - (alreadyReturned[line.id] ?? 0.0))
-          .clamp(0.0, double.infinity);
-
-      if (qty > available + 0.0001) {
-        _showError(
-          context,
-          'كمية الإرجاع (${m.format(qty)}) تتجاوز المتاح (${m.format(available)}) للصنف: ${line.productName}',
-        );
-        return;
-      }
-
-      lines.add(PartialReturnLine(
-        saleItemId: line.id,
-        productId: line.productId,
-        quantity: qty,
-        unitPrice: line.unitPrice,
-        unitCost: line.unitCost,
-      ));
-    }
-
-    if (lines.isEmpty) {
-      _showError(context, 'أدخل كمية إرجاع لصنف واحد على الأقل.');
+    if (_submitting ||
+        _partialSubmitRunner.inFlight ||
+        _partialNoteDialogOpen) {
       return;
     }
 
-    // Show note dialog
+    if (_collectPartialLinesFromControllers(
+          context,
+          alreadyReturned,
+          showErrors: true,
+        ) ==
+        null) {
+      return;
+    }
+
+    _partialNoteDialogOpen = true;
     final note = await showDialog<String>(
       context: context,
       barrierDismissible: false,
       builder: (_) => _PartialReturnNoteDialog(),
     );
+    _partialNoteDialogOpen = false;
     if (note == null) return;
     if (!context.mounted) return;
+
+    final linesAfterNote = _collectPartialLinesFromControllers(
+      context,
+      alreadyReturned,
+      showErrors: true,
+    );
+    if (linesAfterNote == null) return;
 
     final userId = ref.read(authProvider).valueOrNull?.user?.id;
     if (userId == null) {
@@ -874,14 +1077,20 @@ class _PartialReturnSectionState extends ConsumerState<_PartialReturnSection> {
       return;
     }
 
-    final invoice =
-        await AppDatabase.instance.salesDao.getInvoiceById(widget.invoiceId);
+    final invoice = await _invoiceLookupDatabase.salesDao
+        .getInvoiceById(widget.invoiceId);
+    if (!context.mounted) return;
     if (invoice == null) {
       _showError(context, 'الفاتورة غير موجودة');
       return;
     }
+    final invoiceCustomerId = invoice.customerId;
+    if (invoiceCustomerId == null) {
+      _showError(context, 'الفاتورة غير مرتبطة بعميل');
+      return;
+    }
 
-    final partialLines = lines
+    final partialLines = linesAfterNote
         .map(
           (line) => CustomerInvoicePartialReturnLine(
             saleItemId: line.saleItemId,
@@ -889,64 +1098,58 @@ class _PartialReturnSectionState extends ConsumerState<_PartialReturnSection> {
           ),
         )
         .toList();
-    final fingerprint = CustomerInvoiceReturnFingerprint.computePartial(
-      customerId: invoice.customerId,
+
+    final generation = ++_partialSubmitGeneration;
+    final intent = CustomerInvoiceReturnSubmitIntent.partial(
       saleInvoiceId: widget.invoiceId,
-      lines: partialLines
-          .map(
-            (line) => CustomerInvoicePartialReturnLineInput(
-              saleItemId: line.saleItemId,
-              quantity: line.quantity,
-            ),
-          )
-          .toList(),
+      customerId: invoiceCustomerId,
+      returnedByUserId: userId,
       note: note,
+      partialLines: partialLines,
     );
-    if (_pendingPartialFingerprint != null &&
-        _pendingPartialFingerprint != fingerprint) {
-      _clearSubmitAttempt();
-    }
-    _pendingPartialFingerprint = fingerprint;
+
     _submitIdempotencyKey ??= _invoiceReturnUuid.v4();
+    final submitKey = _submitIdempotencyKey!;
 
     setState(() => _submitting = true);
     try {
-      await ref.read(customerInvoiceReturnServiceProvider).processPartialReturn(
-            idempotencyKey: _submitIdempotencyKey!,
-            saleInvoiceId: widget.invoiceId,
-            lines: partialLines,
-            returnedByUserId: userId,
-            note: note,
-          );
-
-      _clearSubmitAttempt();
-      for (final c in _controllers.values) {
-        c.clear();
-      }
-
-      if (!context.mounted) return;
-      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-        const SnackBar(
-          content: Text('تم تنفيذ الإرجاع الجزئي بنجاح واستعادة المخزون.'),
-          backgroundColor: AppColors.success,
-        ),
+      final outcome = await _partialSubmitRunner.submit(
+        intent: intent,
+        idempotencyKey: submitKey,
+        isSubmitStillCurrent: () =>
+            mounted && generation == _partialSubmitGeneration,
+        invokeService: (idempotencyKey) async {
+          try {
+            return await ref
+                .read(customerInvoiceReturnServiceProvider)
+                .processPartialReturn(
+                  idempotencyKey: idempotencyKey,
+                  saleInvoiceId: intent.saleInvoiceId,
+                  lines: intent.partialLines!,
+                  returnedByUserId: intent.returnedByUserId,
+                  note: intent.note,
+                );
+          } on CustomerInvoiceReturnIdempotencyConflictException {
+            rethrow;
+          } on StateError catch (e) {
+            _pendingPartialServiceFailureMessage = e.message;
+            rethrow;
+          } catch (e) {
+            _pendingPartialServiceFailureMessage =
+                'تعذر تنفيذ الإرجاع الجزئي: $e';
+            rethrow;
+          }
+        },
+        postSuccessRefresh: (_) async {
+          if (InvoiceDetailsDialog.failNextPostSuccessRefreshForTesting) {
+            InvoiceDetailsDialog.failNextPostSuccessRefreshForTesting = false;
+            throw Exception('fail refresh');
+          }
+          InvoiceDetailsDialog.partialReturnPostSuccessRefreshCount++;
+        },
       );
 
-      // Tell parent dialog to invalidate & reload
-      widget.onDone();
-    } on CustomerInvoiceReturnIdempotencyConflictException {
-      if (!context.mounted) return;
-      _clearSubmitAttempt();
-      _showError(
-        context,
-        'تعارض في عملية المرتجع. أعد فتح نافذة الفاتورة وحاول مرة أخرى.',
-      );
-    } on StateError catch (e) {
-      if (!context.mounted) return;
-      _showError(context, e.message);
-    } catch (e) {
-      if (!context.mounted) return;
-      _showError(context, 'تعذر تنفيذ الإرجاع الجزئي: $e');
+      _handlePartialReturnOutcome(outcome);
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
@@ -1060,6 +1263,7 @@ class _LineRow extends StatelessWidget {
                 ? const SizedBox.shrink()
                 : canInput
                     ? TextField(
+                        key: Key('invoice_partial_return_qty_${line.id}'),
                         controller: controller,
                         textAlign: TextAlign.center,
                         keyboardType: const TextInputType.numberWithOptions(
@@ -1451,6 +1655,7 @@ class _ReturnConfirmDialogState extends State<_ReturnConfirmDialog> {
                 ),
                 const SizedBox(height: 8),
                 TextFormField(
+                  key: const Key('invoice_full_return_note_field'),
                   controller: _noteController,
                   textDirection: TextDirection.rtl,
                   maxLines: 3,
@@ -1530,6 +1735,7 @@ class _PartialReturnNoteDialogState extends State<_PartialReturnNoteDialog> {
         content: Form(
           key: _formKey,
           child: TextFormField(
+            key: const Key('invoice_partial_return_note_field'),
             controller: _controller,
             textDirection: TextDirection.rtl,
             maxLines: 3,

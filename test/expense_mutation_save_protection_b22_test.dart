@@ -4,6 +4,8 @@ import 'dart:io';
 import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:drift/native.dart';
 import 'package:drift/native.dart' show SqliteException;
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lez_pos/core/activity/activity_types.dart';
 import 'package:lez_pos/core/database/app_database.dart';
@@ -11,11 +13,136 @@ import 'package:lez_pos/core/services/expense_creation_fingerprint.dart';
 import 'package:lez_pos/core/services/expense_creation_service.dart';
 import 'package:lez_pos/core/services/expense_mutation_fingerprint.dart';
 import 'package:lez_pos/core/services/expense_mutation_save_idempotency_conflict_exception.dart';
+import 'package:lez_pos/core/services/expense_mutation_save_result.dart';
 import 'package:lez_pos/core/services/expense_mutation_save_service.dart';
+import 'package:lez_pos/features/auth/providers/auth_provider.dart';
+import 'package:lez_pos/features/expenses/models/expense_category.dart'
+    as expense_models;
+import 'package:lez_pos/features/expenses/models/expense_record.dart'
+    as expense_models;
+import 'package:lez_pos/features/expenses/providers/expense_mutation_save_service_provider.dart';
+import 'package:lez_pos/features/expenses/providers/expense_providers.dart';
+import 'package:lez_pos/features/expenses/screens/widgets/expense_dialog.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite3;
 
 import 'support/expense_creation_test_keys.dart';
 import 'support/expense_mutation_save_test_keys.dart';
+
+class _CountingExpenseMutationSaveService extends ExpenseMutationSaveService {
+  _CountingExpenseMutationSaveService(
+    AppDatabase database, {
+    Completer<void>? saveGate,
+  })  : _saveGate = saveGate,
+        super(database);
+
+  final Completer<void>? _saveGate;
+  bool throwConflict = false;
+  bool throwOnce = false;
+  int updateCalls = 0;
+  final List<String> keysUsed = [];
+
+  @override
+  Future<ExpenseMutationSaveResult> processUpdate({
+    required String idempotencyKey,
+    required String fingerprintHash,
+    required int expenseId,
+    required int categoryId,
+    required double amount,
+    required DateTime expenseDate,
+    required DateTime paidAt,
+    required String notes,
+    required int updatedBy,
+    int? sessionId,
+  }) async {
+    updateCalls++;
+    keysUsed.add(idempotencyKey);
+    if (throwOnce) {
+      throwOnce = false;
+      throw Exception('forced update failure');
+    }
+    if (throwConflict) {
+      throw const ExpenseMutationSaveIdempotencyConflictException();
+    }
+    if (_saveGate != null) {
+      await _saveGate!.future;
+    }
+    return ExpenseMutationSaveResult(
+      expenseRecordId: expenseId,
+      idempotentReplay: false,
+    );
+  }
+}
+
+class _B39UpdateAuthNotifier extends AuthNotifier {
+  _B39UpdateAuthNotifier(this._user);
+
+  final User _user;
+
+  @override
+  FutureOr<AuthState> build() async => AuthState(user: _user);
+}
+
+List<Override> _b39UpdateUiOverrides({
+  required _CountingExpenseMutationSaveService spy,
+  required int categoryId,
+  required int userId,
+}) {
+  return [
+    expenseMutationSaveServiceProvider.overrideWithValue(spy),
+    authProvider.overrideWith(() => _B39UpdateAuthNotifier(_b39UpdateUser(userId))),
+    expenseCategoriesProvider.overrideWith(
+      (ref) async => [
+        expense_models.ExpenseCategory(
+          id: categoryId,
+          name: 'B39 Update Category',
+          isActive: true,
+        ),
+      ],
+    ),
+  ];
+}
+
+User _b39UpdateUser(int id) => User(
+      id: id,
+      fullName: 'B39 Update User',
+      username: 'b39update',
+      passwordHash: 'hash',
+      roleId: 1,
+      isActive: true,
+      refundLimit: 100000,
+      createdAt: DateTime(2026, 1, 1),
+    );
+
+Future<void> _pumpExpenseEditDialog(
+  WidgetTester tester,
+  ProviderContainer container,
+  expense_models.ExpenseRecord existing,
+) async {
+  await tester.binding.setSurfaceSize(const Size(800, 900));
+  addTearDown(() => tester.binding.setSurfaceSize(null));
+  await tester.pumpWidget(
+    UncontrolledProviderScope(
+      container: container,
+      child: MaterialApp(
+        home: Scaffold(
+          body: ExpenseDialog(existing: existing),
+        ),
+      ),
+    ),
+  );
+  for (var i = 0; i < 60; i++) {
+    await tester.pump(const Duration(milliseconds: 50));
+    final auth = container.read(authProvider);
+    if (auth.hasValue &&
+        auth.requireValue.user != null &&
+        find.byKey(const Key('expense_dialog_save')).evaluate().isNotEmpty) {
+      return;
+    }
+  }
+}
+
+Finder _b39UpdateAmountField() =>
+    find.byKey(const Key('expense_dialog_amount'));
 
 Future<({sqlite3.Database rawDb, String path})> openSimulatedV48RawDatabase() async {
   final dbPath =
@@ -853,6 +980,242 @@ void main() {
                 e.extendedResultCode == 2067,
           ),
         ),
+      );
+    });
+  });
+
+  group('B39 expense dialog UI idempotency — update', () {
+    late AppDatabase uiDb;
+    late int uiCategoryId;
+    late int uiUserId;
+    late int uiExpenseId;
+    late _CountingExpenseMutationSaveService spy;
+
+    setUp(() async {
+      TestWidgetsFlutterBinding.ensureInitialized();
+      ExpenseDialog.resetExpenseSubmitTestingHooks();
+      uiDb = AppDatabase.test();
+      uiUserId = await uiDb.into(uiDb.usersTable).insert(
+            UsersTableCompanion.insert(
+              fullName: 'B39 Update UI',
+              username: 'b39up_${DateTime.now().microsecondsSinceEpoch}',
+              passwordHash: 'hash',
+              roleId: 1,
+            ),
+          );
+      uiCategoryId = await uiDb.expensesDao.createCategory(
+        const ExpenseCategoriesCompanion(
+          name: Value('B39 Update Category'),
+          isActive: Value(true),
+        ),
+      );
+      final createResult = await ExpenseCreationService(uiDb).processCreate(
+        idempotencyKey: b18ExpenseCreationIdempotencyKey(),
+        fingerprintHash: ExpenseCreationFingerprint.compute(
+          categoryId: uiCategoryId,
+          amount: 100,
+          expenseDate: expenseDate,
+          paidAt: paidAt,
+          notes: '',
+          sessionId: null,
+          createdBy: uiUserId,
+        ),
+        categoryId: uiCategoryId,
+        amount: 100,
+        expenseDate: expenseDate,
+        paidAt: paidAt,
+        notes: '',
+        createdBy: uiUserId,
+      );
+      uiExpenseId = createResult.expenseRecordId;
+      spy = _CountingExpenseMutationSaveService(uiDb);
+    });
+
+    tearDown(() async {
+      ExpenseDialog.resetExpenseSubmitTestingHooks();
+      await uiDb.close();
+    });
+
+    expense_models.ExpenseRecord existingRecord() =>
+        expense_models.ExpenseRecord(
+          id: uiExpenseId,
+          categoryId: uiCategoryId,
+          amount: 100,
+          expenseDate: expenseDate,
+          paidAt: paidAt,
+          notes: '',
+          createdBy: uiUserId,
+        );
+
+    Future<void> openEditDialog(WidgetTester tester) async {
+      final container = ProviderContainer(
+        overrides: _b39UpdateUiOverrides(
+          spy: spy,
+          categoryId: uiCategoryId,
+          userId: uiUserId,
+        ),
+      );
+      addTearDown(container.dispose);
+      await _pumpExpenseEditDialog(tester, container, existingRecord());
+      await tester.enterText(_b39UpdateAmountField(), '120');
+      await tester.pump();
+    }
+
+    testWidgets('duplicate in-flight update invokes processUpdate once',
+        (tester) async {
+      final gate = Completer<void>();
+      addTearDown(() {
+        if (!gate.isCompleted) gate.complete();
+      });
+      spy = _CountingExpenseMutationSaveService(uiDb, saveGate: gate);
+      await openEditDialog(tester);
+
+      await tester.tap(find.byKey(const Key('expense_dialog_save')));
+      await tester.pump();
+      await tester.runAsync(() async {
+        for (var i = 0; i < 20; i++) {
+          await Future<void>.delayed(Duration.zero);
+        }
+      });
+      await tester.pump();
+
+      expect(spy.updateCalls, 1);
+      gate.complete();
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('stale update does not close dialog', (tester) async {
+      final gate = Completer<void>();
+      addTearDown(() {
+        if (!gate.isCompleted) gate.complete();
+      });
+      spy = _CountingExpenseMutationSaveService(uiDb, saveGate: gate);
+      await openEditDialog(tester);
+
+      await tester.tap(find.byKey(const Key('expense_dialog_save')));
+      await tester.pump();
+      ExpenseDialog.invalidateSubmitGenerationForTesting();
+      gate.complete();
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ExpenseDialog), findsOneWidget);
+      expect(ExpenseDialog.postSuccessRefreshCount, 0);
+    });
+
+    testWidgets('update success closes dialog once', (tester) async {
+      await openEditDialog(tester);
+
+      await tester.tap(find.byKey(const Key('expense_dialog_save')));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ExpenseDialog), findsNothing);
+      expect(spy.updateCalls, 1);
+      expect(ExpenseDialog.postSuccessRefreshCount, 1);
+    });
+
+    testWidgets('update conflict clears key for retry', (tester) async {
+      spy.throwConflict = true;
+      await openEditDialog(tester);
+
+      await tester.tap(find.byKey(const Key('expense_dialog_save')));
+      await tester.pumpAndSettle();
+
+      spy.throwConflict = false;
+      await tester.tap(find.byKey(const Key('expense_dialog_save')));
+      await tester.pumpAndSettle();
+
+      expect(spy.updateCalls, 2);
+      expect(spy.keysUsed[0], isNot(spy.keysUsed[1]));
+    });
+
+    testWidgets('update service failure retry reuses key', (tester) async {
+      spy.throwOnce = true;
+      await openEditDialog(tester);
+
+      await tester.tap(find.byKey(const Key('expense_dialog_save')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('expense_dialog_save')));
+      await tester.pumpAndSettle();
+
+      expect(spy.updateCalls, 2);
+      expect(spy.keysUsed[0], spy.keysUsed[1]);
+    });
+
+    testWidgets('update refresh failure retains key then succeeds', (tester) async {
+      ExpenseDialog.failNextPostSuccessRefreshForTesting = true;
+      await openEditDialog(tester);
+
+      await tester.tap(find.byKey(const Key('expense_dialog_save')));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ExpenseDialog), findsOneWidget);
+      expect(
+        find.text('تم حفظ المصروف، لكن تعذر تحديث العرض. أعد المحاولة.'),
+        findsOneWidget,
+      );
+      expect(spy.updateCalls, 1);
+      expect(ExpenseDialog.postSuccessRefreshCount, 0);
+
+      ExpenseDialog.failNextPostSuccessRefreshForTesting = false;
+      await tester.tap(find.byKey(const Key('expense_dialog_save')));
+      await tester.pumpAndSettle();
+
+      expect(spy.updateCalls, 2);
+      expect(spy.keysUsed[0], spy.keysUsed[1]);
+      expect(find.byType(ExpenseDialog), findsNothing);
+      expect(ExpenseDialog.postSuccessRefreshCount, 1);
+    });
+
+    test('update refresh failure persists mutation before service replay', () async {
+      final key = b22ExpenseMutationIdempotencyKey();
+      final fingerprint = ExpenseMutationFingerprint.computeUpdate(
+        expenseId: uiExpenseId,
+        categoryId: uiCategoryId,
+        amount: 120,
+        expenseDate: expenseDate,
+        paidAt: paidAt,
+        notes: '',
+        sessionId: null,
+        updatedBy: uiUserId,
+      );
+      final service = ExpenseMutationSaveService(uiDb);
+
+      final first = await service.processUpdate(
+        idempotencyKey: key,
+        fingerprintHash: fingerprint,
+        expenseId: uiExpenseId,
+        categoryId: uiCategoryId,
+        amount: 120,
+        expenseDate: expenseDate,
+        paidAt: paidAt,
+        notes: '',
+        updatedBy: uiUserId,
+      );
+      expect(first.idempotentReplay, isFalse);
+      expect(
+        (await uiDb.expensesDao.getExpenseById(uiExpenseId))!.amount,
+        120,
+      );
+
+      final replay = await service.processUpdate(
+        idempotencyKey: key,
+        fingerprintHash: fingerprint,
+        expenseId: uiExpenseId,
+        categoryId: uiCategoryId,
+        amount: 120,
+        expenseDate: expenseDate,
+        paidAt: paidAt,
+        notes: '',
+        updatedBy: uiUserId,
+      );
+      expect(replay.idempotentReplay, isTrue);
+      expect(
+        (await uiDb.expensesDao.getExpenseById(uiExpenseId))!.amount,
+        120,
+      );
+      expect(
+        (await uiDb.select(uiDb.expenseMutationIdempotency).get()).length,
+        1,
       );
     });
   });

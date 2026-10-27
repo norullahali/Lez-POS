@@ -2,13 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart' show DateFormat;
 import 'package:uuid/uuid.dart';
-import '../../../../core/services/expense_creation_fingerprint.dart';
 import '../../../../core/services/expense_creation_idempotency_conflict_exception.dart';
-import '../../../../core/services/expense_mutation_fingerprint.dart';
 import '../../../../core/services/expense_mutation_save_idempotency_conflict_exception.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../features/auth/providers/auth_provider.dart';
 import '../../../../features/pos/providers/pos_provider.dart';
+import '../../expense_submit_idempotency.dart';
 import '../../models/expense_record.dart';
 import '../../providers/expense_creation_service_provider.dart';
 import '../../providers/expense_mutation_save_service_provider.dart';
@@ -18,6 +17,28 @@ class ExpenseDialog extends ConsumerStatefulWidget {
   const ExpenseDialog({super.key, this.existing});
 
   final ExpenseRecord? existing;
+
+  /// When true, the next post-success refresh throws once (B39 widget tests).
+  @visibleForTesting
+  static bool failNextPostSuccessRefreshForTesting = false;
+
+  @visibleForTesting
+  static int postSuccessRefreshCount = 0;
+
+  @visibleForTesting
+  static void Function()? testingInvalidateGenerationHook;
+
+  @visibleForTesting
+  static void invalidateSubmitGenerationForTesting() {
+    testingInvalidateGenerationHook?.call();
+  }
+
+  @visibleForTesting
+  static void resetExpenseSubmitTestingHooks() {
+    failNextPostSuccessRefreshForTesting = false;
+    postSuccessRefreshCount = 0;
+    testingInvalidateGenerationHook = null;
+  }
 
   @override
   ConsumerState<ExpenseDialog> createState() => _ExpenseDialogState();
@@ -34,6 +55,10 @@ class _ExpenseDialogState extends ConsumerState<ExpenseDialog> {
   bool _saving = false;
   String? _idempotencyKey;
   String? _pendingFingerprint;
+  int _submitGeneration = 0;
+  final ExpenseSubmitRunner _submitRunner = ExpenseSubmitRunner();
+  String? _pendingServiceFailureMessage;
+  VoidCallback? _testingGenerationHook;
 
   static final _dateFmt = DateFormat('yyyy/MM/dd');
   static const _expenseCreateUuid = Uuid();
@@ -49,13 +74,32 @@ class _ExpenseDialogState extends ConsumerState<ExpenseDialog> {
     _expenseDate = ex?.expenseDate ?? DateTime.now();
     _paidAt = ex?.paidAt ?? DateTime.now();
     _linkSession = ex?.sessionId != null;
+    _amountCtrl.addListener(_invalidateSubmitGeneration);
+    _notesCtrl.addListener(_invalidateSubmitGeneration);
+    _testingGenerationHook = () {
+      _submitGeneration++;
+    };
+    ExpenseDialog.testingInvalidateGenerationHook = _testingGenerationHook;
   }
 
   @override
   void dispose() {
+    _amountCtrl.removeListener(_invalidateSubmitGeneration);
+    _notesCtrl.removeListener(_invalidateSubmitGeneration);
+    if (ExpenseDialog.testingInvalidateGenerationHook ==
+        _testingGenerationHook) {
+      ExpenseDialog.testingInvalidateGenerationHook = null;
+    }
+    _testingGenerationHook = null;
     _amountCtrl.dispose();
     _notesCtrl.dispose();
     super.dispose();
+  }
+
+  void _invalidateSubmitGeneration() {
+    if (_saving) return;
+    _submitGeneration++;
+    _idempotencyKey = null;
   }
 
   void _resetSaveAttempt() {
@@ -64,6 +108,7 @@ class _ExpenseDialogState extends ConsumerState<ExpenseDialog> {
   }
 
   Future<void> _pickDate(bool isExpenseDate) async {
+    if (_saving) return;
     final initial = isExpenseDate ? _expenseDate : _paidAt;
     final picked = await showDatePicker(
       context: context,
@@ -78,7 +123,96 @@ class _ExpenseDialogState extends ConsumerState<ExpenseDialog> {
         } else {
           _paidAt = picked;
         }
+        _invalidateSubmitGeneration();
       });
+    }
+  }
+
+  ExpenseSubmitIntent? _buildSubmitIntent({
+    required int userId,
+    required int? sessionId,
+  }) {
+    final amount = double.tryParse(_amountCtrl.text.trim());
+    if (amount == null || amount <= 0 || _selectedCategoryId == null) {
+      return null;
+    }
+    final notes = _notesCtrl.text.trim();
+    if (widget.existing != null) {
+      return ExpenseSubmitIntent.update(
+        expenseId: widget.existing!.id!,
+        categoryId: _selectedCategoryId!,
+        amount: amount,
+        expenseDate: _expenseDate,
+        paidAt: _paidAt,
+        notes: notes,
+        sessionId: sessionId,
+        updatedBy: userId,
+      );
+    }
+    return ExpenseSubmitIntent.create(
+      categoryId: _selectedCategoryId!,
+      amount: amount,
+      expenseDate: _expenseDate,
+      paidAt: _paidAt,
+      notes: notes,
+      sessionId: sessionId,
+      createdBy: userId,
+    );
+  }
+
+  void _handleSubmitOutcome(ExpenseSubmitOutcome outcome) {
+    if (!mounted) return;
+    switch (outcome) {
+      case ExpenseSubmitOutcome.skippedInFlight:
+        break;
+      case ExpenseSubmitOutcome.success:
+        _resetSaveAttempt();
+        if (!context.mounted) return;
+        Navigator.of(context).pop(true);
+      case ExpenseSubmitOutcome.postSuccessRefreshFailed:
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'تم حفظ المصروف، لكن تعذر تحديث العرض. أعد المحاولة.',
+            ),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      case ExpenseSubmitOutcome.idempotencyConflict:
+        _resetSaveAttempt();
+        if (!context.mounted) return;
+        final isEdit = widget.existing != null;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              isEdit
+                  ? 'تعذر تعديل المصروف: تعارض في عملية الحفظ.'
+                  : 'تعذر تسجيل المصروف: تعارض في عملية الحفظ.',
+            ),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      case ExpenseSubmitOutcome.serviceFailure:
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              _pendingServiceFailureMessage ?? 'تعذر حفظ المصروف',
+            ),
+            backgroundColor: AppColors.error,
+          ),
+        );
+        _pendingServiceFailureMessage = null;
+      case ExpenseSubmitOutcome.staleCompletion:
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'تم تجاهل نتيجة حفظ سابقة بعد تغيير البيانات.',
+            ),
+          ),
+        );
     }
   }
 
@@ -105,7 +239,7 @@ class _ExpenseDialogState extends ConsumerState<ExpenseDialog> {
       return;
     }
 
-    if (_saving) return;
+    if (_saving || _submitRunner.inFlight) return;
 
     final authState = ref.read(authProvider).valueOrNull;
     final userId = authState?.user?.id ?? 0;
@@ -127,103 +261,76 @@ class _ExpenseDialogState extends ConsumerState<ExpenseDialog> {
         ? ref.read(posSessionProvider).valueOrNull?.id
         : null;
 
+    final intent = _buildSubmitIntent(userId: userId, sessionId: sessionId);
+    if (intent == null) return;
+
+    final fingerprint = intent.fingerprintHash;
+    if (_pendingFingerprint != null && _pendingFingerprint != fingerprint) {
+      _resetSaveAttempt();
+    }
+    _pendingFingerprint = fingerprint;
+
+    final generation = ++_submitGeneration;
+    _idempotencyKey ??= _expenseCreateUuid.v4();
+    final submitKey = _idempotencyKey!;
+
     setState(() => _saving = true);
     try {
-      final isEdit = widget.existing != null;
-      if (isEdit) {
-        final expenseId = widget.existing!.id!;
-        final fingerprint = ExpenseMutationFingerprint.computeUpdate(
-          expenseId: expenseId,
-          categoryId: _selectedCategoryId!,
-          amount: amount,
-          expenseDate: _expenseDate,
-          paidAt: _paidAt,
-          notes: _notesCtrl.text.trim(),
-          sessionId: sessionId,
-          updatedBy: userId,
-        );
-        if (_pendingFingerprint != null &&
-            _pendingFingerprint != fingerprint) {
-          _resetSaveAttempt();
-        }
-        _pendingFingerprint = fingerprint;
-        _idempotencyKey ??= _expenseCreateUuid.v4();
+      final outcome = await _submitRunner.submit(
+        intent: intent,
+        idempotencyKey: submitKey,
+        isSubmitStillCurrent: () =>
+            mounted && generation == _submitGeneration,
+        invokeService: (idempotencyKey) async {
+          try {
+            switch (intent.mode) {
+              case ExpenseSubmitMode.create:
+                await ref.read(expenseCreationServiceProvider).processCreate(
+                      idempotencyKey: idempotencyKey,
+                      fingerprintHash: intent.fingerprintHash,
+                      categoryId: intent.categoryId,
+                      amount: intent.amount,
+                      expenseDate: intent.expenseDate,
+                      paidAt: intent.paidAt,
+                      notes: intent.notes,
+                      createdBy: intent.createdBy!,
+                      sessionId: intent.sessionId,
+                    );
+              case ExpenseSubmitMode.update:
+                await ref.read(expenseMutationSaveServiceProvider).processUpdate(
+                      idempotencyKey: idempotencyKey,
+                      fingerprintHash: intent.fingerprintHash,
+                      expenseId: intent.expenseId!,
+                      categoryId: intent.categoryId,
+                      amount: intent.amount,
+                      expenseDate: intent.expenseDate,
+                      paidAt: intent.paidAt,
+                      notes: intent.notes,
+                      updatedBy: intent.updatedBy!,
+                      sessionId: intent.sessionId,
+                    );
+            }
+          } on ExpenseCreationIdempotencyConflictException {
+            rethrow;
+          } on ExpenseMutationSaveIdempotencyConflictException {
+            rethrow;
+          } catch (e) {
+            _pendingServiceFailureMessage = e.toString();
+            rethrow;
+          }
+        },
+        postSuccessRefresh: () async {
+          if (ExpenseDialog.failNextPostSuccessRefreshForTesting) {
+            ExpenseDialog.failNextPostSuccessRefreshForTesting = false;
+            throw Exception('fail refresh');
+          }
+          ExpenseDialog.postSuccessRefreshCount++;
+          ref.invalidate(expensesProvider);
+          ref.invalidate(expenseSummaryProvider);
+        },
+      );
 
-        await ref.read(expenseMutationSaveServiceProvider).processUpdate(
-              idempotencyKey: _idempotencyKey!,
-              fingerprintHash: fingerprint,
-              expenseId: expenseId,
-              categoryId: _selectedCategoryId!,
-              amount: amount,
-              expenseDate: _expenseDate,
-              paidAt: _paidAt,
-              notes: _notesCtrl.text.trim(),
-              updatedBy: userId,
-              sessionId: sessionId,
-            );
-        _resetSaveAttempt();
-      } else {
-        final fingerprint = ExpenseCreationFingerprint.compute(
-          categoryId: _selectedCategoryId!,
-          amount: amount,
-          expenseDate: _expenseDate,
-          paidAt: _paidAt,
-          notes: _notesCtrl.text.trim(),
-          sessionId: sessionId,
-          createdBy: userId,
-        );
-        if (_pendingFingerprint != null &&
-            _pendingFingerprint != fingerprint) {
-          _resetSaveAttempt();
-        }
-        _pendingFingerprint = fingerprint;
-        _idempotencyKey ??= _expenseCreateUuid.v4();
-
-        await ref.read(expenseCreationServiceProvider).processCreate(
-              idempotencyKey: _idempotencyKey!,
-              fingerprintHash: fingerprint,
-              categoryId: _selectedCategoryId!,
-              amount: amount,
-              expenseDate: _expenseDate,
-              paidAt: _paidAt,
-              notes: _notesCtrl.text.trim(),
-              createdBy: userId,
-              sessionId: sessionId,
-            );
-        _resetSaveAttempt();
-      }
-      ref.invalidate(expensesProvider);
-      ref.invalidate(expenseSummaryProvider);
-      if (mounted) Navigator.of(context).pop(true);
-    } on ExpenseMutationSaveIdempotencyConflictException catch (e) {
-      _resetSaveAttempt();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('تعذر تعديل المصروف: $e'),
-            backgroundColor: AppColors.error,
-          ),
-        );
-      }
-    } on ExpenseCreationIdempotencyConflictException catch (e) {
-      _resetSaveAttempt();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('تعذر تسجيل المصروف: $e'),
-            backgroundColor: AppColors.error,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(e.toString()),
-            backgroundColor: AppColors.error,
-          ),
-        );
-      }
+      _handleSubmitOutcome(outcome);
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -235,6 +342,7 @@ class _ExpenseDialogState extends ConsumerState<ExpenseDialog> {
     final isEdit = widget.existing != null;
     final hasSession =
         ref.watch(posSessionProvider).valueOrNull != null;
+    final canEdit = !_saving;
 
     return AlertDialog(
       shape:
@@ -266,8 +374,12 @@ class _ExpenseDialogState extends ConsumerState<ExpenseDialog> {
                           .map((c) => DropdownMenuItem(
                               value: c.id, child: Text(c.name)))
                           .toList(),
-                      onChanged: (v) =>
-                          setState(() => _selectedCategoryId = v),
+                      onChanged: canEdit
+                          ? (v) => setState(() {
+                                _selectedCategoryId = v;
+                                _invalidateSubmitGeneration();
+                              })
+                          : null,
                       validator: (v) => v == null
                           ? '\u0627\u0644\u0641\u0626\u0629 \u0645\u0637\u0644\u0648\u0628\u0629'
                           : null,
@@ -276,7 +388,9 @@ class _ExpenseDialogState extends ConsumerState<ExpenseDialog> {
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
+                  key: const Key('expense_dialog_amount'),
                   controller: _amountCtrl,
+                  enabled: canEdit,
                   keyboardType: const TextInputType.numberWithOptions(
                       decimal: true),
                   decoration: const InputDecoration(
@@ -291,7 +405,7 @@ class _ExpenseDialogState extends ConsumerState<ExpenseDialog> {
                 ),
                 const SizedBox(height: 12),
                 GestureDetector(
-                  onTap: () => _pickDate(true),
+                  onTap: canEdit ? () => _pickDate(true) : null,
                   child: InputDecorator(
                     decoration: const InputDecoration(
                       labelText:
@@ -304,7 +418,7 @@ class _ExpenseDialogState extends ConsumerState<ExpenseDialog> {
                 ),
                 const SizedBox(height: 12),
                 GestureDetector(
-                  onTap: () => _pickDate(false),
+                  onTap: canEdit ? () => _pickDate(false) : null,
                   child: InputDecorator(
                     decoration: const InputDecoration(
                       labelText:
@@ -318,6 +432,7 @@ class _ExpenseDialogState extends ConsumerState<ExpenseDialog> {
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _notesCtrl,
+                  enabled: canEdit,
                   decoration: const InputDecoration(
                       labelText:
                           '\u0645\u0644\u0627\u062d\u0638\u0627\u062a'),
@@ -327,8 +442,12 @@ class _ExpenseDialogState extends ConsumerState<ExpenseDialog> {
                   const SizedBox(height: 4),
                   CheckboxListTile(
                     value: _linkSession,
-                    onChanged: (v) =>
-                        setState(() => _linkSession = v ?? false),
+                    onChanged: canEdit
+                        ? (v) => setState(() {
+                              _linkSession = v ?? false;
+                              _invalidateSubmitGeneration();
+                            })
+                        : null,
                     title: const Text(
                       '\u0631\u0628\u0637 \u0628\u0627\u0644\u062c\u0644\u0633\u0629 \u0627\u0644\u062d\u0627\u0644\u064a\u0629',
                       style: TextStyle(fontSize: 13),
@@ -349,6 +468,7 @@ class _ExpenseDialogState extends ConsumerState<ExpenseDialog> {
           child: const Text('\u0625\u0644\u063a\u0627\u0621'),
         ),
         ElevatedButton(
+          key: const Key('expense_dialog_save'),
           onPressed: _saving ? null : _submit,
           child: _saving
               ? const SizedBox(

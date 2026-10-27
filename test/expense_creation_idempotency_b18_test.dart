@@ -1,14 +1,24 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:drift/native.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lez_pos/core/database/app_database.dart';
 import 'package:lez_pos/core/services/expense_creation_fingerprint.dart';
 import 'package:lez_pos/core/services/expense_creation_idempotency_conflict_exception.dart';
 import 'package:lez_pos/core/services/expense_creation_result.dart';
 import 'package:lez_pos/core/services/expense_creation_service.dart';
+import 'package:lez_pos/features/auth/providers/auth_provider.dart';
+import 'package:lez_pos/features/expenses/expense_submit_idempotency.dart';
+import 'package:lez_pos/features/expenses/models/expense_category.dart'
+    as expense_models;
 import 'package:lez_pos/features/expenses/models/expense_record.dart' as models;
+import 'package:lez_pos/features/expenses/providers/expense_creation_service_provider.dart';
+import 'package:lez_pos/features/expenses/providers/expense_providers.dart';
+import 'package:lez_pos/features/expenses/screens/widgets/expense_dialog.dart';
 import 'package:lez_pos/features/expenses/repositories/expense_repository.dart';
 import 'package:lez_pos/features/financial/models/cash_ledger_event_type.dart';
 import 'package:lez_pos/features/financial/models/cash_ledger_filter.dart';
@@ -18,6 +28,137 @@ import 'package:lez_pos/features/reports/core/models/report_filter_model.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite3;
 
 import 'support/expense_creation_test_keys.dart';
+
+class _CountingExpenseCreationService extends ExpenseCreationService {
+  _CountingExpenseCreationService(
+    AppDatabase database, {
+    Completer<void>? saveGate,
+  })  : _saveGate = saveGate,
+        super(database);
+
+  final Completer<void>? _saveGate;
+  bool throwConflict = false;
+  bool throwOnce = false;
+  int createCalls = 0;
+  final List<String> keysUsed = [];
+
+  @override
+  Future<ExpenseCreationResult> processCreate({
+    required String idempotencyKey,
+    required String fingerprintHash,
+    required int categoryId,
+    required double amount,
+    required DateTime expenseDate,
+    required DateTime paidAt,
+    required String notes,
+    required int createdBy,
+    int? sessionId,
+  }) async {
+    createCalls++;
+    keysUsed.add(idempotencyKey);
+    if (throwOnce) {
+      throwOnce = false;
+      throw Exception('forced create failure');
+    }
+    if (throwConflict) {
+      throw const ExpenseCreationIdempotencyConflictException();
+    }
+    if (_saveGate != null) {
+      await _saveGate!.future;
+    }
+    return ExpenseCreationResult(
+      expenseRecordId: 9001,
+      idempotentReplay: false,
+    );
+  }
+}
+
+class _TestAuthNotifier extends AuthNotifier {
+  _TestAuthNotifier(this._user);
+
+  final User _user;
+
+  @override
+  FutureOr<AuthState> build() async => AuthState(user: _user);
+}
+
+User _b39TestUser(int id) => User(
+      id: id,
+      fullName: 'B39 User',
+      username: 'b39user',
+      passwordHash: 'hash',
+      roleId: 1,
+      isActive: true,
+      refundLimit: 100000,
+      createdAt: DateTime(2026, 1, 1),
+    );
+
+List<Override> _b39CreateUiOverrides({
+  required _CountingExpenseCreationService spy,
+  required int categoryId,
+  required int userId,
+}) {
+  return [
+    expenseCreationServiceProvider.overrideWithValue(spy),
+    authProvider.overrideWith(() => _TestAuthNotifier(_b39TestUser(userId))),
+    expenseCategoriesProvider.overrideWith(
+      (ref) async => [
+        expense_models.ExpenseCategory(
+          id: categoryId,
+          name: 'B39 Category',
+          isActive: true,
+        ),
+      ],
+    ),
+  ];
+}
+
+Future<void> _pumpExpenseCreateDialog(
+  WidgetTester tester,
+  ProviderContainer container,
+) async {
+  await tester.binding.setSurfaceSize(const Size(800, 900));
+  addTearDown(() => tester.binding.setSurfaceSize(null));
+  await tester.pumpWidget(
+    UncontrolledProviderScope(
+      container: container,
+      child: const MaterialApp(
+        home: Scaffold(
+          body: ExpenseDialog(),
+        ),
+      ),
+    ),
+  );
+  for (var i = 0; i < 60; i++) {
+    await tester.pump(const Duration(milliseconds: 50));
+    final auth = container.read(authProvider);
+    if (auth.hasValue &&
+        auth.requireValue.user != null &&
+        find.byType(DropdownButtonFormField<int>).evaluate().isNotEmpty) {
+      return;
+    }
+  }
+}
+
+Future<void> _selectB39Category(WidgetTester tester) async {
+  await tester.tap(find.byType(DropdownButtonFormField<int>));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('B39 Category').last);
+  await tester.pumpAndSettle();
+}
+
+Finder _expenseAmountField() =>
+    find.byKey(const Key('expense_dialog_amount'));
+
+Future<void> _flushExpenseDialogUi(WidgetTester tester) async {
+  await tester.pump();
+  await tester.runAsync(() async {
+    for (var i = 0; i < 30; i++) {
+      await Future<void>.delayed(Duration.zero);
+    }
+  });
+  await tester.pump();
+}
 
 Future<({sqlite3.Database rawDb, String path})> openSimulatedV44RawDatabase() async {
   final dbPath =
@@ -683,4 +824,258 @@ void main() {
       );
     });
   });
+
+  group('B39 expense submit runner', () {
+    test('skips second submit while in flight', () async {
+      final runner = ExpenseSubmitRunner();
+      final gate = Completer<void>();
+      final intent = ExpenseSubmitIntent.create(
+        categoryId: 1,
+        amount: 50,
+        expenseDate: _DateHelper.d,
+        paidAt: _DateHelper.d,
+        notes: 'n',
+        sessionId: null,
+        createdBy: 1,
+      );
+      var calls = 0;
+
+      final firstFuture = runner.submit(
+        intent: intent,
+        idempotencyKey: 'key-a',
+        isSubmitStillCurrent: () => true,
+        invokeService: (_) async {
+          calls++;
+          await gate.future;
+        },
+        postSuccessRefresh: () async {},
+      );
+
+      final second = await runner.submit(
+        intent: intent,
+        idempotencyKey: 'key-a',
+        isSubmitStillCurrent: () => true,
+        invokeService: (_) async {
+          calls++;
+        },
+        postSuccessRefresh: () async {},
+      );
+
+      expect(second, ExpenseSubmitOutcome.skippedInFlight);
+      gate.complete();
+      await firstFuture;
+      expect(calls, 1);
+    });
+
+    test('stale completion skips post-success refresh', () async {
+      final runner = ExpenseSubmitRunner();
+      var current = true;
+      var refreshCalls = 0;
+      final intent = ExpenseSubmitIntent.create(
+        categoryId: 1,
+        amount: 50,
+        expenseDate: _DateHelper.d,
+        paidAt: _DateHelper.d,
+        notes: 'stale',
+        sessionId: null,
+        createdBy: 1,
+      );
+
+      final outcome = await runner.submit(
+        intent: intent,
+        idempotencyKey: 'key-stale',
+        isSubmitStillCurrent: () => current,
+        invokeService: (_) async {
+          current = false;
+        },
+        postSuccessRefresh: () async {
+          refreshCalls++;
+        },
+      );
+
+      expect(outcome, ExpenseSubmitOutcome.staleCompletion);
+      expect(refreshCalls, 0);
+    });
+  });
+
+  group('B39 expense dialog UI idempotency — create', () {
+    late AppDatabase uiDb;
+    late int uiCategoryId;
+    late int uiUserId;
+    late _CountingExpenseCreationService spy;
+
+    setUp(() async {
+      TestWidgetsFlutterBinding.ensureInitialized();
+      ExpenseDialog.resetExpenseSubmitTestingHooks();
+      uiDb = AppDatabase.test();
+      uiUserId = await uiDb.into(uiDb.usersTable).insert(
+            UsersTableCompanion.insert(
+              fullName: 'B39 UI User',
+              username: 'b39ui_${DateTime.now().microsecondsSinceEpoch}',
+              passwordHash: 'hash',
+              roleId: 1,
+            ),
+          );
+      uiCategoryId = await uiDb.expensesDao.createCategory(
+        const ExpenseCategoriesCompanion(
+          name: Value('B39 Category'),
+          isActive: Value(true),
+        ),
+      );
+      spy = _CountingExpenseCreationService(uiDb);
+    });
+
+    tearDown(() async {
+      ExpenseDialog.resetExpenseSubmitTestingHooks();
+      await uiDb.close();
+    });
+
+    Future<ProviderContainer> openDialog(WidgetTester tester) async {
+      final container = ProviderContainer(
+        overrides: _b39CreateUiOverrides(
+          spy: spy,
+          categoryId: uiCategoryId,
+          userId: uiUserId,
+        ),
+      );
+      addTearDown(container.dispose);
+      await _pumpExpenseCreateDialog(tester, container);
+      await _selectB39Category(tester);
+      await tester.enterText(_expenseAmountField(), '100');
+      await tester.pump();
+      return container;
+    }
+
+    testWidgets('duplicate in-flight create invokes processCreate once',
+        (tester) async {
+      final gate = Completer<void>();
+      addTearDown(() {
+        if (!gate.isCompleted) gate.complete();
+      });
+      spy = _CountingExpenseCreationService(uiDb, saveGate: gate);
+      await openDialog(tester);
+
+      final save = find.byKey(const Key('expense_dialog_save'));
+      await tester.tap(save);
+      await _flushExpenseDialogUi(tester);
+      expect(spy.createCalls, 1);
+      expect(tester.widget<ElevatedButton>(save).onPressed, isNull);
+
+      gate.complete();
+      await _flushExpenseDialogUi(tester);
+    });
+
+    testWidgets('stale completion does not close dialog or refresh',
+        (tester) async {
+      final gate = Completer<void>();
+      addTearDown(() {
+        if (!gate.isCompleted) gate.complete();
+      });
+      spy = _CountingExpenseCreationService(uiDb, saveGate: gate);
+
+      await openDialog(tester);
+
+      await tester.tap(find.byKey(const Key('expense_dialog_save')));
+      await _flushExpenseDialogUi(tester);
+      expect(spy.createCalls, 1);
+      ExpenseDialog.invalidateSubmitGenerationForTesting();
+      gate.complete();
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ExpenseDialog), findsOneWidget);
+      expect(ExpenseDialog.postSuccessRefreshCount, 0);
+      expect(
+        find.text('تم تجاهل نتيجة حفظ سابقة بعد تغيير البيانات.'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('success closes dialog and refreshes once', (tester) async {
+      await openDialog(tester);
+
+      await tester.tap(find.byKey(const Key('expense_dialog_save')));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ExpenseDialog), findsNothing);
+      expect(spy.createCalls, 1);
+      expect(ExpenseDialog.postSuccessRefreshCount, 1);
+    });
+
+    testWidgets('conflict clears key for next attempt', (tester) async {
+      spy.throwConflict = true;
+      await openDialog(tester);
+
+      await tester.tap(find.byKey(const Key('expense_dialog_save')));
+      await tester.pumpAndSettle();
+
+      spy.throwConflict = false;
+      await tester.tap(find.byKey(const Key('expense_dialog_save')));
+      await tester.pumpAndSettle();
+
+      expect(spy.createCalls, 2);
+      expect(spy.keysUsed.length, 2);
+      expect(spy.keysUsed[0], isNot(spy.keysUsed[1]));
+    });
+
+    testWidgets('service failure retry reuses same key', (tester) async {
+      spy.throwOnce = true;
+      await openDialog(tester);
+
+      await tester.tap(find.byKey(const Key('expense_dialog_save')));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('expense_dialog_save')));
+      await tester.pumpAndSettle();
+
+      expect(spy.createCalls, 2);
+      expect(spy.keysUsed.length, 2);
+      expect(spy.keysUsed[0], spy.keysUsed[1]);
+    });
+
+    testWidgets('refresh failure retains key then succeeds', (tester) async {
+      ExpenseDialog.failNextPostSuccessRefreshForTesting = true;
+      await openDialog(tester);
+
+      await tester.tap(find.byKey(const Key('expense_dialog_save')));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ExpenseDialog), findsOneWidget);
+      expect(
+        find.text('تم حفظ المصروف، لكن تعذر تحديث العرض. أعد المحاولة.'),
+        findsOneWidget,
+      );
+
+      ExpenseDialog.failNextPostSuccessRefreshForTesting = false;
+      await tester.tap(find.byKey(const Key('expense_dialog_save')));
+      await tester.pumpAndSettle();
+
+      expect(spy.createCalls, 2);
+      expect(spy.keysUsed[0], spy.keysUsed[1]);
+      expect(find.byType(ExpenseDialog), findsNothing);
+    });
+
+    testWidgets('intent fields disabled while saving', (tester) async {
+      final gate = Completer<void>();
+      addTearDown(() {
+        if (!gate.isCompleted) gate.complete();
+      });
+      spy = _CountingExpenseCreationService(uiDb, saveGate: gate);
+
+      await openDialog(tester);
+
+      await tester.tap(find.byKey(const Key('expense_dialog_save')));
+      await _flushExpenseDialogUi(tester);
+      expect(spy.createCalls, 1);
+
+      final amountField = tester.widget<TextFormField>(_expenseAmountField());
+      expect(amountField.enabled, isFalse);
+
+      gate.complete();
+      await _flushExpenseDialogUi(tester);
+    });
+  });
+}
+
+class _DateHelper {
+  static final d = DateTime(2026, 3, 15);
 }

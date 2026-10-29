@@ -41,6 +41,8 @@ import 'adapters/pdf_printer_adapter.dart';
 import 'adapters/usb_thermal_printer_adapter.dart';
 import 'printer_adapter.dart';
 import 'printer_config.dart';
+import 'printer_type_support.dart';
+import 'unsupported_printer_type_exception.dart';
 
 /// Central printer router for Lez POS.
 ///
@@ -60,6 +62,10 @@ class PrintManager {
   /// can show user-visible feedback (SnackBar, dialog, etc.).
   Future<void> print(InvoiceData data) async {
     _logJobStart(data);
+
+    if (!PrinterTypeSupport.isPrintDeliverySupported(config.type)) {
+      throw UnsupportedPrinterTypeException(config.type);
+    }
 
     final adapter = _buildAdapter();
     debugPrint('[PrintManager]   Adapter      : ${adapter.runtimeType}');
@@ -86,6 +92,10 @@ class PrintManager {
   Future<bool> isAvailable() async {
     debugPrint(
         '[PrintManager] Checking availability for ${config.type.name} printer...');
+    if (!PrinterTypeSupport.isPrintDeliverySupported(config.type)) {
+      debugPrint('[PrintManager]   Available: false (type not supported)');
+      return false;
+    }
     final available = await _buildAdapter().isAvailable();
     debugPrint('[PrintManager]   Available: $available');
     return available;

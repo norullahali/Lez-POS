@@ -9,6 +9,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/printing/print_manager.dart';
 import '../../../core/printing/printer_config.dart';
+import '../../../core/printing/printer_type_support.dart';
+import '../../../core/printing/unsupported_printer_type_exception.dart';
 import '../../../core/services/settings_service.dart';
 import '../../../core/utils/receipt_paper_size.dart';
 import '../../../features/pos/models/invoice_models.dart';
@@ -240,9 +242,12 @@ class _InvoiceSettingsScreenState extends ConsumerState<InvoiceSettingsScreen> {
       );
     } catch (e) {
       if (!mounted) return;
+      final message = e is UnsupportedPrinterTypeException
+          ? e.messageAr
+          : 'فشلت الطباعة: $e';
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('فشلت الطباعة: $e'),
+          content: Text(message),
           backgroundColor: Colors.red,
         ),
       );
@@ -496,26 +501,47 @@ class _SettingsForm extends StatelessWidget {
                 border:     OutlineInputBorder(),
                 prefixIcon: Icon(Icons.print_rounded),
               ),
-              items: const [
-                DropdownMenuItem(
+              items: [
+                const DropdownMenuItem(
                   value: PrinterType.pdf,
                   child: Text('طابعة عادية (PDF)'),
                 ),
-                DropdownMenuItem(
+                const DropdownMenuItem(
                   value: PrinterType.usbThermal,
                   child: Text('طابعة حرارية USB'),
                 ),
                 DropdownMenuItem(
                   value: PrinterType.lanThermal,
-                  child: Text('طابعة حرارية شبكة (LAN)'),
+                  enabled: PrinterTypeSupport.isSelectableInSettings(
+                    PrinterType.lanThermal,
+                  ),
+                  child: const Text(
+                    'طابعة حرارية شبكة (LAN) — غير متاح حالياً',
+                  ),
                 ),
                 DropdownMenuItem(
                   value: PrinterType.bluetoothThermal,
-                  child: Text('طابعة حرارية بلوتوث'),
+                  enabled: PrinterTypeSupport.isSelectableInSettings(
+                    PrinterType.bluetoothThermal,
+                  ),
+                  child: const Text(
+                    'طابعة حرارية بلوتوث — غير متاح حالياً',
+                  ),
                 ),
               ],
               onChanged: (v) { if (v != null) onPrinterTypeChanged(v); },
             ),
+
+            if (!PrinterTypeSupport.isPrintDeliverySupported(printerType)) ...[
+              const SizedBox(height: 8),
+              Text(
+                'الإعدادات المحفوظة لهذا النوع من الطابعات محفوظة، لكن الطباعة '
+                'غير متاحة حالياً. يمكنك التبديل إلى PDF أو USB للطباعة.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+              ),
+            ],
 
             const SizedBox(height: 12),
 

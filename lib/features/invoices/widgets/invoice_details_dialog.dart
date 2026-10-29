@@ -18,7 +18,6 @@ import '../../auth/providers/auth_provider.dart';
 import '../../auth/permissions/permission_keys.dart';
 import '../../auth/providers/permission_provider.dart';
 import '../../auth/utils/permission_actions.dart';
-import '../../pos/models/invoice_models.dart';
 import '../../pos/providers/pos_products_provider.dart';
 import '../../products/providers/products_provider.dart';
 import '../../customers/screens/widgets/customer_credit_refund_entry.dart';
@@ -170,33 +169,8 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
 
   Future<void> _reprint(BuildContext context, InvoiceDetailData data) async {
     final messenger = ScaffoldMessenger.maybeOf(context);
-    final paid = data.header.cashPaid + data.header.cardPaid;
-    final meta = data.returnMetadata;
     try {
-      final outcome = await printSale(
-        invoiceNumber: data.header.invoiceNumber,
-        items: data.lines
-            .map(
-              (l) => InvoiceItem(
-                name: l.productName,
-                qty: l.quantity,
-                unitPrice: l.unitPrice,
-                lineTotal: l.lineTotal,
-              ),
-            )
-            .toList(),
-        paid: paid > 0 ? paid : null,
-        change: data.header.changeAmount > 0 ? data.header.changeAmount : null,
-        customerName: data.header.customerName == 'زبون عام'
-            ? null
-            : data.header.customerName,
-        cashierName:
-            data.header.cashierName == '—' ? null : data.header.cashierName,
-        isReturned: data.isReturned,
-        returnDate: meta?.returnDate,
-        returnNote: meta?.returnNote,
-        returnedByName: meta?.returnedByName,
-      );
+      final outcome = await printInvoiceById(widget.invoiceId);
       if (!context.mounted) return;
       if (outcome.isSubmitted) {
         await ref.read(activityLoggerProvider).logInfo(

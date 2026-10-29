@@ -32,6 +32,8 @@
 import 'dart:typed_data';
 
 import '../../../features/pos/models/invoice_models.dart';
+import '../../services/receipt_financials.dart';
+import '../../utils/receipt_money_format.dart';
 import '../printer_capabilities.dart';
 
 /// Builds an ESC/POS byte stream for a single print job.
@@ -297,28 +299,39 @@ class EscPosBuilder {
     // -- Totals -----------------------------------------------------------
     // Use rtlInfoRow for ALL totals: value on LEFT, label: on RIGHT.
     // Arabic accounting: الإجمالي: (RIGHT)          2500 د.ع (LEFT)
-    final subtotal = data.items.fold(0.0, (s, i) => s + i.lineTotal);
+    final subtotal = ReceiptFinancials.subtotal(data);
+    final discount = ReceiptFinancials.headerDiscount(data);
+    final tax = ReceiptFinancials.taxDisplayAmount(data);
+    final total = ReceiptFinancials.grandTotal(data);
 
-    if (data.showTax) {
-      final tax   = subtotal * 0.15;
-      final total = subtotal + tax;
-      b.rtlInfoRow('المجموع الفرعي', '${_fmt(subtotal)} د.ع', lineWidth: w);
-      b.rtlInfoRow('ضريبة 15%',      '${_fmt(tax)} د.ع',      lineWidth: w);
-      b.boldOn().doubleSizeOn();
-      b.rtlInfoRow('الإجمالي',       '${_fmt(total)} د.ع',    lineWidth: w);
-      b.normalSize().boldOff();
-    } else {
-      b.rtlInfoRow('المجموع الفرعي', '${_fmt(subtotal)} د.ع',   lineWidth: w);
-      b.boldOn().doubleSizeOn();
-      b.rtlInfoRow('الإجمالي',       '${_fmt(data.total)} د.ع', lineWidth: w);
-      b.normalSize().boldOff();
+    b.rtlInfoRow('المجموع الفرعي', '${_fmt(subtotal)} د.ع', lineWidth: w);
+    if (discount > 0) {
+      b.rtlInfoRow('الخصم', '-${_fmt(discount)} د.ع', lineWidth: w);
     }
+    if (data.showTax) {
+      b.rtlInfoRow('ضريبة 15%', '${_fmt(tax)} د.ع', lineWidth: w);
+    }
+    b.boldOn().doubleSizeOn();
+    b.rtlInfoRow('الإجمالي', '${_fmt(total)} د.ع', lineWidth: w);
+    b.normalSize().boldOff();
 
+    if (data.cashPaid != null && data.cashPaid! > 0) {
+      b.rtlInfoRow('نقد', '${_fmt(data.cashPaid!)} د.ع', lineWidth: w);
+    }
+    if (data.cardPaid != null && data.cardPaid! > 0) {
+      b.rtlInfoRow('بطاقة', '${_fmt(data.cardPaid!)} د.ع', lineWidth: w);
+    }
     if (data.paid != null) {
-      b.rtlInfoRow('المدفوع', '${_fmt(data.paid!)} د.ع',   lineWidth: w);
+      b.rtlInfoRow('المدفوع', '${_fmt(data.paid!)} د.ع', lineWidth: w);
     }
     if (data.change != null && data.change! > 0) {
-      b.rtlInfoRow('الباقي',  '${_fmt(data.change!)} د.ع', lineWidth: w);
+      b.rtlInfoRow('الباقي', '${_fmt(data.change!)} د.ع', lineWidth: w);
+    }
+    if (data.debtAmount != null && data.debtAmount! > 0) {
+      b.rtlInfoRow('آجل', '${_fmt(data.debtAmount!)} د.ع', lineWidth: w);
+    }
+    if (data.paymentMethod != null && data.paymentMethod!.isNotEmpty) {
+      b.rtlInfoRow('طريقة الدفع', data.paymentMethod!, lineWidth: w);
     }
 
     b.separator(width: w);
@@ -357,7 +370,7 @@ class EscPosBuilder {
 
   // -- Private static helpers ------------------------------------------------
 
-  static String _fmt(num v) => v.toStringAsFixed(0);
+  static String _fmt(num v) => ReceiptMoneyFormat.formatAmount(v);
 
   static String _fmtDate(DateTime d) =>
       '${d.year}/${d.month.toString().padLeft(2, "0")}/${d.day.toString().padLeft(2, "0")} '

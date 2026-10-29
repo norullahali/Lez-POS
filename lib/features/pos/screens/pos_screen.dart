@@ -30,19 +30,13 @@ import '../../../core/services/customer_payment_idempotency_conflict_exception.d
 import '../settle_debt_idempotency.dart';
 import 'package:uuid/uuid.dart';
 
-import '../models/invoice_models.dart';
-
 // --- Last invoice snapshot used by Ctrl+P re-print ------------------------
 class _LastInvoiceData {
+  final int invoiceId;
   final String invoiceNumber;
-  final List<InvoiceItem> items;
-  final String? cashierName;
-  final String? customerName;
   const _LastInvoiceData({
+    required this.invoiceId,
     required this.invoiceNumber,
-    required this.items,
-    this.cashierName,
-    this.customerName,
   });
 }
 
@@ -266,12 +260,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
       return;
     }
     try {
-      final outcome = await printSale(
-        invoiceNumber: invoice.invoiceNumber,
-        items: invoice.items,
-        cashierName: invoice.cashierName,
-        customerName: invoice.customerName,
-      );
+      final outcome = await printInvoiceById(invoice.invoiceId);
       if (!mounted) return;
       if (outcome.shouldShowOperatorError) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -891,40 +880,14 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
                 userId: userId,
                 approvedByUserId: approvedByUserId,
               );
+      final invoiceId = saleResult.invoiceId;
       final invoiceNumber = saleResult.invoiceNumber;
 
-      final items = activeCartSnapshot.items;
-
-      // Convert once; reused for both print and Ctrl+P re-print.
-      final invoiceItems = items
-          .map((e) => InvoiceItem(
-                name: e.product.name,
-                qty: e.quantity.toDouble(),
-                unitPrice: e.product.sellPrice,
-                lineTotal: e.quantity * e.product.sellPrice,
-              ))
-          .toList();
-
-      // Resolve cashier and customer names for the receipt.
-      // Computed before the print call so the same values are reused for
-      // both the immediate print and any Ctrl+P re-print.
-      final _fullName = user?.fullName ?? '';
-      final printCashierName = _fullName.isNotEmpty ? _fullName : session.cashierName;
-      final printCustomerName =
-          selectedCustomer != null && selectedCustomer.id != 1
-              ? selectedCustomer.name
-              : null; // renderer will fall back to 'زبون عام'
-
-      // ✅ طباعة
+      // ✅ طباعة (persisted invoice — same path as Ctrl+P and history reprint)
       debugPrint('=== BEFORE PRINT ===');
 
       try {
-        final printOutcome = await printSale(
-          invoiceNumber: invoiceNumber,
-          items: invoiceItems,
-          cashierName: printCashierName,
-          customerName: printCustomerName,
-        );
+        final printOutcome = await printInvoiceById(invoiceId);
 
         if (printOutcome.shouldShowOperatorError && mounted) {
           final msg = checkoutPrintFailureMessageAr(printOutcome);
@@ -960,13 +923,11 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
         }
       }
 
-      // Notify parent so Ctrl+P can re-print this invoice (with same names).
+      // Notify parent so Ctrl+P can re-print this invoice from persisted data.
       widget.onCheckoutComplete(
         _LastInvoiceData(
+          invoiceId: invoiceId,
           invoiceNumber: invoiceNumber,
-          items: invoiceItems,
-          cashierName: printCashierName,
-          customerName: printCustomerName,
         ),
       );
 

@@ -205,6 +205,7 @@ SELECT
   si.cash_paid AS cash_paid,
   si.card_paid AS card_paid,
   si.change_amount AS change_amount,
+  si.debt_amount AS debt_amount,
   IFNULL(si.invoice_status, 'completed') AS invoice_status,
   si.return_date AS return_date,
   si.return_note AS return_note,
@@ -276,6 +277,7 @@ WHERE si.id = ?
       cashPaid: (h['cash_paid'] as num).toDouble(),
       cardPaid: (h['card_paid'] as num).toDouble(),
       changeAmount: (h['change_amount'] as num).toDouble(),
+      debtAmount: (h['debt_amount'] as num?)?.toDouble() ?? 0,
       returnMetadata: returnMeta,
     );
 

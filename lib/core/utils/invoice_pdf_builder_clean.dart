@@ -7,6 +7,8 @@ import 'package:pdf/pdf.dart' show PdfColors;
 import 'package:pdf/widgets.dart' as pw;
 
 import '../../features/pos/models/invoice_models.dart';
+import '../services/receipt_financials.dart';
+import 'receipt_money_format.dart';
 import 'receipt_paper_size.dart';
 
 export 'receipt_paper_size.dart' show ReceiptPaperSize;
@@ -214,23 +216,34 @@ class InvoicePdfBuilderClean {
   // TOTALS
 
   pw.Widget _buildTotalSection(InvoiceData data) {
-    final subtotal = data.items.fold(0.0, (s, i) => s + i.lineTotal);
-    final tax      = data.showTax ? subtotal * 0.15 : 0.0;
-    final total    = data.showTax ? subtotal + tax : data.total;
+    final subtotal = ReceiptFinancials.subtotal(data);
+    final discount = ReceiptFinancials.headerDiscount(data);
+    final tax = ReceiptFinancials.taxDisplayAmount(data);
+    final total = ReceiptFinancials.grandTotal(data);
 
     // All total rows use _infoRow: label on RIGHT, value on LEFT — same as
     // info rows. Arabic accounting places the label on the right side.
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.stretch,
       children: [
-        _infoRow('المجموع الفرعي', '${subtotal.toStringAsFixed(0)} د.ع'),
+        _infoRow('المجموع الفرعي', ReceiptMoneyFormat.formatIqd(subtotal)),
+        if (discount > 0)
+          _infoRow('الخصم', '-${ReceiptMoneyFormat.formatAmount(discount)} د.ع'),
         if (data.showTax)
-          _infoRow('ضريبة 15%', '${tax.toStringAsFixed(0)} د.ع'),
-        _infoRow('الإجمالي', '${total.toStringAsFixed(0)} د.ع', bold: true),
+          _infoRow('ضريبة 15%', ReceiptMoneyFormat.formatIqd(tax)),
+        _infoRow('الإجمالي', ReceiptMoneyFormat.formatIqd(total), bold: true),
+        if (data.cashPaid != null && data.cashPaid! > 0)
+          _infoRow('نقد', ReceiptMoneyFormat.formatIqd(data.cashPaid!)),
+        if (data.cardPaid != null && data.cardPaid! > 0)
+          _infoRow('بطاقة', ReceiptMoneyFormat.formatIqd(data.cardPaid!)),
         if (data.paid != null)
-          _infoRow('المدفوع', '${data.paid!.toStringAsFixed(0)} د.ع'),
+          _infoRow('المدفوع', ReceiptMoneyFormat.formatIqd(data.paid!)),
         if (data.change != null && data.change! > 0)
-          _infoRow('الباقي', '${data.change!.toStringAsFixed(0)} د.ع'),
+          _infoRow('الباقي', ReceiptMoneyFormat.formatIqd(data.change!)),
+        if (data.debtAmount != null && data.debtAmount! > 0)
+          _infoRow('آجل', ReceiptMoneyFormat.formatIqd(data.debtAmount!)),
+        if (data.paymentMethod != null && data.paymentMethod!.isNotEmpty)
+          _infoRow('طريقة الدفع', data.paymentMethod!),
       ],
     );
   }
@@ -413,5 +426,5 @@ String _safeArabic(String text) {
 }
 
 String _safe(num? value) {
-  return (value ?? 0).toStringAsFixed(0);
+  return ReceiptMoneyFormat.formatAmount(value ?? 0);
 }

@@ -44,6 +44,7 @@ class InvoiceDetailHeader {
   final double cashPaid;
   final double cardPaid;
   final double changeAmount;
+  final double debtAmount;
 
   /// Non-null when [invoiceStatus] == `returned`.
   final ReturnMetadata? returnMetadata;
@@ -63,6 +64,7 @@ class InvoiceDetailHeader {
     required this.cashPaid,
     required this.cardPaid,
     required this.changeAmount,
+    this.debtAmount = 0,
     this.returnMetadata,
   });
 }

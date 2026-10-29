@@ -6,11 +6,15 @@ class InvoiceItem {
   final double unitPrice;
   final double lineTotal;
 
+  /// Per-line discount persisted at sale time (absolute amount).
+  final double lineDiscount;
+
   InvoiceItem({
     required this.name,
     required this.qty,
     required this.unitPrice,
     required this.lineTotal,
+    this.lineDiscount = 0,
   });
 }
 
@@ -21,7 +25,20 @@ class InvoiceData {
   final String invoiceNumber;
   final DateTime date;
   final List<InvoiceItem> items;
+  /// Authoritative final invoice total from [sales_invoices.total].
   final double total;
+
+  /// Persisted header subtotal (sum of line totals at sale). Null for synthetic/test receipts.
+  final double? headerSubtotal;
+
+  /// Combined invoice + loyalty discount from [sales_invoices.discount_amount].
+  final double? headerDiscountTotal;
+
+  final double? cashPaid;
+  final double? cardPaid;
+  final double? debtAmount;
+  final String? paymentMethod;
+
   final String storeName;
   final String? phone;
   final String? address;
@@ -50,6 +67,12 @@ class InvoiceData {
     required this.items,
     required this.storeName,
     required this.total,
+    this.headerSubtotal,
+    this.headerDiscountTotal,
+    this.cashPaid,
+    this.cardPaid,
+    this.debtAmount,
+    this.paymentMethod,
     this.phone,
     this.address,
     this.logoBytes,

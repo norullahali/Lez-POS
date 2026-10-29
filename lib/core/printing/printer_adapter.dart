@@ -4,6 +4,7 @@
 // Callers always go through PrintManager, never through adapters directly.
 
 import '../../features/pos/models/invoice_models.dart';
+import 'print_outcome.dart';
 
 /// Base class for all printer adapters.
 ///
@@ -14,8 +15,8 @@ abstract class PrinterAdapter {
 
   /// Prints [data] on the configured printer.
   ///
-  /// Throws on unrecoverable errors so callers can show user-visible feedback.
-  Future<void> print(InvoiceData data);
+  /// Returns a structured [PrintOutcome]; does not throw for expected failures.
+  Future<PrintOutcome> print(InvoiceData data);
 
   /// Returns true when the printer is currently reachable.
   ///

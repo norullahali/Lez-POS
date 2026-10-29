@@ -23,6 +23,7 @@ import 'widgets/session_dialog.dart';
 import 'widgets/customer_selection_modal.dart';
 import 'widgets/smart_search_bar.dart';
 import 'package:lez_pos/core/services/receipt_service.dart';
+import '../../../core/printing/print_outcome_messages.dart';
 import '../../../core/services/credit_limit_exception.dart';
 import '../../../core/services/pos_sale_idempotency_conflict_exception.dart';
 import '../../../core/services/customer_payment_idempotency_conflict_exception.dart';
@@ -265,16 +266,23 @@ class _PosScreenState extends ConsumerState<PosScreen> {
       return;
     }
     try {
-      await printSale(
+      final outcome = await printSale(
         invoiceNumber: invoice.invoiceNumber,
         items: invoice.items,
         cashierName: invoice.cashierName,
         customerName: invoice.customerName,
       );
+      if (!mounted) return;
+      if (outcome.shouldShowOperatorError) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(printFailureMessageAr(outcome)),
+          backgroundColor: AppColors.error,
+        ));
+      }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('خطأ في الطباعة: $e'),
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('تعذرت طباعة الفاتورة. حاول مرة أخرى.'),
         backgroundColor: AppColors.error,
       ));
     }
@@ -911,18 +919,45 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
       debugPrint('=== BEFORE PRINT ===');
 
       try {
-        await printSale(
+        final printOutcome = await printSale(
           invoiceNumber: invoiceNumber,
           items: invoiceItems,
           cashierName: printCashierName,
           customerName: printCustomerName,
         );
 
-        debugPrint('=== PRINT SUCCESS ===');
+        if (printOutcome.shouldShowOperatorError && mounted) {
+          final msg = checkoutPrintFailureMessageAr(printOutcome);
+          if (msg.isNotEmpty) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(msg),
+                backgroundColor: AppColors.warning,
+                duration: const Duration(seconds: 4),
+              ),
+            );
+          }
+        } else if (printOutcome.isSubmitted) {
+          debugPrint('=== PRINT SUBMITTED ===');
+        } else if (printOutcome.isCancelled) {
+          debugPrint('=== PRINT CANCELLED ===');
+        }
       } catch (e, s) {
-        debugPrint('=== PRINT ERROR ===');
+        debugPrint('=== PRINT ERROR (unexpected) ===');
         debugPrint(e.toString());
         debugPrint(s.toString());
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'تم حفظ الفاتورة، لكن تعذرت طباعتها. '
+                'يمكنك إعادة المحاولة باستخدام Ctrl+P.',
+              ),
+              backgroundColor: AppColors.warning,
+              duration: Duration(seconds: 4),
+            ),
+          );
+        }
       }
 
       // Notify parent so Ctrl+P can re-print this invoice (with same names).

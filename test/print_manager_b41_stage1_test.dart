@@ -1,9 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lez_pos/core/database/app_database.dart';
 import 'package:lez_pos/core/printing/print_manager.dart';
+import 'package:lez_pos/core/printing/print_outcome.dart';
 import 'package:lez_pos/core/printing/printer_config.dart';
 import 'package:lez_pos/core/printing/printer_type_support.dart';
-import 'package:lez_pos/core/printing/unsupported_printer_type_exception.dart';
 import 'package:lez_pos/core/services/settings_service.dart';
 import 'package:lez_pos/features/pos/models/invoice_models.dart';
 
@@ -42,8 +42,7 @@ void main() {
   });
 
   group('PrintManager guard', () {
-    test('lanThermal throws UnsupportedPrinterTypeException, not UnimplementedError',
-        () async {
+    test('lanThermal returns unsupportedConfig, not UnimplementedError', () async {
       final manager = PrintManager(
         const PrinterConfig(
           type: PrinterType.lanThermal,
@@ -51,13 +50,12 @@ void main() {
         ),
       );
 
-      await expectLater(
-        manager.print(_minimalInvoice()),
-        throwsA(isA<UnsupportedPrinterTypeException>()),
-      );
+      final outcome = await manager.print(_minimalInvoice());
+      expect(outcome.kind, PrintOutcomeKind.unsupportedConfig);
+      expect(outcome.unsupportedType, PrinterType.lanThermal);
     });
 
-    test('bluetoothThermal throws UnsupportedPrinterTypeException', () async {
+    test('bluetoothThermal returns unsupportedConfig', () async {
       final manager = PrintManager(
         const PrinterConfig(
           type: PrinterType.bluetoothThermal,
@@ -65,13 +63,12 @@ void main() {
         ),
       );
 
-      await expectLater(
-        manager.print(_minimalInvoice()),
-        throwsA(isA<UnsupportedPrinterTypeException>()),
-      );
+      final outcome = await manager.print(_minimalInvoice());
+      expect(outcome.kind, PrintOutcomeKind.unsupportedConfig);
     });
 
-    test('isAvailable is false for unsupported types without adapter send', () async {
+    test('isAvailable is false for unsupported types without adapter send',
+        () async {
       final manager = PrintManager(
         const PrinterConfig(type: PrinterType.lanThermal),
       );
@@ -90,7 +87,8 @@ void main() {
       await db.close();
     });
 
-    test('saved lanThermal config is preserved after failed print guard', () async {
+    test('saved lanThermal config is preserved after failed print guard',
+        () async {
       final settings = SettingsService(db);
       const saved = PrinterConfig(
         type: PrinterType.lanThermal,
@@ -103,10 +101,8 @@ void main() {
       expect(loaded.type, PrinterType.lanThermal);
       expect(loaded.printerIp, '10.0.0.50');
 
-      await expectLater(
-        PrintManager(loaded).print(_minimalInvoice()),
-        throwsA(isA<UnsupportedPrinterTypeException>()),
-      );
+      final outcome = await PrintManager(loaded).print(_minimalInvoice());
+      expect(outcome.kind, PrintOutcomeKind.unsupportedConfig);
 
       final afterPrint = await settings.getPrinterConfig();
       expect(afterPrint.type, PrinterType.lanThermal);

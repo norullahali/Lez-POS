@@ -14,6 +14,7 @@ import 'package:flutter/foundation.dart';
 import '../../features/pos/models/invoice_models.dart';
 import '../database/app_database.dart';
 import '../printing/print_manager.dart';
+import '../printing/print_outcome.dart';
 import 'settings_service.dart';
 
 /// Prints a POS sale receipt.
@@ -22,9 +23,8 @@ import 'settings_service.dart';
 /// call site (pos_screen.dart). Store info and printer config are loaded
 /// from [SettingsService] automatically.
 ///
-/// Throws on unrecoverable print errors; the caller is responsible for
-/// showing user-visible feedback (e.g. SnackBar).
-Future<void> printSale({
+/// Returns a [PrintOutcome]; callers show SnackBars for [PrintOutcome.shouldShowOperatorError].
+Future<PrintOutcome> printSale({
   required String invoiceNumber,
   required List<InvoiceItem> items,
   double? paid,
@@ -91,6 +91,8 @@ Future<void> printSale({
   final manager = PrintManager(config);
 
   debugPrint('[ReceiptService] Delegating to PrintManager (${config.type.name})...');
-  await manager.print(invoiceData);
-  debugPrint('[ReceiptService] printSale() completed.');
+  final outcome = await manager.print(invoiceData);
+  debugPrint(
+      '[ReceiptService] printSale() finished — ${outcome.kind.name}/${outcome.code}');
+  return outcome;
 }

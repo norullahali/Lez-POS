@@ -87,9 +87,17 @@ class UsbThermalPrinterAdapter extends ThermalPrinterAdapter {
       _throwFromResult(result, display);
     }
 
+    if (result.bytesWritten != bytes.length) {
+      throw PrinterWriteException(
+        'Spooler accepted a partial write (${result.bytesWritten}/'
+        '${bytes.length} bytes) for "$display".',
+        win32Code: result.win32ErrorCode,
+      );
+    }
+
     debugPrint(
-        '[UsbThermalPrinterAdapter] ✓ ${result.bytesWritten} bytes sent '
-        'to "$display" in ${result.elapsedMs} ms.');
+        '[UsbThermalPrinterAdapter] ✓ ${result.bytesWritten} bytes submitted '
+        'to spooler for "$display" in ${result.elapsedMs} ms.');
   }
 
   // -- Availability check ----------------------------------------------------

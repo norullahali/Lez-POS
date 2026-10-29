@@ -8,9 +8,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../../core/printing/print_manager.dart';
+import '../../../core/printing/print_outcome_messages.dart';
 import '../../../core/printing/printer_config.dart';
 import '../../../core/printing/printer_type_support.dart';
-import '../../../core/printing/unsupported_printer_type_exception.dart';
 import '../../../core/services/settings_service.dart';
 import '../../../core/utils/receipt_paper_size.dart';
 import '../../../features/pos/models/invoice_models.dart';
@@ -231,23 +231,29 @@ class _InvoiceSettingsScreenState extends ConsumerState<InvoiceSettingsScreen> {
         bluetoothDeviceId: _btDeviceIdCtrl.text.trim().isEmpty ? null : _btDeviceIdCtrl.text.trim(),
       );
 
-      await PrintManager(config).print(invoice);
+      final outcome = await PrintManager(config).print(invoice);
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('تمت الطباعة التجريبية بنجاح'),
-          backgroundColor: Colors.green,
-        ),
-      );
+      if (outcome.isSubmitted && outcome.deliveryKind != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(testPrintSuccessMessageAr(outcome.deliveryKind!)),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else if (outcome.shouldShowOperatorError) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(printFailureMessageAr(outcome)),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     } catch (e) {
       if (!mounted) return;
-      final message = e is UnsupportedPrinterTypeException
-          ? e.messageAr
-          : 'فشلت الطباعة: $e';
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(message),
+          content: Text('فشلت الطباعة التجريبية. حاول مرة أخرى.'),
           backgroundColor: Colors.red,
         ),
       );

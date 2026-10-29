@@ -1,36 +1,4 @@
 // lib/core/printing/print_manager.dart
-//
-// Central entry point for all printing in Lez POS.
-//
-// Architecture:
-//
-//   printSale() / printPurchaseInvoice() / ...
-//         |
-//         v
-//    PrintManager.print(InvoiceData)
-//         |
-//         |-- PrinterType.pdf            --> PdfPrinterAdapter
-//         |                                    InvoicePdfBuilderClean (layout)
-//         |                                    package:printing (delivery)
-//         |
-//         |-- PrinterType.usbThermal     --> UsbThermalPrinterAdapter
-//         |                                    ThermalPrinterAdapter (base)
-//         |                                    EscPosBuilder (bytes)
-//         |                                    win32 WritePrinter [TODO]
-//         |
-//         |-- PrinterType.lanThermal     --> LanThermalPrinterAdapter
-//         |                                    ThermalPrinterAdapter (base)
-//         |                                    EscPosBuilder (bytes)
-//         |                                    dart:io Socket [TODO]
-//         |
-//         `-- PrinterType.bluetoothThermal -> BluetoothThermalPrinterAdapter
-//                                             ThermalPrinterAdapter (base)
-//                                             EscPosBuilder (bytes)
-//                                             Platform BT plugin [TODO]
-//
-// Usage:
-//   final config = await settingsService.getPrinterConfig();
-//   await PrintManager(config).print(invoiceData);
 
 import 'package:flutter/foundation.dart';
 
@@ -39,56 +7,51 @@ import 'adapters/bluetooth_thermal_printer_adapter.dart';
 import 'adapters/lan_thermal_printer_adapter.dart';
 import 'adapters/pdf_printer_adapter.dart';
 import 'adapters/usb_thermal_printer_adapter.dart';
+import 'print_outcome.dart';
 import 'printer_adapter.dart';
 import 'printer_config.dart';
 import 'printer_type_support.dart';
-import 'unsupported_printer_type_exception.dart';
 
 /// Central printer router for Lez POS.
-///
-/// Instantiate with the current [PrinterConfig] from [SettingsService]
-/// and call [print].  The manager selects the correct adapter, adds
-/// structured debug logs, and tracks timing for each job.
 class PrintManager {
   final PrinterConfig config;
 
   const PrintManager(this.config);
 
-  // -- Main entry point ------------------------------------------------------
-
-  /// Routes [data] to the correct adapter and prints it.
-  ///
-  /// Throws the adapter error on unrecoverable failures so the caller
-  /// can show user-visible feedback (SnackBar, dialog, etc.).
-  Future<void> print(InvoiceData data) async {
-    _logJobStart(data);
-
+  /// Routes [data] to the correct adapter and returns a [PrintOutcome].
+  Future<PrintOutcome> print(InvoiceData data) async {
     if (!PrinterTypeSupport.isPrintDeliverySupported(config.type)) {
-      throw UnsupportedPrinterTypeException(config.type);
+      debugPrint(
+          '[PrintManager] Unsupported printer type: ${config.type.name}');
+      return PrintOutcome.unsupportedConfig(config.type);
     }
+
+    _logJobStart(data);
 
     final adapter = _buildAdapter();
     debugPrint('[PrintManager]   Adapter      : ${adapter.runtimeType}');
 
     final sw = Stopwatch()..start();
     try {
-      await adapter.print(data);
+      final outcome = await adapter.print(data);
       sw.stop();
       debugPrint(
-          '[PrintManager] ✓ Print job completed in ${sw.elapsedMilliseconds} ms');
+          '[PrintManager] Outcome: ${outcome.code} (${outcome.kind.name}) '
+          'in ${sw.elapsedMilliseconds} ms');
+      if (outcome.debugDetail != null) {
+        debugPrint('[PrintManager]   Detail: ${outcome.debugDetail}');
+      }
+      return outcome;
     } catch (e, s) {
       sw.stop();
       debugPrint(
-          '[PrintManager] ✗ Print job FAILED after ${sw.elapsedMilliseconds} ms');
+          '[PrintManager] Unexpected error after ${sw.elapsedMilliseconds} ms');
       debugPrint('[PrintManager]   Error  : $e');
       debugPrint('[PrintManager]   Stack  : $s');
       rethrow;
     }
   }
 
-  // -- Availability check ----------------------------------------------------
-
-  /// Returns true when the configured printer is currently reachable.
   Future<bool> isAvailable() async {
     debugPrint(
         '[PrintManager] Checking availability for ${config.type.name} printer...');
@@ -101,8 +64,6 @@ class PrintManager {
     return available;
   }
 
-  // -- Adapter factory -------------------------------------------------------
-
   PrinterAdapter _buildAdapter() {
     return switch (config.type) {
       PrinterType.pdf              => PdfPrinterAdapter(config),
@@ -111,8 +72,6 @@ class PrintManager {
       PrinterType.bluetoothThermal => BluetoothThermalPrinterAdapter(config),
     };
   }
-
-  // -- Debug logging ---------------------------------------------------------
 
   void _logJobStart(InvoiceData data) {
     debugPrint('[PrintManager] === Print job started =======================');

@@ -11,6 +11,7 @@ import '../../../core/services/partial_return_service.dart';
 import '../../../core/activity/activity_categories.dart';
 import '../../../core/activity/activity_types.dart';
 import '../../activity/providers/activity_context_provider.dart';
+import '../../../core/printing/print_outcome_messages.dart';
 import '../../../core/services/receipt_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../auth/providers/auth_provider.dart';
@@ -172,7 +173,7 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
     final paid = data.header.cashPaid + data.header.cardPaid;
     final meta = data.returnMetadata;
     try {
-      await printSale(
+      final outcome = await printSale(
         invoiceNumber: data.header.invoiceNumber,
         items: data.lines
             .map(
@@ -197,23 +198,34 @@ class _InvoiceDetailsDialogState extends ConsumerState<InvoiceDetailsDialog> {
         returnedByName: meta?.returnedByName,
       );
       if (!context.mounted) return;
-      await ref.read(activityLoggerProvider).logInfo(
-        activityType: ActivityTypes.invoiceReprinted,
-        category: ActivityCategories.sales,
-        action: 'reprint',
-        title: 'إعادة طباعة فاتورة',
-        entityType: 'invoice',
-        entityId: widget.invoiceId,
-        metadata: {'invoiceNumber': data.header.invoiceNumber},
-      );
-      messenger?.showSnackBar(
-        const SnackBar(content: Text('تم إرسال الفاتورة للطباعة')),
-      );
+      if (outcome.isSubmitted) {
+        await ref.read(activityLoggerProvider).logInfo(
+          activityType: ActivityTypes.invoiceReprinted,
+          category: ActivityCategories.sales,
+          action: 'reprint',
+          title: 'إعادة طباعة فاتورة',
+          entityType: 'invoice',
+          entityId: widget.invoiceId,
+          metadata: {'invoiceNumber': data.header.invoiceNumber},
+        );
+        messenger?.showSnackBar(
+          const SnackBar(
+            content: Text('تم إرسال الفاتورة إلى الطابعة/نافذة الطباعة'),
+          ),
+        );
+      } else if (outcome.shouldShowOperatorError) {
+        messenger?.showSnackBar(
+          SnackBar(
+            content: Text(printFailureMessageAr(outcome)),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
     } catch (e) {
       if (!context.mounted) return;
       messenger?.showSnackBar(
-        SnackBar(
-          content: Text('خطأ في الطباعة: $e'),
+        const SnackBar(
+          content: Text('تعذرت طباعة الفاتورة. حاول مرة أخرى.'),
           backgroundColor: AppColors.error,
         ),
       );

@@ -1,8 +1,8 @@
 /// Presentation-only export structures for the Financial Dashboard (Phase 5.3.7).
 ///
 /// **Ownership:** built by [DashboardExportBuilder]; consumed by
-/// [DashboardExportControls] placeholders and future PDF / print / clipboard
-/// renderers.
+/// [DashboardExportControls] for CSV export and clipboard summary (B42 Stage 1);
+/// PDF and print remain deferred.
 ///
 /// **Immutability:** const constructors; all fields are final.
 ///
@@ -36,7 +36,11 @@ class DashboardExportDocument {
   /// [DashboardPersonalization] visibility filtering.
   final List<DashboardExportSection> sections;
 
-  /// Plain-text summary for future clipboard / print pipelines.
+  /// True when at least one section contains exportable rows.
+  bool get hasExportableContent =>
+      sections.any((section) => section.hasContent);
+
+  /// Plain-text summary for clipboard export.
   ///
   /// Presentation serialization only — does not mutate or persist data.
   String toPlainTextSummary() {
@@ -49,7 +53,7 @@ class DashboardExportDocument {
     for (final section in sections) {
       buffer.writeln(section.title);
       if (!section.hasContent) {
-        buffer.writeln('  (no data loaded)');
+        buffer.writeln('  \u0644\u0627 \u062a\u0648\u062c\u062f \u0628\u064a\u0627\u0646\u0627\u062a');
         buffer.writeln();
         continue;
       }
